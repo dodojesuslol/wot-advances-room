@@ -93,7 +93,7 @@ Legende: ✅ vorhanden · 🟡 teilweise · ❌ fehlt · 🚫 bewusst weggelasse
 
 | # | Funktion im Original | Status | Hinweise / WG-API |
 |---|---|---|---|
-| F1 | **Automatische Gegnersuche / Warteschlange** (Panel im Fenster) | 🟡 | v0.7.3, im Spiel testen: bleibt WG-Original (Nutzerwunsch). Startet die Suche (`as_changeAutoSearchStateS`), blendet sich die Oberfläche aus; endet sie (`as_hideAutoSearchS`), kommt sie zurück |
+| F1 | **Automatische Gegnersuche / Warteschlange** (Panel im Fenster) | ✅ | bleibt WG-Original (Nutzerwunsch): Oberfläche blendet sich während der Suche aus und kommt danach zurück (v0.7.3, im Spiel bestätigt) |
 | F2 | **Warte-Overlay** („Daten werden geladen“, `showStrongholdWaiting`) | ❌ | `invalidateStrongholdWaiting` |
 | F3 | Wartungsmodus (`onStrongholdMaintenance`) | ❌ | |
 | F4 | Cooldowns: Buttons kurz gesperrt (`as_setCoolDownS`) | ❌ | |
