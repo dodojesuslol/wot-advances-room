@@ -447,7 +447,8 @@ body {
 @keyframes ezspin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 .waittext { color: #ffe4c0; font-size: 14rem; font-weight: bold; text-align: center; }
 
-/* commander drags a volunteer onto a slot */
+/* commander drags a volunteer onto a slot, or a member onto the volunteers list */
+.panel.cands.dropout { border-color: #96cd6e; background-color: rgba(60, 90, 40, 0.5); }
 .dragghost {
     position: absolute;
     padding: 3rem 8rem;

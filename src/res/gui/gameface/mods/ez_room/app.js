@@ -10,6 +10,7 @@ let sizeLogged = false;
 const ui = {
     raw: false,
     selCand: 0, // commander: volunteer being dragged onto a slot (green slots = WG's allowed ones)
+    dragOut: 0, // commander: team member being dragged onto the volunteers list (= leaveSlot)
     hoverRow: "", // data-user of the row under the mouse (its buttons are shown, see markHover)
     sort: null, // team table sort {key: "clan"|"name"|"rating"|"tank", dir: 1|-1}; null = slot order
 };
@@ -172,7 +173,7 @@ function renderCandidates() {
               .join("")
         : `<div class="empty">${L("Niemand wartet", "Nobody waiting")}</div>`;
     return `
-        <div class="panel cands">
+        <div class="panel cands ${ui.dragOut ? "dropout" : ""}" ${ui.dragOut ? `data-dropout="1"` : ""}>
             <div class="ptitle">${L("Freiwillige", "Volunteers")}<span class="count">${players.length}</span></div>
             <div class="plist" data-scroll="60">${rows}</div>
             ${renderRoomActions()}
@@ -246,7 +247,7 @@ function renderSlot(slot, idx) {
           ? `<div class="veh none pick" ${vehAct}>${L("Panzer wählen", "Choose tank")}</div>`
           : `<div class="veh none">${p ? L("Kein Panzer", "No tank") : rowAct.indexOf("takeSlot") !== -1 ? `<span class="take">${L("Platz nehmen", "Take slot")}</span>` : ""}</div>`;
     return `
-        <div ${p ? `data-user="${p.dbID}"` : ""} class="slot ${p ? "taken" : "open"} ${mine ? "mine" : ""} ${ready ? "ready" : ""} ${slot.isClosed ? "closed" : ""} ${highlight ? "hl" : ""} ${rowAct ? "clickable" : ""}" ${rowAct} ${highlight && !p ? `data-drop="${idx}"` : ""}>
+        <div ${p ? `data-user="${p.dbID}"` : ""} class="slot ${p ? "taken" : "open"} ${mine ? "mine" : ""} ${ready ? "ready" : ""} ${slot.isClosed ? "closed" : ""} ${highlight ? "hl" : ""} ${rowAct ? "clickable" : ""}" ${rowAct} ${highlight && !p ? `data-drop="${idx}"` : ""} ${p && !mine && isCommander() && slot.isRemoveAvailable ? `data-member="${p.dbID}"` : ""}>
             <div class="no">${idx + 1}</div>
             ${who}
             <div class="rating">${p ? esc(slot.rating || "") : ""}</div>
@@ -688,9 +689,10 @@ document.addEventListener("click", (e) => {
 });
 
 // commander: click a volunteer = WG puts him into the next free allowed slot (Python picks it),
-// drag him onto a green slot = exactly that slot. Mouse events only (Gameface has no HTML5 DnD).
+// drag him onto a green slot = exactly that slot; drag a team member onto the volunteers list =
+// back to the volunteers (leaveSlot, like "Raus"). Mouse events only (Gameface has no HTML5 DnD).
 const DRAG_START_PX = 6;
-let drag = null; // {id, x, y, started, name}
+let drag = null; // {kind: "cand"|"member", id, x, y, started, name}
 
 function dragGhost(show, e, name) {
     let g = document.getElementById("dragghost");
@@ -713,19 +715,22 @@ function dragGhost(show, e, name) {
 function endDrag() {
     drag = null;
     dragGhost(false);
-    if (ui.selCand) {
-        ui.selCand = 0;
+    if (ui.selCand || ui.dragOut) {
+        ui.selCand = ui.dragOut = 0;
         render();
     }
 }
 
 document.addEventListener("mousedown", (e) => {
     if (e.button !== 0) return;
-    const el = closest(e.target, "data-cand");
-    if (!el || closest(e.target, "data-act")) return; // kick button etc. inside the row
+    if (closest(e.target, "data-act")) return; // kick / Raus buttons inside the row
+    const cand = closest(e.target, "data-cand");
+    const member = cand ? null : closest(e.target, "data-member");
+    const el = cand || member;
+    if (!el) return;
     e.preventDefault();
     const nameEl = el.querySelector(".name");
-    drag = { id: Number(el.getAttribute("data-cand")), x: e.clientX, y: e.clientY, started: false, name: nameEl ? nameEl.textContent : "" };
+    drag = { kind: cand ? "cand" : "member", id: Number(el.getAttribute(cand ? "data-cand" : "data-member")), x: e.clientX, y: e.clientY, started: false, name: nameEl ? nameEl.textContent : "" };
 });
 
 document.addEventListener("mousemove", (e) => {
@@ -733,8 +738,10 @@ document.addEventListener("mousemove", (e) => {
     if (!drag.started) {
         if (Math.abs(e.clientX - drag.x) + Math.abs(e.clientY - drag.y) < DRAG_START_PX) return;
         drag.started = true;
-        ui.selCand = drag.id;
-        send({ action: "highlight", dbID: drag.id });
+        if (drag.kind === "cand") {
+            ui.selCand = drag.id;
+            send({ action: "highlight", dbID: drag.id });
+        } else ui.dragOut = drag.id;
         render();
     }
     dragGhost(true, e, drag.name);
@@ -745,11 +752,13 @@ document.addEventListener("mouseup", (e) => {
     const d = drag;
     if (!d.started) {
         drag = null;
-        send({ action: "assignNext", dbID: d.id });
+        if (d.kind === "cand") send({ action: "assignNext", dbID: d.id }); // a click on a member does nothing
         return;
     }
-    const target = closest(e.target, "data-drop");
-    if (target) send({ action: "assign", slot: Number(target.getAttribute("data-drop")), dbID: d.id });
+    if (d.kind === "cand") {
+        const target = closest(e.target, "data-drop");
+        if (target) send({ action: "assign", slot: Number(target.getAttribute("data-drop")), dbID: d.id });
+    } else if (closest(e.target, "data-dropout")) send({ action: "leaveSlot", dbID: d.id });
     endDrag();
 });
 
@@ -822,7 +831,7 @@ document.addEventListener("keydown", (e) => {
             data.reserveOptions = null;
             send({ action: "reserveOpen", slot: -1 });
             render();
-        } else if (ui.selCand) {
+        } else if (ui.selCand || ui.dragOut) {
             if (drag) endDrag();
             else {
                 ui.selCand = 0;
