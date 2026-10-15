@@ -23,7 +23,7 @@ for i in range(15):
     slots.append({'player': p, 'selectedVehicle': veh, 'playerStatus': 2 if p and p['readyState'] else 0,
                   'rating': p['rating'] if p else '', 'isLegionaries': i == 9, 'isClosed': False, 'isLocked': False,
                   'slotLabel': '' if p else '<font color="#8c8c7c">Freier Platz</font>', 'canBeTaken': not p})
-data = {'version': '0.4.0', 'lang': lang, 'dev': True, 'title': u'Vorstoß', 'me': {'dbID': 100, 'isCommander': True},
+data = {'version': '0.5.0', 'lang': lang, 'dev': True, 'title': u'Vorstoß', 'me': {'dbID': 100, 'isCommander': True},
         'room': {'mapID': 5, 'mapName': 'Prokhorovka', 'headerDescr': '<font color="#8c8c7c">Stufe X · 15 Spieler</font>',
                  'mineClanName': '[CLAN]', 'enemyClanName': '[ENEMY]', 'waitForBattleDescr': ''},
         'mapIcon': 'img://gui/maps/icons/map/stats/05_prohorovka.png',
@@ -40,6 +40,9 @@ data['configure'] = {'isEnabled': True, 'isRoomStatusEnabled': True}
 data['opened'] = ['Vor Legionären verbergen', 'Die Abteilung wird angezeigt', 'tooltip']
 data['actionButton'] = {'isEnabled': True, 'isReady': False, 'label': 'Bereit!', 'stateString': '<font color="#ff2717">Nicht alle Spieler sind bereit</font>'}
 data['highlight'] = [11, 12]
+data['reserves'] = [{'id': 1, 'level': 10, 'slotType': 'inspire', 'tooltip': '{HEADER}Inspiration{/HEADER}{BODY}x{/BODY}'}, {'id': 0, 'level': 0, 'slotType': 'artillerySupport'}, {'id': 3, 'level': 8, 'slotType': 'heavyTrucks'}, {'id': 0, 'slotType': 'requisitionPlus'}]
+data['reservesEnabled'] = [True, True, True, False]
+data['reserveOptions'] = {'slot': 0, 'title': 'Verstärkung', 'items': [{'id': 1, 'type': 'inspire', 'title': 'Inspiration', 'desc': 'auf verdiente Industrieressourcen', 'bonus': '+15%', 'level': 10, 'count': 4, 'selected': True}, {'id': 2, 'type': 'inspire', 'title': 'Inspiration', 'desc': 'auf verdiente Industrieressourcen', 'bonus': '+10%', 'level': 8, 'count': 0, 'selected': False}, {'id': 5, 'type': 'artillerySupport', 'title': 'Artillerieschlag', 'desc': 'Schaden im Gefecht', 'bonus': '', 'level': 9, 'count': 2, 'selected': False}]}
 data['chat'] = {'joined': True, 'lines': ["<font color='#FFC864'>_Waxer_</font><font color='#96968C'> (19:29:%02d) </font><font color='#E9E2BF'>%s</font>" % (i, t) for i, t in enumerate(['good ??', 'hahahaah', 'my new job hahahah', 'wait', 'join pls &lt;3', 'https://discord.gg/xyz', 'TS?', 'download then', 'IN MY COUNTRY NOT WORKING', 'thx for join', 'hey', 'pantera, join disc'] * 2)]}
 for sl in data['slots']:
     if sl['player']: sl['isRemoveAvailable'] = True

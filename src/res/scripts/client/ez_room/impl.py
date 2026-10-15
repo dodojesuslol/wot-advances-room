@@ -20,7 +20,7 @@ from helpers import dependency, getClientLanguage
 from helpers.i18n import makeString
 from skeletons.gui.impl import IGuiLoader
 
-__version__ = '0.4.0'
+__version__ = '0.5.0'
 _logger = logging.getLogger('EZ_ROOM')
 _logger.setLevel(logging.INFO)
 _LAYOUT_PATH = ('ez_room', 'views', 'EzRoomView')
@@ -225,6 +225,37 @@ def _installChatHook():
     ChannelComponent._ezRoomChatHook = True
 
 
+# --- reserves ------------------------------------------------------------------------
+# Same list as WG's FortReserveSelectPopover; selecting runs the room's _selectReserve.
+def _packReserveOptions(view, slotIndex):
+    from gui.Scaleform.daapi.view.lobby.rally import vo_converters as rally_vo
+    entity = view.prbEntity
+    settings = entity.getStrongholdSettings()
+    order = settings.getReserveOrder()
+    if not 0 <= slotIndex < len(order):
+        return None
+    groupType = order[slotIndex]
+    reserves = settings.getReserve()
+    selected = [r.getId() for r in reserves.getSelectedReserves() if r]
+    items = []
+    for reserve in reserves.getUniqueReservesByGroupType(groupType):
+        count = reserves.getReserveCount(reserve.getType(), reserve.getLevel())
+        isSelected = reserve.getId() in selected
+        try:
+            bonus = u'' if reserve.isUsingInBattle() else u'+%s%%' % reserve.getBonusPercent()
+        except Exception:
+            bonus = u''
+        items.append({'id': reserve.getId(),
+                      'type': rally_vo.getReserveNameVO(reserve.getType()),
+                      'title': _u(reserve.getTitle()),
+                      'desc': _u(reserve.getDescription()),
+                      'bonus': bonus,
+                      'level': reserve.getLevel(),
+                      'count': count - 1 if isSelected else count,
+                      'selected': isSelected})
+    return {'slot': slotIndex, 'title': _u(rally_vo.getReserveGroupTitle(groupType)), 'items': items}
+
+
 def _actionButton(vo):
     # WG's ready button state; label is an i18n key ('#cyberSport:window/unit/ready')
     if not isinstance(vo, dict):
@@ -239,7 +270,7 @@ def _actionButton(vo):
     return vo
 
 
-def _pack(bridge, frame=None):
+def _pack(bridge, frame=None, reserveSlot=-1):
     view = bridge.view
     calls = bridge.calls
     first = lambda name, default=None: calls[name][0] if name in calls and calls[name] else default
@@ -295,7 +326,13 @@ def _pack(bridge, frame=None):
         'filters': first('as_setFiltersDataS'),
         'highlight': first('as_highlightSlotsS'),
         'chat': _packChat(bridge),
+        'reserveOptions': None,
     }
+    if reserveSlot >= 0 and view is not None:
+        try:
+            data['reserveOptions'] = _packReserveOptions(view, reserveSlot)
+        except Exception:
+            _logger.exception('reserve options failed')
     if DEV:
         data['raw'] = {'calls': calls, 'slotCalls': bridge.slotCalls}
     return _clean(data)
@@ -332,6 +369,7 @@ class EzRoomView(ViewImpl):
         self._roomRect = None   # last seen rect of WG's room window
         self._tracking = False
         self._loggedRect = False
+        self._reserveSlot = -1  # reserve slot whose list is open
 
     @property
     def viewModel(self):
@@ -386,7 +424,7 @@ class EzRoomView(ViewImpl):
 
     def onRoomChanged(self):
         try:
-            data = _pack(self._bridge, self._frame)
+            data = _pack(self._bridge, self._frame, self._reserveSlot)
             self.viewModel.setData(json.dumps(data))
         except Exception:
             _logger.exception('packing room data failed')
@@ -429,6 +467,15 @@ class EzRoomView(ViewImpl):
                 bridge.call('toggleReadyStateRequest')
             elif action == 'toggleOpen':
                 bridge.call('toggleRoomStatus')
+            elif action == 'reserveOpen':
+                self._reserveSlot = int(args.get('slot', -1))
+                self.onRoomChanged()
+            elif action == 'reserveSelect':
+                self._reserveSlot = -1
+                view = bridge.view
+                if view is not None:
+                    view._selectReserve({'newId': int(args.get('id')), 'oldId': None, 'isRemove': bool(args.get('remove'))})
+                self.onRoomChanged()
             elif action == 'chatSend':
                 text = (args.get('text') or u'').strip()
                 component = _chatComponent(bridge)

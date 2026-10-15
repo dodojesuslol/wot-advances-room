@@ -41,14 +41,14 @@ body {
     border-bottom: 1rem solid rgba(242, 138, 58, 0.45);
     background-image: linear-gradient(to bottom, rgba(40, 34, 28, 0.9), rgba(21, 21, 21, 0.6));
 }
-.titles { width: 250rem; }
+.titles { width: 220rem; }
 .title { font-size: 18rem; font-weight: bold; color: #eeede9; }
 .sub { font-size: 11rem; color: rgba(233, 231, 220, 0.55); margin-top: 2rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .center { flex-grow: 1; display: flex; justify-content: center; }
-.tools { width: 250rem; display: flex; justify-content: flex-end; }
+.tools { width: 150rem; display: flex; justify-content: flex-end; }
 
 .vs { display: flex; align-items: center; }
-.clan { width: 150rem; font-size: 15rem; font-weight: bold; color: #ffe4c0; }
+.clan { width: 120rem; font-size: 15rem; font-weight: bold; color: #ffe4c0; }
 .clan.mine { text-align: right; }
 .clan.enemy { color: #ff7a52; }
 .clan.ready { text-shadow: 0 0 8rem rgba(150, 205, 110, 0.9); }
@@ -281,3 +281,42 @@ body {
 }
 .chatin input:focus { border-color: rgba(255, 196, 108, 0.6); }
 .ibtn.send { padding: 3rem 9rem; }
+
+/* reserves */
+#root { position: relative; }
+.reserves { display: flex; align-items: center; margin-left: 8rem; }
+.rslot {
+    position: relative;
+    width: 36rem;
+    height: 36rem;
+    margin-left: 4rem;
+    border: 1rem solid rgba(255, 255, 255, 0.12);
+    border-radius: 3rem;
+    background-color: rgba(0, 0, 0, 0.35);
+}
+.rslot.on { cursor: pointer; }
+.rslot.on:hover, .rslot.open { border-color: rgba(255, 196, 108, 0.7); }
+.rslot.off { opacity: 0.55; }
+.rslot.set { border-color: rgba(255, 196, 108, 0.35); }
+.ricon { width: 100%; height: 100%; background-size: contain; background-repeat: no-repeat; background-position: center; }
+.rlvl { position: absolute; right: 2rem; bottom: 0; font-size: 10rem; color: #ffe4c0; }
+
+.rpopup {
+    position: absolute;
+    top: 54rem;
+    right: 150rem;
+    width: 330rem;
+    background-color: rgba(18, 18, 19, 0.97);
+    border: 1rem solid rgba(255, 196, 108, 0.35);
+    box-shadow: 0 6rem 18rem rgba(0, 0, 0, 0.6);
+}
+.ropt { display: flex; align-items: center; padding: 6rem 10rem; cursor: pointer; border-bottom: 1rem solid rgba(255, 255, 255, 0.05); }
+.ropt:hover { background-color: rgba(255, 255, 255, 0.06); }
+.ropt.sel { background-color: rgba(255, 196, 108, 0.12); }
+.ropt.none { opacity: 0.4; cursor: default; }
+.ropt .ricon { width: 40rem; height: 40rem; flex-shrink: 0; }
+.rtext { flex-grow: 1; width: 0; margin: 0 8rem; }
+.rtitle { color: #ffe4c0; font-weight: bold; font-size: 12rem; }
+.rdesc { color: rgba(233, 231, 220, 0.6); font-size: 11rem; }
+.rcount { flex-shrink: 0; font-size: 11rem; color: rgba(233, 231, 220, 0.7); }
+.ropt.sel .rcount { color: #ff9a72; }

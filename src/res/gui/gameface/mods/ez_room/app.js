@@ -99,10 +99,52 @@ function renderHeader() {
                 <div class="sub">${esc(txt(room.headerDescr))}</div>
             </div>
             <div class="center">${center}</div>
+            ${renderReserves()}
             <div class="tools">
                 ${data.dev ? `<div class="btn ghost" data-act="raw">${ui.raw ? L("Raum", "Room") : L("Rohdaten", "Raw data")}</div>` : ""}
                 <div class="btn" data-act="hide">${L("Original", "Original")}</div>
             </div>
+        </div>`;
+}
+
+// reserve slots (top right like in WG's room); click opens the list (data.reserveOptions)
+function renderReserves() {
+    const list = data.reserves || [];
+    if (!list.length) return "";
+    const enabled = data.reservesEnabled || [];
+    const open = data.reserveOptions ? data.reserveOptions.slot : -1;
+    return `<div class="reserves">${list
+        .map((r, i) => {
+            const on = !!enabled[i];
+            const tip = txt(String(r.tooltip || "").replace(/\{\/?HEADER\}/g, "").replace(/\{BODY\}/g, " – ").replace(/\{\/BODY\}/g, ""));
+            return `<div class="rslot ${on ? "on" : "off"} ${open === i ? "open" : ""} ${r.id ? "set" : ""}" ${on ? `data-act="reserveOpen" data-slot="${i}"` : ""} data-tip="${esc(tip)}">
+                <div class="ricon" style="background-image:url(img://gui/maps/icons/reserveTypes/${esc(r.slotType)}.png)"></div>
+                ${r.id && r.level ? `<div class="rlvl">${ROMAN[r.level] || r.level}</div>` : ""}
+            </div>`;
+        })
+        .join("")}</div>`;
+}
+
+function renderReservePopup() {
+    const o = data.reserveOptions;
+    if (!o) return "";
+    const items = (o.items || [])
+        .map(
+            (it) => `
+        <div class="ropt ${it.selected ? "sel" : ""} ${!it.selected && it.count <= 0 ? "none" : ""}" ${it.selected || it.count > 0 ? `data-act="reserveSelect" data-id="${it.id}" data-remove="${it.selected ? 1 : 0}"` : ""}>
+            <div class="ricon" style="background-image:url(img://gui/maps/icons/reserveTypes/${esc(it.type)}.png)"></div>
+            <div class="rtext">
+                <div class="rtitle">${esc(it.title)} <span class="muted">${ROMAN[it.level] || it.level}</span></div>
+                <div class="rdesc">${esc(it.bonus ? it.bonus + " " : "")}${esc(it.desc)}</div>
+            </div>
+            <div class="rcount">${it.selected ? L("Entfernen", "Remove") : "×" + it.count}</div>
+        </div>`
+        )
+        .join("");
+    return `
+        <div class="rpopup" data-popup="1">
+            <div class="ptitle">${esc(o.title)}</div>
+            ${items || `<div class="empty">${L("Keine Reserven", "No reserves")}</div>`}
         </div>`;
 }
 
@@ -385,7 +427,7 @@ function render() {
     const keep = {};
     root.querySelectorAll("[data-scroll]").forEach((el, i) => (keep[i] = el.scrollTop));
     const body = ui.raw ? renderRaw() : `${renderCandidates()}${renderTeam()}${renderSide()}`;
-    root.innerHTML = `${renderHeader()}<div class="body">${body}</div>${renderFooter()}`;
+    root.innerHTML = `${renderHeader()}<div class="body">${body}</div>${renderFooter()}${renderReservePopup()}`;
     root.querySelectorAll("[data-scroll]").forEach((el, i) => {
         if (keep[i]) el.scrollTop = keep[i];
     });
@@ -409,6 +451,12 @@ function closest(el, attr) {
 
 document.addEventListener("click", (e) => {
     const el = closest(e.target, "data-act");
+    // a click outside the reserve list closes it
+    if (data.reserveOptions && !closest(e.target, "data-popup") && !(el && el.getAttribute("data-act") === "reserveOpen")) {
+        data.reserveOptions = null;
+        send({ action: "reserveOpen", slot: -1 });
+        render();
+    }
     if (!el) return;
     e.stopPropagation();
     const act = el.getAttribute("data-act");
@@ -441,6 +489,11 @@ document.addEventListener("click", (e) => {
             }, 3000);
         }
         render();
+    } else if (act === "reserveOpen") {
+        const open = data.reserveOptions && data.reserveOptions.slot === slot;
+        send({ action: "reserveOpen", slot: open ? -1 : slot });
+    } else if (act === "reserveSelect") {
+        send({ action: "reserveSelect", id: id, remove: el.getAttribute("data-remove") === "1" });
     } else if (act === "chatSend") sendChat();
     else if (act === "chooseVehicle") send({ action: "chooseVehicle", cd: Number(el.getAttribute("data-cd")) || 0 });
     else if (act === "ready" || act === "invite" || act === "toggleOpen" || act === "configure") send({ action: act });
@@ -482,7 +535,11 @@ document.addEventListener("keydown", (e) => {
     }
     if (e.keyCode === 116 && data.dev) send({ action: "devReload" });
     else if (e.keyCode === 27) {
-        if (ui.selCand || ui.kickArm) {
+        if (data.reserveOptions) {
+            data.reserveOptions = null;
+            send({ action: "reserveOpen", slot: -1 });
+            render();
+        } else if (ui.selCand || ui.kickArm) {
             ui.selCand = ui.kickArm = 0;
             render();
         } else send({ action: "hide" });
