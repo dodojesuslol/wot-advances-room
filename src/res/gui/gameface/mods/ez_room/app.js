@@ -234,12 +234,22 @@ setInterval(() => {
 
 // --- render ----------------------------------------------------------------------
 
-// the window has the size of its content: body = room content area of WG's window (px)
+// view size = room content area of WG's window (px); Gameface windows are sized from JS
+// (viewEnv.resizeViewPx, same as WG's own OfferBannerWindow)
+let appliedSize = "";
 function applyFrame() {
     const f = data.frame;
-    if (!f || f.length < 4) return;
-    document.documentElement.style.width = document.body.style.width = f[2] + "px";
-    document.documentElement.style.height = document.body.style.height = f[3] + "px";
+    if (!f || f.length < 4 || f[2] <= 0 || f[3] <= 0) return;
+    const key = f[2] + "x" + f[3];
+    if (key === appliedSize) return;
+    appliedSize = key;
+    try {
+        if (window.viewEnv && viewEnv.resizeViewPx) viewEnv.resizeViewPx(f[2], f[3]);
+    } catch (e) {
+        send({ action: "log", msg: "resizeViewPx failed: " + e });
+    }
+    document.documentElement.style.width = document.body.style.width = "100%";
+    document.documentElement.style.height = document.body.style.height = "100%";
 }
 
 function render() {
@@ -304,7 +314,15 @@ function readModel() {
         render();
         if (data.frame && !sizeLogged) {
             sizeLogged = true;
-            send({ action: "log", msg: "frame " + JSON.stringify(data.frame) + " body " + document.body.offsetWidth + "x" + document.body.offsetHeight + " dpr " + (window.devicePixelRatio || 1) + " rem " + getComputedStyle(document.documentElement).fontSize });
+            setTimeout(() => {
+                let env = "";
+                try {
+                    env = " viewSizePx " + JSON.stringify(viewEnv.getViewSizePx()) + " posRem " + JSON.stringify(viewEnv.getViewGlobalPositionRem()) + " scale " + viewEnv.getScale();
+                } catch (e) {
+                    env = " viewEnv: " + e;
+                }
+                send({ action: "log", msg: "frame " + JSON.stringify(data.frame) + " body " + document.body.offsetWidth + "x" + document.body.offsetHeight + env });
+            }, 500);
         }
     } catch (e) {
         console.error("ez_room: bad model data", e);
