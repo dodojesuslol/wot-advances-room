@@ -1,0 +1,11 @@
+[
+  {
+    "type": "Layout",
+    "id": "R.mods.ez_room.views.EzRoomView",
+    "path": "coui://gui/gameface/mods/ez_room/index.html",
+    "parameters": {
+      "entrance": "ez_room",
+      "impl": "gameface"
+    }
+  }
+]

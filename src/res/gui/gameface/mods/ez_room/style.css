@@ -1,0 +1,200 @@
+/* 1rem = 1 design px (Gameface sets the root font size to the UI scale)
+   Look: same as EZ TANK PICKER (WoT 2.0 inspired: dark glass, cream text, orange accent). */
+html, body {
+    width: 100%;
+    height: 100%;
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+}
+
+body {
+    background-color: #151515;
+    background-image: url(img://gui/maps/icons/hangar/selectVehicle/bg.jpg);
+    background-size: cover;
+    background-position: center;
+    color: #eeede9;
+    font-family: Warhelios;
+    font-size: 15rem;
+}
+
+#root {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.muted { color: rgba(233, 231, 220, 0.5); }
+.small { font-size: 12rem; }
+.grow { flex-grow: 1; }
+
+/* header */
+.header {
+    height: 76rem;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    padding: 0 32rem;
+    border-bottom: 1rem solid rgba(242, 138, 58, 0.45);
+    background-image: linear-gradient(to bottom, rgba(40, 34, 28, 0.9), rgba(21, 21, 21, 0.6));
+}
+.titles { width: 420rem; }
+.title { font-size: 24rem; font-weight: bold; color: #eeede9; }
+.sub { font-size: 13rem; color: rgba(233, 231, 220, 0.55); margin-top: 4rem; }
+.center { flex-grow: 1; display: flex; justify-content: center; }
+.tools { width: 420rem; display: flex; justify-content: flex-end; }
+
+.vs { display: flex; align-items: center; }
+.clan { width: 220rem; font-size: 18rem; font-weight: bold; color: #ffe4c0; }
+.clan.mine { text-align: right; }
+.clan.enemy { color: #ff7a52; }
+.clan.ready { text-shadow: 0 0 8rem rgba(150, 205, 110, 0.9); }
+.timer {
+    margin: 0 18rem;
+    padding: 6rem 16rem;
+    border: 1rem solid rgba(242, 138, 58, 0.55);
+    border-radius: 4rem;
+    background-color: rgba(10, 10, 10, 0.8);
+    color: #ffdd99;
+    font-size: 22rem;
+    font-weight: bold;
+}
+.wait { color: rgba(233, 231, 220, 0.7); font-size: 16rem; }
+
+.btn {
+    margin-left: 10rem;
+    padding: 8rem 16rem;
+    border: 1rem solid rgba(255, 255, 255, 0.2);
+    border-radius: 3rem;
+    background-color: rgba(255, 255, 255, 0.06);
+    color: #eeede9;
+    font-size: 14rem;
+    cursor: pointer;
+}
+.btn:hover { border-color: rgba(255, 255, 255, 0.45); background-color: rgba(255, 255, 255, 0.12); }
+.btn.ghost { background-color: transparent; color: rgba(233, 231, 220, 0.6); }
+
+/* body: volunteers | team | map + chat */
+.body {
+    flex-grow: 1;
+    display: flex;
+    padding: 20rem 32rem;
+    min-height: 0;
+}
+
+.panel {
+    display: flex;
+    flex-direction: column;
+    background-color: rgba(24, 24, 25, 0.88);
+    border: 1rem solid rgba(255, 255, 255, 0.08);
+    min-height: 0;
+}
+.ptitle {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    height: 44rem;
+    padding: 0 16rem;
+    border-bottom: 1rem solid rgba(255, 255, 255, 0.07);
+    color: #ffe4c0;
+    font-size: 15rem;
+    font-weight: bold;
+    text-transform: uppercase;
+}
+.ptitle .count {
+    margin-left: 10rem;
+    padding: 1rem 7rem;
+    border-radius: 3rem;
+    background-color: rgba(255, 196, 108, 0.18);
+    color: #ffd79a;
+    font-size: 12rem;
+}
+.plist { flex-grow: 1; overflow-y: hidden; padding: 6rem 0; }
+.empty { padding: 14rem 16rem; color: rgba(233, 231, 220, 0.45); font-size: 13rem; }
+
+.cands { width: 300rem; flex-shrink: 0; }
+.cand { display: flex; align-items: center; height: 30rem; padding: 0 16rem; }
+.cand:hover { background-color: rgba(255, 255, 255, 0.05); }
+.cand .name { flex-grow: 1; }
+.cand .rating { color: rgba(233, 231, 220, 0.5); font-size: 13rem; }
+.offline { opacity: 0.45; }
+.own { color: #ffe23b; text-shadow: 0 0 6rem rgba(255, 226, 59, 0.6); }
+
+.team { flex-grow: 1; margin: 0 20rem; }
+.slots { flex-grow: 1; overflow-y: hidden; padding: 6rem 8rem; }
+.slot {
+    display: flex;
+    align-items: center;
+    height: 38rem;
+    margin-bottom: 3rem;
+    padding-right: 12rem;
+    background-color: rgba(255, 255, 255, 0.035);
+    border-left: 3rem solid rgba(242, 138, 58, 0.35);
+}
+.slot.taken { background-color: rgba(255, 255, 255, 0.06); border-left-color: rgba(242, 138, 58, 0.85); }
+.slot.closed { opacity: 0.4; }
+.slot.hl { background-color: rgba(150, 205, 110, 0.12); border-left-color: #96cd6e; }
+.slot .no { width: 34rem; text-align: right; padding-right: 12rem; color: rgba(233, 231, 220, 0.4); font-size: 13rem; }
+.slot .who { width: 300rem; display: flex; align-items: center; }
+.slot .name.free { color: rgba(233, 231, 220, 0.3); }
+.slot .rating { width: 70rem; text-align: right; padding-right: 18rem; color: rgba(233, 231, 220, 0.5); font-size: 13rem; }
+.crown {
+    width: 8rem;
+    height: 8rem;
+    margin-right: 8rem;
+    background-color: #ffc46c;
+    transform: rotate(45deg);
+}
+.tag { margin-left: 8rem; padding: 1rem 6rem; border-radius: 3rem; font-size: 11rem; }
+.tag.leg { background-color: rgba(79, 159, 224, 0.2); color: #9cc8f0; }
+
+.veh { flex-grow: 1; display: flex; align-items: center; }
+.veh.none { color: rgba(233, 231, 220, 0.3); font-size: 13rem; }
+.veh.bad .vname { color: #ff9a72; }
+.vicon { width: 80rem; height: 24rem; background-size: contain; background-repeat: no-repeat; background-position: center; }
+.tier { width: 34rem; text-align: center; color: rgba(233, 231, 220, 0.55); font-size: 13rem; }
+.vname { color: #ffe4c0; font-weight: bold; }
+.vstate { margin-left: 10rem; color: #ff9a72; font-size: 12rem; }
+
+.status { width: 20rem; display: flex; justify-content: flex-end; }
+.dot { width: 10rem; height: 10rem; border-radius: 5rem; background-color: rgba(255, 255, 255, 0.15); }
+.dot.ready { background-color: #96cd6e; }
+.dot.battle { background-color: #f28a3a; }
+
+.side { width: 380rem; flex-shrink: 0; display: flex; flex-direction: column; }
+.map { flex-shrink: 0; margin-bottom: 20rem; }
+.mapimg {
+    height: 300rem;
+    margin: 12rem;
+    background-color: rgba(42, 48, 38, 0.8);
+    background-size: cover;
+    background-position: center;
+    display: flex;
+    align-items: flex-end;
+}
+.mapname {
+    flex-grow: 1;
+    padding: 8rem 12rem;
+    background-color: rgba(0, 0, 0, 0.55);
+    color: #eeede9;
+    font-weight: bold;
+}
+.chat { flex-grow: 1; }
+
+.raw { flex-grow: 1; }
+.rawname { padding: 8rem 16rem 2rem; color: #ffc46c; font-size: 13rem; }
+.rawval { margin: 0; padding: 0 16rem; color: rgba(233, 231, 220, 0.75); font-size: 11rem; white-space: pre-wrap; }
+
+/* footer */
+.footer {
+    height: 36rem;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    padding: 0 32rem;
+    border-top: 1rem solid rgba(255, 255, 255, 0.07);
+    background-color: rgba(0, 0, 0, 0.4);
+    font-size: 13rem;
+}
+.comment { margin-left: 20rem; color: #ffd79a; }
