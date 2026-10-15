@@ -31,7 +31,7 @@ DEV = None
 # size of the room content in WG's Flash window (FortClanBattleRoomUI, fortClanBattleRoom.swf)
 _ROOM_W, _ROOM_H = 1013, 653
 _CONTENT_OFFSET = (12, 35, _ROOM_W, _ROOM_H)
-_TRACK_INTERVAL = 0.1
+_TRACK_INTERVAL = 0.0  # every frame: the overlay follows WG's window while it is dragged
 
 
 def _rect(window):
