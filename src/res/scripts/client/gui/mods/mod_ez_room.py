@@ -9,8 +9,8 @@
 #   {"src": "X:/Projekte/wot-advances-room/src"}
 # Then impl.py, app.js and style.css are read fresh from that folder every time the overlay
 # opens (F5 inside the overlay reopens it). Optional: "layer" (frameworks.wulf WindowLayer name),
-# "inset" [left, top, right, bottom] = overlay rect inside WG's room window (default: computed so
-# the overlay covers the 1013x653 room content and leaves WG's title bar free).
+# "offset" [dx, dy, w, h] = overlay rect relative to WG's room window position (default
+# [12, 35, 1013, 653]: the room content, WG's title bar stays free).
 import json
 import logging
 import os

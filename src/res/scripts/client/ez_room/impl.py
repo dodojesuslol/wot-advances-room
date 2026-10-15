@@ -19,17 +19,18 @@ from gui.shared.utils.functions import getArenaGeometryName
 from helpers import getClientLanguage
 from helpers.i18n import makeString
 
-__version__ = '0.2.2'
+__version__ = '0.2.3'
 _logger = logging.getLogger('EZ_ROOM')
 _logger.setLevel(logging.INFO)
 _LAYOUT_PATH = ('ez_room', 'views', 'EzRoomView')
 _UI_DIR = 'res/gui/gameface/mods/ez_room'
 _SNAPSHOT_FILE = os.path.join('mods', 'configs', 'ez_room', 'last_room.json')  # dev only, for the preview
 
-# set by the loader in dev mode: contents of dev.json ({'src': 'X:/.../src', optional 'layer', 'inset'})
+# set by the loader in dev mode: contents of dev.json ({'src': 'X:/.../src', optional 'layer', 'offset'})
 DEV = None
 # size of the room content in WG's Flash window (FortClanBattleRoomUI, fortClanBattleRoom.swf)
 _ROOM_W, _ROOM_H = 1013, 653
+_CONTENT_OFFSET = (12, 35, _ROOM_W, _ROOM_H)
 _TRACK_INTERVAL = 0.1
 
 
@@ -66,7 +67,7 @@ def _roomRect(bridge):
         return None
     try:
         geom = view.as_getGeometryS()
-        if geom and len(geom) >= 4 and geom[2] and geom[3]:
+        if geom and len(geom) >= 2:
             return tuple(float(v) for v in geom[:4])
     except Exception:
         _logger.exception('as_getGeometryS failed')
@@ -74,17 +75,12 @@ def _roomRect(bridge):
 
 
 def _frame(roomRect, config):
-    # overlay rect inside WG's room window: the room content area, title bar left free
-    x, y, w, h = roomRect
-    inset = (config or {}).get('inset')
-    if inset and len(inset) == 4:
-        left, top, right, bottom = [float(v) for v in inset]
-    elif w >= _ROOM_W and h >= _ROOM_H:
-        left = right = bottom = (w - _ROOM_W) / 2.0
-        top = h - _ROOM_H - bottom
-    else:
-        left = top = right = bottom = 0.0
-    return (int(round(x + left)), int(round(y + top)), int(round(w - left - right)), int(round(h - top - bottom)))
+    # overlay rect = room content of WG's window. as_getGeometryS gives the window's top-left
+    # (incl. its shadow) and -1 as size; the content starts 12 px right / 35 px down (measured
+    # in game, title bar above stays WG's) and is 1013 x 653 (fortClanBattleRoom.swf).
+    x, y = roomRect[0], roomRect[1]
+    dx, dy, w, h = (config or {}).get('offset') or _CONTENT_OFFSET
+    return (int(round(x + dx)), int(round(y + dy)), int(w), int(h))
 
 
 def _lang():
@@ -390,8 +386,10 @@ def openOverlay(bridge, devConfig=None):
     layoutID = _layoutID()
     if layoutID is None:
         return None
-    layerName = (devConfig or {}).get('layer') or 'WINDOW'
-    layer = getattr(WindowLayer, layerName, WindowLayer.WINDOW)
+    # FULLSCREEN_WINDOW: above WG's Flash windows (WINDOW), same layer as the tank picker,
+    # which therefore still opens on top
+    layerName = (devConfig or {}).get('layer') or 'FULLSCREEN_WINDOW'
+    layer = getattr(WindowLayer, layerName, WindowLayer.FULLSCREEN_WINDOW)
     if _roomWindowView(bridge) is None:
         _logger.warning('room window not found, overlay not opened')
         return None
