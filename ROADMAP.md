@@ -23,7 +23,7 @@ Legende: ✅ vorhanden · 🟡 teilweise · ❌ fehlt · 🚫 bewusst weggelasse
 | A3 | Zurück-Link „Zur Abteilungszusammenstellung gehen“ (`backBtn`) | ❌ | Fenster-Meta `onBackClick()` auf `StrongholdBattleRoomWindow` |
 | A4 | Richtungs-/Gebäudegrafik (grüne Burg → Flaggen → ⚔ → rote Burg) | ❌ | `as_setDirectionS(value, animationNotAvailable)`, `as_updateReadyDirectionsS`; `makeDirectionVO` liefert `attack1..5`/`defense1..5`/`definition` |
 | A5 | Eigener Clan / Gegner-Clan mit Bereit-Anzeige | 🟡 | Namen + Glow da; WGs Bereit-Lämpchen-Optik fehlt |
-| A6 | Gefechts-Timer, normale und Alarm-Farbe (#ffdd99 / #ff7f00) | 🟡 | v0.7.7, im Spiel testen: letzte 10 s sofort orange + oranger Rand (Farben aus dem Timer-VO), ohne Animation |
+| A6 | Gefechts-Timer, normale und Alarm-Farbe (#ffdd99 / #ff7f00) | ✅ | v0.7.7: letzte 10 s sofort orange + oranger Rand (Farben aus dem Timer-VO), ohne Animation |
 | A7 | Timer-Alarm-Ton (Flash ruft `onTimerAlert()` → `playBattleRoomTimerAlert`) | 🚫 | nicht nachbauen (Nutzer): der Flash-Timer läuft unter der Oberfläche weiter und spielt den Original-Ton selbst |
 | A8 | „Warten auf Gefecht“-Text (`waitForBattleDescr`) | ✅ | |
 | A9 | 4 Reserve-Plätze + Auswahl | ✅ | eigene Liste statt Popover |
@@ -37,7 +37,7 @@ Legende: ✅ vorhanden · 🟡 teilweise · ❌ fehlt · 🚫 bewusst weggelasse
 | B1 | Kopfzeile „Mitglieder: x/15 (Legionäre x/y)“ | ✅ | `as_setTableHeaderS` |
 | B2 | Spalten Clan / Name / Wertung / Panzer, sortierbar | ✅ | eigene Erweiterung (v0.7.0) |
 | B3 | Platznummer, Spielername in WG-Farbe, eigener Name hervorgehoben | ✅ | |
-| B4 | Status-Icon pro Spieler (bereit / nicht bereit / im Gefecht) | 🟡 | eigene Punkte; seit v0.7.10 ganze Zeile grün bei „bereit“ (Nutzerwunsch, im Spiel testen); WG-Icons fehlen |
+| B4 | Status-Icon pro Spieler (bereit / nicht bereit / im Gefecht) | 🟡 | eigene Punkte; seit v0.7.10 ganze Zeile grün bei „bereit“ (Nutzerwunsch, im Spiel bestätigt); WG-Icons fehlen |
 | B5 | **Sprach-Indikator** (Spieler spricht gerade, `isPlayerSpeaking`) | ❌ | |
 | B6 | Abzeichen (Badge) vor dem Namen (`badgeVisualVO`) | ❌ | |
 | B7 | Kommandanten-Icon | 🟡 | eigene Raute statt WG-Icon |
@@ -48,8 +48,8 @@ Legende: ✅ vorhanden · 🟡 teilweise · ❌ fehlt · 🚫 bewusst weggelasse
 | B12 | **Eingefrorene Panzer** + „Auftauen“-Button (`vehBrokenIcon`) | ❌ | `onUnfrozenVehicleSlotClick(slotIndex)`, Slot-VO `hasFrozenVehicle`, `canUnfrozeVehicles` |
 | B13 | Prestige-Stufe (`prestigeLevel`) | ❌ | |
 | B14 | Freien Platz nehmen | ✅ | `assignSlotRequest(slot, -1)` |
-| B15 | Platz verlassen / Kommandant: Spieler raus, kicken | 🟡 | v0.7.6, im Spiel testen: „Raus“ + „✕“ (Kick, ein Klick, keine Rückfrage) erscheinen sofort beim Überfahren über dem Zeilenende, ohne Flackern; Freiwillige: „✕“. `leaveSlotRequest`, `requestToKickUser` |
-| B16 | Drag & Drop Freiwillige → Platz | 🟡 | v0.7.5, im Spiel testen: Kommandant klickt Freiwilligen → nächster freier erlaubter Platz (`getAvailableSlots`, kleinste Nummer); ziehen → grüne Plätze, loslassen = genau dieser Platz. Zwei-Klick-Verfahren entfernt (Nutzerwunsch) |
+| B15 | Platz verlassen / Kommandant: Spieler raus, kicken | ✅ | v0.7.6: „Raus“ + „✕“ (Kick, ein Klick, keine Rückfrage) erscheinen sofort beim Überfahren über dem Zeilenende, ohne Flackern; Freiwillige: „✕“. `leaveSlotRequest`, `requestToKickUser` |
+| B16 | Drag & Drop Freiwillige → Platz | ✅ | v0.7.5: Kommandant klickt Freiwilligen → nächster freier erlaubter Platz (`getAvailableSlots`, kleinste Nummer); ziehen → grüne Plätze, loslassen = genau dieser Platz. Zwei-Klick-Verfahren entfernt (Nutzerwunsch) |
 | B17 | Gesperrte / geschlossene Plätze, Legionärs-Suchplätze („Spieler wird gesucht“) | 🟡 | Label kommt mit, Optik prüfen |
 | B18 | Rechtsklick-Menü | ✅ | `BackportContextMenuWindow` mit `UNIT_USER` |
 | B19 | Spieler-Tooltip (WG-Nutzerinfo) und Panzer-Tooltip | ❌ | WG-Backport-Tooltips statt eigener |
@@ -94,7 +94,7 @@ Legende: ✅ vorhanden · 🟡 teilweise · ❌ fehlt · 🚫 bewusst weggelasse
 | # | Funktion im Original | Status | Hinweise / WG-API |
 |---|---|---|---|
 | F1 | **Automatische Gegnersuche / Warteschlange** (Panel im Fenster) | ✅ | bleibt WG-Original (Nutzerwunsch): Oberfläche blendet sich während der Suche aus und kommt danach zurück (v0.7.3, im Spiel bestätigt) |
-| F2 | **Warte-Overlay** („Daten werden geladen“, `showStrongholdWaiting`) | 🟡 | v0.7.4, im Spiel testen: Hook auf `StrongholdBattleRoomWindow.as_setWaitingS` → eigener Schleier mit Kreisel + WG-Text über dem Raum (Variante 1, Nutzerwahl) |
+| F2 | **Warte-Overlay** („Daten werden geladen“, `showStrongholdWaiting`) | ✅ | v0.7.4: Hook auf `StrongholdBattleRoomWindow.as_setWaitingS` → eigener Schleier mit Kreisel + WG-Text über dem Raum (Variante 1, Nutzerwahl) |
 | F3 | Wartungsmodus (`onStrongholdMaintenance`) | ❌ | |
 | F4 | Cooldowns: Buttons kurz gesperrt (`as_setCoolDownS`) | ❌ | |
 | F5 | UI-Klänge (`g_strongholdSoundController`, Klick-Sounds) | ❌ | |
