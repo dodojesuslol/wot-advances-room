@@ -23,7 +23,7 @@ for i in range(15):
     slots.append({'player': p, 'selectedVehicle': veh, 'playerStatus': 2 if p and p['readyState'] else 0,
                   'rating': p['rating'] if p else '', 'isLegionaries': i == 9, 'isClosed': False, 'isLocked': False,
                   'slotLabel': '' if p else '<font color="#8c8c7c">Freier Platz</font>', 'canBeTaken': not p})
-data = {'version': '0.1.0', 'lang': lang, 'dev': True, 'title': u'Vorstoß', 'me': {'dbID': 100, 'isCommander': True},
+data = {'version': '0.2.0', 'lang': lang, 'dev': True, 'title': u'Vorstoß', 'me': {'dbID': 100, 'isCommander': True},
         'room': {'mapID': 5, 'mapName': 'Prokhorovka', 'headerDescr': '<font color="#8c8c7c">Stufe X · 15 Spieler</font>',
                  'mineClanName': '[CLAN]', 'enemyClanName': '[ENEMY]', 'waitForBattleDescr': ''},
         'mapIcon': 'img://gui/maps/icons/map/stats/05_prohorovka.png',
@@ -33,4 +33,5 @@ data = {'version': '0.1.0', 'lang': lang, 'dev': True, 'title': u'Vorstoß', 'me
         'timer': {'deltaTime': 299}, 'timerAge': 0, 'readyStatus': [True, False],
         'opened': ['Raum verbergen', u'Raum ist sichtbar', ''], 'comment': u'Nur Stufe X, bitte Sprachchat',
         'raw': {'calls': {'as_setTimerDeltaS': [{'deltaTime': 299}]}, 'slotCalls': {}}}
+data['frame'] = [100, 100, 1013, 653]
 json.dump(data, open(sys.argv[1], 'w'), ensure_ascii=False, indent=1)

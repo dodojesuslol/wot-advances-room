@@ -8,7 +8,9 @@
 # Dev mode: create <game>/mods/configs/ez_room/dev.json with
 #   {"src": "X:/Projekte/wot-advances-room/src"}
 # Then impl.py, app.js and style.css are read fresh from that folder every time the overlay
-# opens (F5 inside the overlay reopens it). Optional "layer": a frameworks.wulf WindowLayer name.
+# opens (F5 inside the overlay reopens it). Optional: "layer" (frameworks.wulf WindowLayer name),
+# "inset" [left, top, right, bottom] = overlay rect inside WG's room window (default: computed so
+# the overlay covers the 1013x653 room content and leaves WG's title bar free).
 import json
 import logging
 import os
@@ -18,6 +20,7 @@ import weakref
 
 import BigWorld
 from gui.Scaleform.daapi.view.lobby.fortifications.stronghold_battle_room import StrongholdBattleRoom
+from gui.Scaleform.daapi.view.lobby.fortifications.stronghold_battle_room_window import StrongholdBattleRoomWindow
 
 _logger = logging.getLogger('EZ_ROOM')
 _logger.setLevel(logging.INFO)
@@ -79,6 +82,17 @@ class RoomBridge(object):
     @property
     def view(self):
         return self._view()
+
+    def roomWindow(self):
+        # wulf window of WG's Flash room window (position/size the overlay follows)
+        windowView = _roomWindowView() if _roomWindowView is not None else None
+        if windowView is None:
+            return None
+        try:
+            return windowView.getParentWindow()
+        except Exception:
+            _logger.exception('room window lookup failed')
+            return None
 
     def record(self, name, args):
         if name in _PER_SLOT and args:
@@ -145,6 +159,7 @@ class RoomBridge(object):
 
 
 _bridge = None  # bridge of the room that is open right now
+_roomWindowView = None  # weakref to the StrongholdBattleRoomWindow (Flash window view)
 
 
 def currentBridge():
@@ -207,6 +222,25 @@ def _updateTitle(self, isSortie, direction, resourceMultiplier):
         bridge.changed()
 
 
+_origWindowPopulate = StrongholdBattleRoomWindow._populate
+_origWindowDispose = StrongholdBattleRoomWindow._dispose
+
+
+def _windowPopulate(self):
+    global _roomWindowView
+    _roomWindowView = weakref.ref(self)
+    _origWindowPopulate(self)
+
+
+def _windowDispose(self):
+    global _roomWindowView
+    if _roomWindowView is not None and _roomWindowView() is self:
+        _roomWindowView = None
+        if _bridge is not None:
+            _bridge.close()
+    _origWindowDispose(self)
+
+
 def _toggleOverlay():
     bridge = _bridge
     if bridge is None:
@@ -239,6 +273,8 @@ for _name in dir(StrongholdBattleRoom):
     if _name.startswith('as_') and _name.endswith('S') and _name not in _SKIP:
         setattr(StrongholdBattleRoom, _name, _wrapCall(_name, getattr(StrongholdBattleRoom, _name)))
 StrongholdBattleRoom._populate = _populate
+StrongholdBattleRoomWindow._populate = _windowPopulate
+StrongholdBattleRoomWindow._dispose = _windowDispose
 StrongholdBattleRoom._dispose = _dispose
 StrongholdBattleRoom._updateTitle = _updateTitle
 StrongholdBattleRoom._rebuildCandidatesDP = _wrapNotify(StrongholdBattleRoom._rebuildCandidatesDP)

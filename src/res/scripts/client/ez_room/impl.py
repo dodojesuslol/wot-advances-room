@@ -12,22 +12,54 @@ import BigWorld
 from frameworks.wulf import ViewFlags, ViewModel, ViewSettings, WindowFlags, WindowLayer
 from gui.impl.gen import R
 from gui.impl.pub import ViewImpl
-from gui.impl.pub.lobby_window import LobbyWindow
+from gui.impl.pub.window_impl import WindowImpl
 from gui.Scaleform.daapi.view.lobby.rally import vo_converters
 from gui.Scaleform.locale.FORTIFICATIONS import FORTIFICATIONS
 from gui.shared.utils.functions import getArenaGeometryName
 from helpers import getClientLanguage
 from helpers.i18n import makeString
 
-__version__ = '0.1.0'
+__version__ = '0.2.0'
 _logger = logging.getLogger('EZ_ROOM')
 _logger.setLevel(logging.INFO)
 _LAYOUT_PATH = ('ez_room', 'views', 'EzRoomView')
 _UI_DIR = 'res/gui/gameface/mods/ez_room'
 _SNAPSHOT_FILE = os.path.join('mods', 'configs', 'ez_room', 'last_room.json')  # dev only, for the preview
 
-# set by the loader in dev mode: contents of dev.json ({'src': 'X:/.../src', optional 'layer'})
+# set by the loader in dev mode: contents of dev.json ({'src': 'X:/.../src', optional 'layer', 'inset'})
 DEV = None
+# size of the room content in WG's Flash window (FortClanBattleRoomUI, fortClanBattleRoom.swf)
+_ROOM_W, _ROOM_H = 1013, 653
+_TRACK_INTERVAL = 0.1
+
+
+def _rect(window):
+    # (x, y, w, h) of a wulf window, None if unknown
+    if window is None:
+        return None
+    try:
+        pos = window.globalPosition
+        if not pos or (not pos[0] and not pos[1]):
+            pos = window.position
+        size = window.size
+        return (float(pos[0]), float(pos[1]), float(size[0]), float(size[1]))
+    except Exception:
+        _logger.exception('reading window rect failed')
+        return None
+
+
+def _frame(roomRect, config):
+    # overlay rect inside WG's room window: the room content area, title bar left free
+    x, y, w, h = roomRect
+    inset = (config or {}).get('inset')
+    if inset and len(inset) == 4:
+        left, top, right, bottom = [float(v) for v in inset]
+    elif w >= _ROOM_W and h >= _ROOM_H:
+        left = right = bottom = (w - _ROOM_W) / 2.0
+        top = h - _ROOM_H - bottom
+    else:
+        left = top = right = bottom = 0.0
+    return (int(round(x + left)), int(round(y + top)), int(round(w - left - right)), int(round(h - top - bottom)))
 
 
 def _lang():
@@ -117,7 +149,7 @@ def _me(view):
         return {}
 
 
-def _pack(bridge):
+def _pack(bridge, frame=None):
     view = bridge.view
     calls = bridge.calls
     first = lambda name, default=None: calls[name][0] if name in calls and calls[name] else default
@@ -146,6 +178,7 @@ def _pack(bridge):
     timer = first('as_setTimerDeltaS')
     data = {
         'version': __version__,
+        'frame': list(frame) if frame else None,
         'lang': _lang(),
         'dev': bool(DEV),
         'title': _title(bridge),
@@ -198,11 +231,16 @@ class EzRoomModel(ViewModel):
 
 class EzRoomView(ViewImpl):
 
-    def __init__(self, layoutID, bridge):
+    def __init__(self, layoutID, bridge, config):
         settings = ViewSettings(layoutID, flags=ViewFlags.VIEW, model=EzRoomModel())
         super(EzRoomView, self).__init__(settings)
         self._bridge = bridge
+        self._config = config or {}
         self._snapshotPending = False
+        self._frame = None      # (x, y, w, h) the overlay should cover
+        self._roomRect = None   # last seen rect of WG's room window
+        self._tracking = False
+        self._loggedRect = False
 
     @property
     def viewModel(self):
@@ -212,12 +250,41 @@ class EzRoomView(ViewImpl):
         super(EzRoomView, self)._onLoading(*args, **kwargs)
         if DEV:
             self.viewModel.setDev(_devUI())
+        self._track()
         self.onRoomChanged()
+
+    # follow WG's room window (moved by dragging its title bar) ---------------------
+
+    def _track(self):
+        self._tracking = True
+        try:
+            roomRect = _rect(self._bridge.roomWindow())
+            if roomRect is not None and roomRect != self._roomRect:
+                self._roomRect = roomRect
+                frame = _frame(roomRect, self._config)
+                sizeChanged = self._frame is None or frame[2:] != self._frame[2:]
+                self._frame = frame
+                window = self.getParentWindow()
+                if window is not None:
+                    window.move(frame[0], frame[1])
+                if not self._loggedRect:
+                    self._loggedRect = True
+                    _logger.info('room window rect %r -> overlay frame %r, overlay window rect %r', roomRect, frame, _rect(window))
+                if sizeChanged:
+                    self.onRoomChanged()
+        except Exception:
+            _logger.exception('tracking room window failed')
+        BigWorld.callback(_TRACK_INTERVAL, self._trackNext)
+
+    def _trackNext(self):
+        if self._tracking:
+            self._track()
 
     def _getEvents(self):
         return ((self.viewModel.onAction, self.__onAction),)
 
     def _finalize(self):
+        self._tracking = False
         try:
             self._bridge.onWindowGone(self.getParentWindow())
         except Exception:
@@ -226,7 +293,7 @@ class EzRoomView(ViewImpl):
 
     def onRoomChanged(self):
         try:
-            data = _pack(self._bridge)
+            data = _pack(self._bridge, self._frame)
             self.viewModel.setData(json.dumps(data))
         except Exception:
             _logger.exception('packing room data failed')
@@ -243,7 +310,7 @@ class EzRoomView(ViewImpl):
             if not os.path.isdir(path):
                 os.makedirs(path)
             with open(_SNAPSHOT_FILE, 'wb') as f:
-                f.write(json.dumps(_pack(self._bridge), indent=1, sort_keys=True).encode('utf-8'))
+                f.write(json.dumps(_pack(self._bridge, self._frame), indent=1, sort_keys=True).encode('utf-8'))
         except Exception:
             _logger.exception('writing snapshot failed')
 
@@ -257,20 +324,25 @@ class EzRoomView(ViewImpl):
                 self._bridge.reopen()
             elif action == 'log':
                 _logger.info('ui: %s', args.get('msg'))
+                if self._frame:
+                    _logger.info('overlay window rect %r, frame %r', _rect(self.getParentWindow()), self._frame)
             else:
                 _logger.warning('unknown action %r', args)
         except Exception:
             _logger.exception('action %r failed', args)
 
 
-class EzRoomWindow(LobbyWindow):
+class EzRoomWindow(WindowImpl):
+    # plain window (no decorator) laid exactly over the content of WG's room window
     __slots__ = ()
 
-    def __init__(self, layoutID, bridge, layer):
+    def __init__(self, layoutID, bridge, layer, parent, config):
         super(EzRoomWindow, self).__init__(
-            wndFlags=WindowFlags.WINDOW | WindowFlags.WINDOW_FULLSCREEN,
-            content=EzRoomView(layoutID, bridge),
-            layer=layer)
+            WindowFlags.WINDOW,
+            content=EzRoomView(layoutID, bridge, config),
+            parent=parent,
+            layer=layer,
+            areaID=R.areas.default())
 
 
 def _layoutID():
@@ -291,7 +363,11 @@ def openOverlay(bridge, devConfig=None):
         return None
     layerName = (devConfig or {}).get('layer') or 'WINDOW'
     layer = getattr(WindowLayer, layerName, WindowLayer.WINDOW)
-    window = EzRoomWindow(layoutID, bridge, layer)
+    roomWindow = bridge.roomWindow()
+    if roomWindow is None:
+        _logger.warning('room window not found, overlay not opened')
+        return None
+    window = EzRoomWindow(layoutID, bridge, layer, roomWindow, devConfig)
     window.load()
-    _logger.info('overlay opened (layer %s)', layerName)
+    _logger.info('overlay opened (layer %s, room window %r)', layerName, _rect(roomWindow))
     return window

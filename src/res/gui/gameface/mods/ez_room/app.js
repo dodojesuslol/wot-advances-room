@@ -6,6 +6,7 @@ const ROMAN = ["", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", 
 const STATUS = { NORMAL: 0, READY: 2, BATTLE: 3, LOCKED: 4, CREATOR: 5 };
 
 let data = {};
+let sizeLogged = false;
 const ui = { raw: false };
 
 function L(de, en) {
@@ -77,7 +78,7 @@ function renderHeader() {
             <div class="center">${center}</div>
             <div class="tools">
                 ${data.dev ? `<div class="btn ghost" data-act="raw">${ui.raw ? L("Raum", "Room") : L("Rohdaten", "Raw data")}</div>` : ""}
-                <div class="btn" data-act="hide">${L("Original anzeigen", "Show original")}</div>
+                <div class="btn" data-act="hide">${L("Original", "Original")}</div>
             </div>
         </div>`;
 }
@@ -181,7 +182,7 @@ function renderSide() {
             </div>
             <div class="panel chat">
                 <div class="ptitle">${L("Chat", "Chat")}</div>
-                <div class="empty">${L("Der Chat kommt in Schritt 3. Bis dahin: „Original anzeigen“.", "Chat comes in step 3. Until then: \"Show original\".")}</div>
+                <div class="empty">${L("Chat kommt in Schritt 3 – bis dahin „Original“.", "Chat comes in step 3 – until then \"Original\".")}</div>
             </div>
         </div>`;
 }
@@ -228,7 +229,16 @@ setInterval(() => {
 
 // --- render ----------------------------------------------------------------------
 
+// the window has the size of its content: body = room content area of WG's window (px)
+function applyFrame() {
+    const f = data.frame;
+    if (!f || f.length < 4) return;
+    document.documentElement.style.width = document.body.style.width = f[2] + "px";
+    document.documentElement.style.height = document.body.style.height = f[3] + "px";
+}
+
 function render() {
+    applyFrame();
     const root = document.getElementById("root");
     const keep = {};
     root.querySelectorAll("[data-scroll]").forEach((el, i) => (keep[i] = el.scrollTop));
@@ -287,6 +297,10 @@ function readModel() {
         data = JSON.parse(raw);
         timerBase = { at: Date.now() };
         render();
+        if (data.frame && !sizeLogged) {
+            sizeLogged = true;
+            send({ action: "log", msg: "frame " + JSON.stringify(data.frame) + " body " + document.body.offsetWidth + "x" + document.body.offsetHeight + " dpr " + (window.devicePixelRatio || 1) + " rem " + getComputedStyle(document.documentElement).fontSize });
+        }
     } catch (e) {
         console.error("ez_room: bad model data", e);
         send({ action: "log", msg: "bad model data: " + e });
