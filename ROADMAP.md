@@ -74,7 +74,7 @@ Legende: ✅ vorhanden · 🟡 teilweise · ❌ fehlt · 🚫 bewusst weggelasse
 | # | Funktion im Original | Status | Hinweise / WG-API |
 |---|---|---|---|
 | D1 | Kartenname / „Zufallskarte“ (mit Würfel-Grafik) | 🟡 | Name da, Würfel-Grafik fehlt |
-| D2 | Minimap-Bild mit Raster A–K / 1–0 | 🟡 | v0.7.12 (Raster 10 feste Zeilen, border-box; 0.7.11 brach in Gameface nach 9 Feldern um), im Spiel testen: echte quadratische Minikarte `gui/maps/icons/map/<geometry>.png` (300×300; vorher fälschlich map/stats = 500×235 Landschaftsbild), Raster in festen px (200×200, Felder 20×20), mittig. WGs eigener Pfad (`MinimapLobby._resilientMapIconPathGetter`: map/<gameplay>/c_<geometry>) existiert im Client nicht |
+| D2 | Minimap-Bild mit Raster A–K / 1–0 | ✅ | v0.7.12 (Raster 10 feste Zeilen, border-box; 0.7.11 brach in Gameface nach 9 Feldern um), im Spiel bestätigt: echte quadratische Minikarte `gui/maps/icons/map/<geometry>.png` (300×300; vorher fälschlich map/stats = 500×235 Landschaftsbild), Raster in festen px (200×200, Felder 20×20), mittig. WGs eigener Pfad (`MinimapLobby._resilientMapIconPathGetter`: map/<gameplay>/c_<geometry>) existiert im Client nicht |
 | D3 | Basen / Startpunkte auf der Minimap (`MinimapLobby.setArena`, `setPlayerTeam`) | ❌ | |
 | D4 | **Minimap-Markierungen des Kommandanten** (`MinimapGrid`, eigener Chat-Kanal) | ❌ | Kommandant klickt Planquadrate, alle sehen sie |
 
