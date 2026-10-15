@@ -25,6 +25,10 @@ from gui.Scaleform.daapi.view.lobby.fortifications.stronghold_battle_room_window
 _logger = logging.getLogger('EZ_ROOM')
 _logger.setLevel(logging.INFO)
 _DEV_FILE = os.path.join('mods', 'configs', 'ez_room', 'dev.json')
+# crash guard: exists while the overlay is being opened; if the client dies in between, the next
+# start finds it and keeps the overlay off for that session (WG's Flash room stays usable)
+_GUARD_FILE = os.path.join('mods', 'configs', 'ez_room', 'opening.guard')
+_guardTripped = False
 _IMPL_PATH = 'res/scripts/client/ez_room/impl.py'
 # Python 2 sets a module's globals to None when the module object dies, so every dev-loaded
 # impl is kept alive here (open views and callbacks still use its functions).
@@ -129,15 +133,20 @@ class RoomBridge(object):
             return
         getattr(view, name)(*args)
 
-    def open(self):
+    def open(self, manual=False):
         if self.window is not None or self.view is None:
             return
+        if _guardTripped and not manual:
+            _logger.warning('overlay stays off this session (last start crashed while opening it); open it from the mods list')
+            return
         self.hidden = False
+        _setGuard(True)
         try:
             self.window = _impl().openOverlay(self, _devConfig())
         except Exception:
             _logger.exception('opening room overlay failed, Flash room stays')
             self.window = None
+        BigWorld.callback(3.0, lambda: _setGuard(False))
 
     def close(self, hide=False):
         self.hidden = hide
@@ -160,6 +169,20 @@ class RoomBridge(object):
 
 _bridge = None  # bridge of the room that is open right now
 _roomWindowView = None  # weakref to the StrongholdBattleRoomWindow (Flash window view)
+
+
+def _setGuard(on):
+    try:
+        if on:
+            folder = os.path.dirname(_GUARD_FILE)
+            if not os.path.isdir(folder):
+                os.makedirs(folder)
+            with open(_GUARD_FILE, 'w') as f:
+                f.write('opening')
+        elif os.path.isfile(_GUARD_FILE):
+            os.remove(_GUARD_FILE)
+    except Exception:
+        _logger.exception('crash guard file failed')
 
 
 def currentBridge():
@@ -246,7 +269,7 @@ def _toggleOverlay():
     if bridge is None:
         return
     if bridge.window is None:
-        bridge.open()
+        bridge.open(manual=True)
     else:
         bridge.close(hide=True)
 
@@ -279,6 +302,10 @@ StrongholdBattleRoom._dispose = _dispose
 StrongholdBattleRoom._updateTitle = _updateTitle
 StrongholdBattleRoom._rebuildCandidatesDP = _wrapNotify(StrongholdBattleRoom._rebuildCandidatesDP)
 StrongholdBattleRoom.initCandidatesDP = _wrapNotify(StrongholdBattleRoom.initCandidatesDP)
+if os.path.isfile(_GUARD_FILE):
+    _guardTripped = True
+    _setGuard(False)
+    _logger.warning('last start crashed while opening the overlay: overlay off for this session')
 _registerModsList()
 try:
     from ez_room.impl import __version__

@@ -19,7 +19,7 @@ from gui.shared.utils.functions import getArenaGeometryName
 from helpers import getClientLanguage
 from helpers.i18n import makeString
 
-__version__ = '0.2.0'
+__version__ = '0.2.1'
 _logger = logging.getLogger('EZ_ROOM')
 _logger.setLevel(logging.INFO)
 _LAYOUT_PATH = ('ez_room', 'views', 'EzRoomView')
@@ -38,9 +38,9 @@ def _rect(window):
     if window is None:
         return None
     try:
-        pos = window.globalPosition
-        if not pos or (not pos[0] and not pos[1]):
-            pos = window.position
+        # plain position only: calculateGlobalPosition is a native call that may not be safe
+        # on WG's Flash windows
+        pos = window.position
         size = window.size
         return (float(pos[0]), float(pos[1]), float(size[0]), float(size[1]))
     except Exception:
@@ -250,13 +250,14 @@ class EzRoomView(ViewImpl):
         super(EzRoomView, self)._onLoading(*args, **kwargs)
         if DEV:
             self.viewModel.setDev(_devUI())
-        self._track()
         self.onRoomChanged()
+        # move only after the window is loaded (like WG's OfferBannerWindow: load(), then move)
+        self._tracking = True
+        BigWorld.callback(0.2, self._trackNext)
 
     # follow WG's room window (moved by dragging its title bar) ---------------------
 
     def _track(self):
-        self._tracking = True
         try:
             roomRect = _rect(self._bridge.roomWindow())
             if roomRect is not None and roomRect != self._roomRect:
@@ -336,11 +337,13 @@ class EzRoomWindow(WindowImpl):
     # plain window (no decorator) laid exactly over the content of WG's room window
     __slots__ = ()
 
-    def __init__(self, layoutID, bridge, layer, parent, config):
+
+    # (same setup as WG's OfferBannerWindow: no parent, default area, moved after load)
+    def __init__(self, layoutID, bridge, layer, config):
         super(EzRoomWindow, self).__init__(
             WindowFlags.WINDOW,
             content=EzRoomView(layoutID, bridge, config),
-            parent=parent,
+            parent=None,
             layer=layer,
             areaID=R.areas.default())
 
@@ -367,7 +370,7 @@ def openOverlay(bridge, devConfig=None):
     if roomWindow is None:
         _logger.warning('room window not found, overlay not opened')
         return None
-    window = EzRoomWindow(layoutID, bridge, layer, roomWindow, devConfig)
+    window = EzRoomWindow(layoutID, bridge, layer, devConfig)
     window.load()
     _logger.info('overlay opened (layer %s, room window %r)', layerName, _rect(roomWindow))
     return window
