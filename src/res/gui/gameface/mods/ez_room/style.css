@@ -262,3 +262,22 @@ body {
 .btn.main:hover { background-image: linear-gradient(to bottom, #ffa452, #e05f28); }
 .btn.main.off { background-image: none; background-color: rgba(255, 255, 255, 0.08); color: rgba(233, 231, 220, 0.35); cursor: default; }
 .btn.main.isready { background-image: linear-gradient(to bottom, #8fc66a, #5e9a3c); }
+
+/* chat */
+.chatlog { flex-grow: 1; height: 0; overflow-y: hidden; padding: 6rem 10rem; }
+.cline { font-size: 12rem; line-height: 16rem; color: #c8c6bc; margin-bottom: 2rem; word-wrap: break-word; }
+.chatin { flex-shrink: 0; display: flex; align-items: center; padding: 6rem; border-top: 1rem solid rgba(255, 255, 255, 0.07); }
+.chatin input {
+    flex-grow: 1;
+    width: 0;
+    height: 24rem;
+    padding: 0 8rem;
+    border: 1rem solid rgba(255, 255, 255, 0.15);
+    border-radius: 3rem;
+    background-color: rgba(0, 0, 0, 0.35);
+    color: #eeede9;
+    font-family: Warhelios;
+    font-size: 12rem;
+}
+.chatin input:focus { border-color: rgba(255, 196, 108, 0.6); }
+.ibtn.send { padding: 3rem 9rem; }

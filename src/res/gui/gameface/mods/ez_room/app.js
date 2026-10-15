@@ -240,6 +240,61 @@ function renderReadyBar() {
         </div>`;
 }
 
+// WG's chat lines are Flash HTML: keep <font color> as coloured spans, drop every other tag
+// (the user text inside is already escaped by WG)
+function chatHtml(line) {
+    let out = "";
+    let open = 0;
+    String(line || "")
+        .replace(/<br\s*\/?>/gi, " ")
+        .split(/(<[^>]*>)/)
+        .forEach((part) => {
+            if (!part) return;
+            if (part[0] !== "<") {
+                out += part;
+                return;
+            }
+            const m = /^<font\b[^>]*color\s*=\s*['"]?(#[0-9a-fA-F]{6})/i.exec(part);
+            if (m) {
+                out += `<span style="color:${m[1]}">`;
+                open++;
+            } else if (/^<font\b/i.test(part)) {
+                out += "<span>";
+                open++;
+            } else if (/^<\/font>/i.test(part) && open > 0) {
+                out += "</span>";
+                open--;
+            }
+        });
+    while (open-- > 0) out += "</span>";
+    return out;
+}
+
+function renderChat() {
+    const chat = data.chat || {};
+    const lines = chat.lines || [];
+    return `
+        <div class="panel chat">
+            <div class="ptitle">${L("Chat", "Chat")}</div>
+            <div class="chatlog" id="chatlog" data-scroll="40">${lines.map((l) => `<div class="cline">${chatHtml(l)}</div>`).join("")}</div>
+            <div class="chatin">
+                <input id="chatinput" type="text" maxlength="512" placeholder="${chat.joined ? L("Nachricht …", "Message …") : L("Nicht verbunden", "Not connected")}" />
+                <div class="ibtn send" data-act="chatSend">➤</div>
+            </div>
+        </div>`;
+}
+
+function sendChat() {
+    const input = document.getElementById("chatinput");
+    if (!input) return;
+    const text = (input.value || "").trim();
+    if (!text) return;
+    send({ action: "chatSend", text: text });
+    input.value = "";
+    chatDraft = "";
+    chatStick = true;
+}
+
 function renderSide() {
     const room = data.room || {};
     const map = txt(room.mapName);
@@ -251,10 +306,7 @@ function renderSide() {
                     <div class="mapname">${esc(map)}</div>
                 </div>
             </div>
-            <div class="panel chat">
-                <div class="ptitle">${L("Chat", "Chat")}</div>
-                <div class="empty">${L("Chat kommt in Schritt 3 – bis dahin „Original“.", "Chat comes in step 3 – until then \"Original\".")}</div>
-            </div>
+            ${renderChat()}
         </div>`;
 }
 
@@ -316,9 +368,20 @@ function applyFrame() {
     document.documentElement.style.height = document.body.style.height = "100%";
 }
 
+let chatDraft = "";
+let chatFocus = false;
+let chatStick = true; // keep the chat scrolled to the newest line
+
 function render() {
     applyFrame();
     const root = document.getElementById("root");
+    const input = document.getElementById("chatinput");
+    if (input) {
+        chatDraft = input.value || "";
+        chatFocus = document.activeElement === input;
+    }
+    const log = document.getElementById("chatlog");
+    if (log) chatStick = log.scrollTop + log.clientHeight >= log.scrollHeight - 8;
     const keep = {};
     root.querySelectorAll("[data-scroll]").forEach((el, i) => (keep[i] = el.scrollTop));
     const body = ui.raw ? renderRaw() : `${renderCandidates()}${renderTeam()}${renderSide()}`;
@@ -326,6 +389,13 @@ function render() {
     root.querySelectorAll("[data-scroll]").forEach((el, i) => {
         if (keep[i]) el.scrollTop = keep[i];
     });
+    const newInput = document.getElementById("chatinput");
+    if (newInput) {
+        newInput.value = chatDraft;
+        if (chatFocus) newInput.focus();
+    }
+    const newLog = document.getElementById("chatlog");
+    if (newLog && chatStick) newLog.scrollTop = newLog.scrollHeight;
 }
 
 // Gameface has no Element.closest
@@ -371,7 +441,8 @@ document.addEventListener("click", (e) => {
             }, 3000);
         }
         render();
-    } else if (act === "chooseVehicle") send({ action: "chooseVehicle", cd: Number(el.getAttribute("data-cd")) || 0 });
+    } else if (act === "chatSend") sendChat();
+    else if (act === "chooseVehicle") send({ action: "chooseVehicle", cd: Number(el.getAttribute("data-cd")) || 0 });
     else if (act === "ready" || act === "invite" || act === "toggleOpen" || act === "configure") send({ action: act });
 });
 
@@ -401,6 +472,14 @@ document.addEventListener(
 );
 
 document.addEventListener("keydown", (e) => {
+    const inChat = document.activeElement && document.activeElement.id === "chatinput";
+    if (inChat) {
+        if (e.keyCode === 13) {
+            e.preventDefault();
+            sendChat();
+        } else if (e.keyCode === 27) document.activeElement.blur();
+        return;
+    }
     if (e.keyCode === 116 && data.dev) send({ action: "devReload" });
     else if (e.keyCode === 27) {
         if (ui.selCand || ui.kickArm) {

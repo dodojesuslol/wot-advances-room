@@ -20,7 +20,7 @@ from helpers import dependency, getClientLanguage
 from helpers.i18n import makeString
 from skeletons.gui.impl import IGuiLoader
 
-__version__ = '0.3.1'
+__version__ = '0.4.0'
 _logger = logging.getLogger('EZ_ROOM')
 _logger.setLevel(logging.INFO)
 _LAYOUT_PATH = ('ez_room', 'views', 'EzRoomView')
@@ -171,6 +171,60 @@ def _me(view):
         return {}
 
 
+# --- room chat ----------------------------------------------------------------------
+# The room window's ChannelComponent (Flash chat box) is bound to the unit channel controller.
+# We read the controller's history, send through the component (same checks as Flash) and get
+# notified of new lines through a hook on ChannelComponent.as_addMessageS.
+_CHAT_LINES = 150
+
+
+def _chatComponent(bridge):
+    windowView = _roomWindowView(bridge)
+    try:
+        return getattr(windowView, 'chat', None) if windowView is not None else None
+    except Exception:
+        _logger.exception('chat component lookup failed')
+        return None
+
+
+def _packChat(bridge):
+    component = _chatComponent(bridge)
+    controller = component._controller() if component is not None else None
+    if controller is None:
+        return {'joined': False, 'lines': []}
+    try:
+        history = list(controller.getHistory() or ())
+        return {'joined': bool(controller.isJoined()), 'lines': history[-_CHAT_LINES:]}
+    except Exception:
+        _logger.exception('chat history failed')
+        return {'joined': False, 'lines': []}
+
+
+def _installChatHook():
+    # once per client session (survives dev reloads: the wrapper only uses the loader module)
+    from messenger.gui.Scaleform.view.lobby.ChannelComponent import ChannelComponent
+    if getattr(ChannelComponent, '_ezRoomChatHook', False):
+        return
+    orig = ChannelComponent.as_addMessageS
+
+    def as_addMessageS(self, message):
+        result = orig(self, message)
+        try:
+            import sys
+            loader = sys.modules.get('gui.mods.mod_ez_room')
+            bridge = loader.currentBridge() if loader is not None else None
+            if bridge is not None and bridge.window is not None:
+                windowView = bridge.roomWindowView() if hasattr(bridge, 'roomWindowView') else None
+                if windowView is not None and getattr(windowView, 'chat', None) is self:
+                    bridge.changed()
+        except Exception:
+            logging.getLogger('EZ_ROOM').exception('chat hook failed')
+        return result
+
+    ChannelComponent.as_addMessageS = as_addMessageS
+    ChannelComponent._ezRoomChatHook = True
+
+
 def _actionButton(vo):
     # WG's ready button state; label is an i18n key ('#cyberSport:window/unit/ready')
     if not isinstance(vo, dict):
@@ -240,6 +294,7 @@ def _pack(bridge, frame=None):
         'teamHeaderText': first('as_updateTeamHeaderTextS'),
         'filters': first('as_setFiltersDataS'),
         'highlight': first('as_highlightSlotsS'),
+        'chat': _packChat(bridge),
     }
     if DEV:
         data['raw'] = {'calls': calls, 'slotCalls': bridge.slotCalls}
@@ -374,6 +429,11 @@ class EzRoomView(ViewImpl):
                 bridge.call('toggleReadyStateRequest')
             elif action == 'toggleOpen':
                 bridge.call('toggleRoomStatus')
+            elif action == 'chatSend':
+                text = (args.get('text') or u'').strip()
+                component = _chatComponent(bridge)
+                if text and component is not None:
+                    component.sendMessage(text.encode('utf-8') if isinstance(text, unicode) else text)
             elif action == 'contextMenu':
                 self._contextMenu(int(args.get('dbID')))
             elif action == 'chooseVehicle':
@@ -527,6 +587,10 @@ def openOverlay(bridge, devConfig=None):
     if _roomWindowView(bridge) is None:
         _logger.warning('room window not found, overlay not opened')
         return None
+    try:
+        _installChatHook()
+    except Exception:
+        _logger.exception('installing chat hook failed')
     window = EzRoomWindow(layoutID, bridge, layer, devConfig)
     window.load()
     _logger.info('overlay opened (layer %s, room window %r)', layerName, _roomRect(bridge))
