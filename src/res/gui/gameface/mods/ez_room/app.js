@@ -10,10 +10,8 @@ let sizeLogged = false;
 const ui = {
     raw: false,
     selCand: 0, // commander: volunteer being dragged onto a slot (green slots = WG's allowed ones)
-    kickArm: 0, // dbID whose kick button was clicked once (second click kicks)
     sort: null, // team table sort {key: "clan"|"name"|"rating"|"tank", dir: 1|-1}; null = slot order
 };
-let kickTimer = 0;
 
 function L(de, en) {
     return data.lang === "de" ? de : en;
@@ -69,9 +67,9 @@ function slotOf(dbID) {
     return (data.slots || []).findIndex((s) => s && s.player && s.player.dbID === dbID);
 }
 
+// one click kicks the player out of the room (requestToKick)
 function kickButton(dbID) {
-    const armed = ui.kickArm === dbID;
-    return `<div class="ibtn kick ${armed ? "armed" : ""}" data-act="kick" data-id="${dbID}" title="kick">${armed ? L("Sicher?", "Sure?") : "✕"}</div>`;
+    return `<div class="ibtn kick" data-act="kick" data-id="${dbID}" data-tip="${esc(L("Aus dem Raum werfen", "Kick from the room"))}">✕</div>`;
 }
 
 // --- parts -----------------------------------------------------------------------
@@ -214,7 +212,7 @@ function renderSlot(slot, idx) {
     const acts = [];
     if (mine) acts.push(`<div class="ibtn" data-act="leaveSlot" data-id="${p.dbID}" title="leave">${L("Verlassen", "Leave")}</div>`);
     else if (p && isCommander() && slot.isRemoveAvailable) {
-        acts.push(`<div class="ibtn" data-act="leaveSlot" data-id="${p.dbID}" title="to volunteers">${L("Raus", "Out")}</div>`);
+        acts.push(`<div class="ibtn" data-act="leaveSlot" data-id="${p.dbID}" data-tip="${esc(L("Zurück zu den Freiwilligen", "Back to the volunteers"))}">${L("Raus", "Out")}</div>`);
         acts.push(kickButton(p.dbID));
     }
     let who;
@@ -250,8 +248,8 @@ function renderSlot(slot, idx) {
             ${who}
             <div class="rating">${p ? esc(slot.rating || "") : ""}</div>
             ${veh}
-            ${acts.length ? `<div class="acts ${mine ? "always" : ""}">${acts.join("")}</div>` : ""}
             <div class="status">${slotStatus(slot)}</div>
+            <div class="acts ${mine ? "always" : ""}">${acts.join("")}</div>
         </div>`;
 }
 
@@ -583,20 +581,8 @@ document.addEventListener("click", (e) => {
         render();
     } else if (act === "takeSlot") send({ action: "takeSlot", slot: slot });
     else if (act === "leaveSlot") send({ action: "leaveSlot", dbID: id });
-    else if (act === "kick") {
-        if (ui.kickArm === id) {
-            ui.kickArm = 0;
-            send({ action: "kick", dbID: id });
-        } else {
-            ui.kickArm = id;
-            if (kickTimer) clearTimeout(kickTimer);
-            kickTimer = setTimeout(() => {
-                ui.kickArm = 0;
-                render();
-            }, 3000);
-        }
-        render();
-    } else if (act === "reserveOpen") {
+    else if (act === "kick") send({ action: "kick", dbID: id });
+    else if (act === "reserveOpen") {
         const open = data.reserveOptions && data.reserveOptions.slot === slot;
         send({ action: "reserveOpen", slot: open ? -1 : slot });
     } else if (act === "reserveSelect") {
@@ -750,8 +736,7 @@ document.addEventListener("keydown", (e) => {
             data.reserveOptions = null;
             send({ action: "reserveOpen", slot: -1 });
             render();
-        } else if (ui.selCand || ui.kickArm) {
-            ui.kickArm = 0;
+        } else if (ui.selCand) {
             if (drag) endDrag();
             else {
                 ui.selCand = 0;

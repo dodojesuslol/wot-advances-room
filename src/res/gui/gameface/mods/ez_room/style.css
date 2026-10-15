@@ -220,8 +220,12 @@ body {
 .veh.pick:hover .vname, .veh.none.pick:hover { color: #ffffff; }
 .veh.none.pick { color: #ffc46c; }
 
-.acts { display: none; flex-shrink: 0; align-items: center; margin-left: 6rem; }
-.acts.always, .slot:hover .acts, .cand:hover .acts { display: flex; }
+/* row buttons: laid over the end of the row and shown at once on hover (the row layout never
+   changes, so nothing flickers and the tank names keep their width) */
+.slot, .cand { position: relative; }
+.acts { position: absolute; right: 0; top: 0; bottom: 0; display: flex; align-items: center; padding: 0 6rem 0 14rem; background-color: rgba(30, 30, 31, 0.97); visibility: hidden; }
+.acts.always, .slot:hover .acts, .cand:hover .acts { visibility: visible; }
+.acts.always { position: static; padding: 0 0 0 6rem; background-color: transparent; }
 .ibtn {
     margin-left: 4rem;
     padding: 2rem 7rem;
@@ -233,7 +237,7 @@ body {
     white-space: nowrap;
 }
 .ibtn:hover { border-color: rgba(255, 255, 255, 0.5); color: #ffffff; }
-.ibtn.kick:hover, .ibtn.kick.armed { border-color: #ff7a52; color: #ff9a72; }
+.ibtn.kick:hover { border-color: #ff7a52; color: #ff9a72; }
 
 .cand.pickable { cursor: pointer; }
 .cand.sel { background-color: rgba(150, 205, 110, 0.18); }
