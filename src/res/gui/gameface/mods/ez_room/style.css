@@ -118,6 +118,8 @@ body {
 
 .cands { width: 210rem; flex-shrink: 0; }
 .cand { display: flex; align-items: center; height: 24rem; padding: 0 10rem; }
+.cgroup { padding: 8rem 10rem 3rem; color: rgba(233, 231, 220, 0.45); font-size: 11rem; text-transform: uppercase; }
+.inv { width: 6rem; height: 6rem; margin-right: 6rem; border-radius: 3rem; background-color: #4f9fe0; flex-shrink: 0; }
 .cand:hover { background-color: rgba(255, 255, 255, 0.05); }
 .cand .name { flex-grow: 1; width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cand .rating { color: rgba(233, 231, 220, 0.5); font-size: 11rem; margin-left: 6rem; }

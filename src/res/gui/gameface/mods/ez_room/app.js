@@ -84,15 +84,20 @@ function renderHeader() {
 }
 
 function renderCandidates() {
+    // the list also holds group headers ({headerText}) and spacers ({emptyRender})
     const list = data.candidates || [];
+    const players = list.filter((p) => p.dbID);
     const me = (data.me || {}).dbID;
-    const rows = list.length
+    const rows = players.length
         ? list
               .map((p) => {
+                  if (p.headerText) return `<div class="cgroup">${esc(txt(p.headerText))}</div>`;
+                  if (!p.dbID) return "";
                   const own = p.dbID === me;
                   const c = own ? "" : color((p.colors || [])[0]);
                   return `
                     <div class="cand ${p.isOffline ? "offline" : ""} ${own ? "own" : ""}">
+                        ${p.isInvite ? `<div class="inv" title="invited"></div>` : ""}
                         <div class="name" ${c ? `style="color:${c}"` : ""}>${esc(p.userName || p.fullName)}</div>
                         <div class="rating">${esc(p.rating || "")}</div>
                     </div>`;
@@ -101,7 +106,7 @@ function renderCandidates() {
         : `<div class="empty">${L("Niemand wartet", "Nobody waiting")}</div>`;
     return `
         <div class="panel cands">
-            <div class="ptitle">${L("Freiwillige", "Volunteers")}<span class="count">${list.length}</span></div>
+            <div class="ptitle">${L("Freiwillige", "Volunteers")}<span class="count">${players.length}</span></div>
             <div class="plist" data-scroll="60">${rows}</div>
         </div>`;
 }
