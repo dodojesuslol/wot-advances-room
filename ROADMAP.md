@@ -1,6 +1,6 @@
 # EZ ROOM – Roadmap: Funktionsgleichheit mit dem WG-Original
 
-Stand: v0.7.6 (2026-10-15). Ziel: Jede Funktion des Flash-Raums (`fortClanBattleRoom.swf` + `fortBattleRoomWindow.swf`)
+Stand: v0.7.7 (2026-10-15). Ziel: Jede Funktion des Flash-Raums (`fortClanBattleRoom.swf` + `fortBattleRoomWindow.swf`)
 einzeln mit dem Original vergleichen und alles, was fehlt, nachbauen. Zum Vergleich in einem echten Raum über den
 „Original“-Button umschalten (Esc / Mods-Button bringt die neue Oberfläche zurück).
 
@@ -23,7 +23,7 @@ Legende: ✅ vorhanden · 🟡 teilweise · ❌ fehlt · 🚫 bewusst weggelasse
 | A3 | Zurück-Link „Zur Abteilungszusammenstellung gehen“ (`backBtn`) | ❌ | Fenster-Meta `onBackClick()` auf `StrongholdBattleRoomWindow` |
 | A4 | Richtungs-/Gebäudegrafik (grüne Burg → Flaggen → ⚔ → rote Burg) | ❌ | `as_setDirectionS(value, animationNotAvailable)`, `as_updateReadyDirectionsS`; `makeDirectionVO` liefert `attack1..5`/`defense1..5`/`definition` |
 | A5 | Eigener Clan / Gegner-Clan mit Bereit-Anzeige | 🟡 | Namen + Glow da; WGs Bereit-Lämpchen-Optik fehlt |
-| A6 | Gefechts-Timer, normale und Alarm-Farbe (#ffdd99 / #ff7f00), Glow | 🟡 | Zeit läuft; Alarmfarbe fehlt (`as_setTimerDeltaS`: htmlFormatter/alertHtmlFormatter, state) |
+| A6 | Gefechts-Timer, normale und Alarm-Farbe (#ffdd99 / #ff7f00) | 🟡 | v0.7.7, im Spiel testen: letzte 10 s sofort orange + oranger Rand (Farben aus dem Timer-VO), ohne Animation |
 | A7 | Timer-Alarm-Ton (Flash ruft `onTimerAlert()` → `playBattleRoomTimerAlert`) | 🚫 | nicht nachbauen (Nutzer): der Flash-Timer läuft unter der Oberfläche weiter und spielt den Original-Ton selbst |
 | A8 | „Warten auf Gefecht“-Text (`waitForBattleDescr`) | ✅ | |
 | A9 | 4 Reserve-Plätze + Auswahl | ✅ | eigene Liste statt Popover |

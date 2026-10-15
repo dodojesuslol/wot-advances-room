@@ -486,20 +486,39 @@ function renderRaw() {
 
 let timerBase = null; // {deltaTime, at}
 
-function timerText() {
+function timerLeft() {
     const t = data.timer;
-    if (!t || typeof t.deltaTime !== "number") return "--:--";
+    if (!t || typeof t.deltaTime !== "number") return -1;
     const elapsed = timerBase ? (Date.now() - timerBase.at) / 1000 : 0;
-    const left = Math.max(0, Math.round(t.deltaTime - (data.timerAge || 0) - elapsed));
+    return Math.max(0, Math.round(t.deltaTime - (data.timerAge || 0) - elapsed));
+}
+
+function timerText() {
+    const left = timerLeft();
+    if (left < 0) return "--:--";
     const m = Math.floor(left / 60);
     const s = left % 60;
     return (m < 10 ? "0" : "") + m + ":" + (s < 10 ? "0" : "") + s;
 }
 
-setInterval(() => {
-    const el = document.getElementById("timer");
-    if (el) el.textContent = timerText();
-}, 500);
+// last 10 s: alert colour like WG's AdvancedClanBattleTimer (colour from the timer VO's
+// alertHtmlFormatter); switches at once, no animation
+const TIMER_ALERT_SEC = 10;
+function fmtColor(f, fallback) {
+    const m = /color\s*=\s*['"]?(#[0-9a-fA-F]{6})/.exec(String(f || ""));
+    return m ? m[1] : fallback;
+}
+function updateTimer(el) {
+    if (!el) return;
+    const t = data.timer || {};
+    const left = timerLeft();
+    const alert = left >= 0 && left <= TIMER_ALERT_SEC;
+    el.textContent = timerText();
+    el.className = "timer" + (alert ? " alert" : "");
+    el.style.color = alert ? fmtColor(t.alertHtmlFormatter, "#ff7f00") : fmtColor(t.htmlFormatter, "#ffdd99");
+}
+
+setInterval(() => updateTimer(document.getElementById("timer")), 500);
 
 // --- render ----------------------------------------------------------------------
 
@@ -549,6 +568,7 @@ function render() {
         newInput.value = chatDraft;
         if (chatFocus) newInput.focus();
     }
+    updateTimer(document.getElementById("timer"));
     const newLog = document.getElementById("chatlog");
     if (newLog && chatStick) newLog.scrollTop = newLog.scrollHeight;
 }
@@ -762,8 +782,7 @@ function readModel() {
         data = next;
         timerBase = { at: Date.now() };
         if (key === lastKey) {
-            const el = document.getElementById("timer");
-            if (el) el.textContent = timerText();
+            updateTimer(document.getElementById("timer"));
             return;
         }
         lastKey = key;

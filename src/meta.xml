@@ -1,6 +1,6 @@
 <root>
     <id>ez.advances_room</id>
-    <version>0.7.6</version>
+    <version>0.7.7</version>
     <name>EZ ROOM for ADV</name>
     <description>Modern web UI for the Stronghold / Advances battle room (overlays WG's Flash room, keeps all its logic).</description>
 </root>

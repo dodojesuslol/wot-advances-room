@@ -62,6 +62,7 @@ body {
     font-size: 18rem;
     font-weight: bold;
 }
+.timer.alert { border-color: #ff7f00; background-color: rgba(60, 18, 0, 0.85); }
 .wait { color: rgba(233, 231, 220, 0.7); font-size: 13rem; }
 
 .btn {
