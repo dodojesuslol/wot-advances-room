@@ -1,6 +1,6 @@
 # EZ ROOM – Roadmap: Funktionsgleichheit mit dem WG-Original
 
-Stand: v0.7.3 (2026-10-15). Ziel: Jede Funktion des Flash-Raums (`fortClanBattleRoom.swf` + `fortBattleRoomWindow.swf`)
+Stand: v0.7.4 (2026-10-15). Ziel: Jede Funktion des Flash-Raums (`fortClanBattleRoom.swf` + `fortBattleRoomWindow.swf`)
 einzeln mit dem Original vergleichen und alles, was fehlt, nachbauen. Zum Vergleich in einem echten Raum über den
 „Original“-Button umschalten (Esc / Mods-Button bringt die neue Oberfläche zurück).
 
@@ -94,7 +94,7 @@ Legende: ✅ vorhanden · 🟡 teilweise · ❌ fehlt · 🚫 bewusst weggelasse
 | # | Funktion im Original | Status | Hinweise / WG-API |
 |---|---|---|---|
 | F1 | **Automatische Gegnersuche / Warteschlange** (Panel im Fenster) | ✅ | bleibt WG-Original (Nutzerwunsch): Oberfläche blendet sich während der Suche aus und kommt danach zurück (v0.7.3, im Spiel bestätigt) |
-| F2 | **Warte-Overlay** („Daten werden geladen“, `showStrongholdWaiting`) | ❌ | `invalidateStrongholdWaiting` |
+| F2 | **Warte-Overlay** („Daten werden geladen“, `showStrongholdWaiting`) | 🟡 | v0.7.4, im Spiel testen: Hook auf `StrongholdBattleRoomWindow.as_setWaitingS` → eigener Schleier mit Kreisel + WG-Text über dem Raum (Variante 1, Nutzerwahl) |
 | F3 | Wartungsmodus (`onStrongholdMaintenance`) | ❌ | |
 | F4 | Cooldowns: Buttons kurz gesperrt (`as_setCoolDownS`) | ❌ | |
 | F5 | UI-Klänge (`g_strongholdSoundController`, Klick-Sounds) | ❌ | |

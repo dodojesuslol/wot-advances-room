@@ -80,6 +80,7 @@ body {
 
 /* body: volunteers | team | map + chat */
 .body {
+    position: relative;
     flex-grow: 1;
     display: flex;
     padding: 8rem;
@@ -400,3 +401,36 @@ body {
 }
 .thead { color: #ffe4c0; font-weight: bold; font-size: 12rem; margin-bottom: 3rem; }
 .tbody { color: rgba(233, 231, 220, 0.8); font-size: 11rem; }
+
+/* WG's waiting animation (room window as_setWaitingS): covers the room body, blocks clicks */
+.waitcover {
+    position: absolute;
+    left: 0;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: rgba(10, 10, 10, 0.78);
+}
+.waitbox {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-width: 260rem;
+    padding: 22rem 30rem;
+    background-color: rgba(24, 24, 25, 0.95);
+    border: 1rem solid rgba(255, 255, 255, 0.1);
+}
+.spinner {
+    width: 34rem;
+    height: 34rem;
+    margin-bottom: 12rem;
+    border: 3rem solid rgba(242, 138, 58, 0.25);
+    border-top-color: #f28a3a;
+    border-radius: 50%;
+    animation: ezspin 1s linear infinite;
+}
+@keyframes ezspin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+.waittext { color: #ffe4c0; font-size: 14rem; font-weight: bold; text-align: center; }

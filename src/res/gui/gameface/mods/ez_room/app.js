@@ -464,6 +464,18 @@ function renderFooter() {
         </div>`;
 }
 
+// WG's waiting animation of the room window ("loading data"): dark cover over the whole room
+function renderWaiting() {
+    if (data.waiting == null) return "";
+    return `
+        <div class="waitcover">
+            <div class="waitbox">
+                <div class="spinner"></div>
+                <div class="waittext">${esc(txt(data.waiting))}</div>
+            </div>
+        </div>`;
+}
+
 function renderRaw() {
     const raw = data.raw || {};
     const names = Object.keys(raw.calls || {}).sort();
@@ -530,7 +542,7 @@ function render() {
     const keep = {};
     root.querySelectorAll("[data-scroll]").forEach((el, i) => (keep[i] = el.scrollTop));
     const body = ui.raw ? renderRaw() : `${renderCandidates()}${renderTeam()}${renderSide()}`;
-    root.innerHTML = `${renderHeader()}<div class="body">${body}</div>${renderFooter()}${renderReservePopup()}<div id="tip" class="tip"></div>`;
+    root.innerHTML = `${renderHeader()}<div class="body">${body}${ui.raw ? "" : renderWaiting()}</div>${renderFooter()}${renderReservePopup()}<div id="tip" class="tip"></div>`;
     tipTarget = null;
     root.querySelectorAll("[data-scroll]").forEach((el, i) => {
         if (keep[i]) el.scrollTop = keep[i];

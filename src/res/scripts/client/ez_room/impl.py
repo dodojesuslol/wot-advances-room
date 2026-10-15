@@ -20,7 +20,7 @@ from helpers import dependency, getClientLanguage
 from helpers.i18n import makeString
 from skeletons.gui.impl import IGuiLoader
 
-__version__ = '0.7.3'
+__version__ = '0.7.4'
 _logger = logging.getLogger('EZ_ROOM')
 _logger.setLevel(logging.INFO)
 _LAYOUT_PATH = ('ez_room', 'views', 'EzRoomView')
@@ -303,6 +303,58 @@ def _installSearchHooks():
     StrongholdBattleRoomWindow._ezRoomSearchHooks = True
 
 
+# --- WG's waiting animation ("loading data") -------------------------------------------
+# The room window shows it (as_setWaitingS) while the stronghold data is not valid, e.g. after
+# the commander changed the settings. The overlay shows its own cover with WG's text meanwhile.
+
+def _installWaitingHook():
+    # once per client session; state is kept on the window view (survives dev reloads)
+    from gui.Scaleform.daapi.view.lobby.fortifications.stronghold_battle_room_window import StrongholdBattleRoomWindow
+    if StrongholdBattleRoomWindow.__dict__.get('_ezRoomWaitingHook'):
+        return
+    orig = StrongholdBattleRoomWindow.as_setWaitingS
+
+    def as_setWaitingS(self, visible, message):
+        result = orig(self, visible, message)
+        try:
+            self._ezRoomWaiting = (bool(visible), message)
+            import sys
+            loader = sys.modules.get('gui.mods.mod_ez_room')
+            bridge = loader.currentBridge() if loader is not None else None
+            if bridge is not None and bridge.window is not None and bridge.roomWindowView() is self:
+                bridge.changed()
+        except Exception:
+            logging.getLogger('EZ_ROOM').exception('waiting hook failed')
+        return result
+
+    StrongholdBattleRoomWindow.as_setWaitingS = as_setWaitingS
+    StrongholdBattleRoomWindow._ezRoomWaitingHook = True
+
+
+def _packWaiting(bridge):
+    # WG's waiting text while the room waits for data, else None
+    windowView = _roomWindowView(bridge)
+    if windowView is None:
+        return None
+    state = getattr(windowView, '_ezRoomWaiting', None)
+    if state is None:
+        # hook came after the room opened (dev reload): same rule as WG's invalidateStrongholdWaiting
+        try:
+            view = bridge.view
+            state = (view is not None and not view.prbEntity.isStrongholdSettingsValid(), '#waiting:prebattle/change_settings')
+        except Exception:
+            _logger.exception('waiting state failed')
+            return None
+    visible, message = state
+    if not visible:
+        return None
+    try:
+        text = _u(makeString(message)) if message else u''
+    except Exception:
+        text = u''
+    return text if text and not text.startswith(u'#') else u'…'
+
+
 # --- reserves ------------------------------------------------------------------------
 # Same list as WG's FortReserveSelectPopover; selecting runs the room's _selectReserve.
 def _packReserveOptions(view, slotIndex):
@@ -405,6 +457,7 @@ def _pack(bridge, frame=None, reserveSlot=-1):
         'filters': first('as_setFiltersDataS'),
         'highlight': first('as_highlightSlotsS'),
         'chat': _packChat(bridge),
+        'waiting': _packWaiting(bridge),
         'reserveOptions': None,
         'settings': _loadSettings(),
     }
@@ -757,6 +810,7 @@ def openOverlay(bridge, devConfig=None):
         _logger.exception('installing chat hook failed')
     try:
         _installSearchHooks()
+        _installWaitingHook()
     except Exception:
         _logger.exception('installing search hooks failed')
     if _searchActive(bridge):
@@ -774,5 +828,6 @@ def openOverlay(bridge, devConfig=None):
 # that starts before the overlay opens is seen too
 try:
     _installSearchHooks()
+    _installWaitingHook()
 except Exception:
     _logger.exception('installing search hooks failed')
