@@ -11,8 +11,7 @@ const ui = {
     raw: false,
     selCand: 0, // commander: candidate picked to be put into a slot
     kickArm: 0, // dbID whose kick button was clicked once (second click kicks)
-    filterSel: null, // vehicle filter list: Set of selected CDs while the list is open
-    filterSlot: -1,
+    sort: null, // team table sort {key: "clan"|"name"|"rating"|"tank", dir: 1|-1}; null = slot order
 };
 let kickTimer = 0;
 
@@ -193,75 +192,6 @@ function renderRoomActions() {
     return `<div class="pfoot">${btns.join("")}${status ? `<div class="pnote">${esc(status)}</div>` : ""}</div>`;
 }
 
-// slot class filter bits (FILTER_STATE in WG's fortifications vo_converters)
-const FILTER_TYPES = [["lightTank", 1], ["mediumTank", 2], ["heavyTank", 4], ["AT-SPG", 16], ["SPG", 8]];
-
-function filterTip(type) {
-    const items = (data.filters && data.filters.items) || [];
-    const bit = (FILTER_TYPES.find((t) => t[0] === type) || [])[1];
-    const it = items.find((i) => i.filterValue === bit);
-    return it ? it.tooltip : "";
-}
-
-// legionnaire filters of a free slot: editable for the commander, read-only for everyone else
-function renderSlotFilters(slot, idx) {
-    if (slot.player || slot.isClosed || !slot.isFiltersEnabled) return "";
-    const state = slot.filterState || 0;
-    const vehicles = slot.vehicles || [];
-    const edit = isCommander();
-    if (!edit && !state && !vehicles.length) return "";
-    const icons = FILTER_TYPES.map(([type, bit]) => {
-        const on = (state & bit) !== 0;
-        if (!edit && !on) return "";
-        return `<div class="fico ${on ? "on" : ""} ${edit ? "edit" : ""}" ${edit ? `data-act="filterClass" data-slot="${idx}" data-state="${state ^ bit}"` : ""} data-tip="${esc(filterTip(type))}" style="background-image:url(img://gui/maps/icons/filters/tanks/${type}.png)"></div>`;
-    }).join("");
-    const veh = edit
-        ? `<div class="ibtn fveh ${vehicles.length ? "on" : ""}" data-act="filterOpen" data-slot="${idx}">${L("Panzer", "Tanks")}${vehicles.length ? " " + vehicles.length : ""}</div>`
-        : vehicles.length
-          ? `<div class="fcount">${vehicles.length} ${L("Panzer", "tanks")}</div>`
-          : "";
-    const reset = edit && (state || vehicles.length) ? `<div class="ibtn" data-act="filterReset" data-slot="${idx}" data-tip="${esc(L("Filter zurücksetzen", "Reset filters"))}">✕</div>` : "";
-    return `<div class="filters">${icons}${veh}${reset}</div>`;
-}
-
-function renderFilterPopup() {
-    const o = data.filterOptions;
-    if (!o) return "";
-    if (ui.filterSlot !== o.slot || !ui.filterSel) {
-        ui.filterSlot = o.slot;
-        ui.filterSel = new Set(o.selected || []);
-    }
-    const groups = {};
-    (o.items || []).forEach((v) => (groups[v.type] = groups[v.type] || []).push(v));
-    const body = FILTER_TYPES.filter(([type]) => groups[type])
-        .map(
-            ([type]) => `
-            <div class="fgroup">
-                <div class="fghead"><div class="fico on" style="background-image:url(img://gui/maps/icons/filters/tanks/${type}.png)"></div></div>
-                <div class="fgrid">${groups[type]
-                    .map(
-                        (v) => `<div class="fchip ${ui.filterSel.has(v.cd) ? "sel" : ""} ${v.inHangar ? "" : "nohangar"}" data-act="filterToggle" data-id="${v.cd}">
-                            <div class="vicon" style="background-image:url(${img(v.icon)})"></div><div class="fname">${esc(v.name)}</div></div>`
-                    )
-                    .join("")}</div>
-            </div>`
-        )
-        .join("");
-    return `
-        <div class="modal" data-popup="1">
-            <div class="mbox">
-                <div class="ptitle">${L("Erlaubte Panzer für Platz", "Allowed tanks for slot")} ${o.slot + 1}<span class="grow"></span><span class="muted">${ui.filterSel.size} ${L("gewählt", "selected")}</span></div>
-                <div class="mbody" data-scroll="80">${body}</div>
-                <div class="mfoot">
-                    <div class="btn" data-act="filterNone">${L("Keine", "None")}</div>
-                    <span class="grow"></span>
-                    <div class="btn" data-act="filterCancel">${L("Abbrechen", "Cancel")}</div>
-                    <div class="btn main" data-act="filterApply">${L("Übernehmen", "Apply")}</div>
-                </div>
-            </div>
-        </div>`;
-}
-
 function slotStatus(slot) {
     const p = slot.player;
     if (!p) return "";
@@ -293,6 +223,7 @@ function renderSlot(slot, idx) {
         const own = p.dbID === me;
         const c = own ? "" : color((p.colors || [])[0]);
         who = `
+            <div class="clan">${esc(p.clanAbbrev ? "[" + p.clanAbbrev + "]" : "")}</div>
             <div class="who">
                 ${p.isCommander ? `<div class="crown" title="commander"></div>` : ""}
                 <div class="name ${own ? "own" : ""} ${p.isOffline ? "offline" : ""}" ${c ? `style="color:${c}"` : ""}>${esc(p.userName || p.fullName)}</div>
@@ -300,7 +231,7 @@ function renderSlot(slot, idx) {
             </div>`;
     } else {
         const label = txt(slot.slotLabel) || (slot.isClosed ? L("Gesperrt", "Closed") : L("Freier Platz", "Free slot"));
-        who = `<div class="who"><div class="name free">${esc(label)}</div></div>`;
+        who = `<div class="clan"></div><div class="who"><div class="name free">${esc(label)}</div></div>`;
     }
     const vehAct = mine ? `data-act="chooseVehicle" data-cd="${v ? v.intCD : 0}"` : "";
     const veh = v
@@ -320,7 +251,6 @@ function renderSlot(slot, idx) {
             ${who}
             <div class="rating">${p ? esc(slot.rating || "") : ""}</div>
             ${veh}
-            ${renderSlotFilters(slot, idx)}
             ${acts.length ? `<div class="acts ${mine ? "always" : ""}">${acts.join("")}</div>` : ""}
             <div class="status">${slotStatus(slot)}</div>
         </div>`;
@@ -337,8 +267,70 @@ function renderTeam() {
                 <span class="grow"></span>
                 ${vt ? `<span class="muted">${esc(txt(vt[0]))}</span>` : ""}
             </div>
-            <div class="slots" data-scroll="60">${slots.map(renderSlot).join("")}</div>
+            ${renderColumns()}
+            <div class="slots" data-scroll="60">${sortedSlots().map(([slot, idx]) => renderSlot(slot, idx)).join("")}</div>
             ${renderReadyBar()}
+        </div>`;
+}
+
+// --- team table sorting (display only; empty slots always stay below, in slot order) ---
+const SORT_COLS = [
+    ["clan", () => L("Clan", "Clan")],
+    ["name", () => L("Name", "Name")],
+    ["rating", () => L("Wertung", "Rating")],
+    ["tank", () => L("Panzer", "Tank")],
+];
+
+function ratingValue(slot) {
+    const n = parseInt(String(slot.rating || (slot.player && slot.player.rating) || "").replace(/[^0-9]/g, ""), 10);
+    return isNaN(n) ? -1 : n;
+}
+
+function sortValue(slot, key) {
+    const p = slot.player;
+    const v = slot.selectedVehicle;
+    if (key === "clan") return (p.clanAbbrev || "").toLowerCase();
+    if (key === "name") return (p.userName || p.fullName || "").toLowerCase();
+    if (key === "rating") return ratingValue(slot);
+    if (key === "tank") return v ? (v.shortUserName || v.userName || "").toLowerCase() : null;
+    return 0;
+}
+
+function sortedSlots() {
+    const rows = (data.slots || []).map((slot, idx) => [slot, idx]);
+    const sort = ui.sort;
+    if (!sort || !sort.key || !sort.dir) return rows;
+    const taken = rows.filter(([s]) => s && s.player);
+    const rest = rows.filter(([s]) => !(s && s.player));
+    taken.sort((a, b) => {
+        const va = sortValue(a[0], sort.key);
+        const vb = sortValue(b[0], sort.key);
+        // players without a value (no clan / no tank) always go below the others
+        const ea = va === null || va === "" || va === -1;
+        const eb = vb === null || vb === "" || vb === -1;
+        if (ea !== eb) return ea ? 1 : -1;
+        let c = 0;
+        if (typeof va === "number") c = va - vb;
+        else c = va < vb ? -1 : va > vb ? 1 : 0;
+        return c * sort.dir || a[1] - b[1];
+    });
+    return taken.concat(rest);
+}
+
+function renderColumns() {
+    const sort = ui.sort || {};
+    const head = (key, label, cls) => {
+        const on = sort.key === key && sort.dir;
+        const arrow = on ? (sort.dir > 0 ? "▲" : "▼") : "";
+        return `<div class="col ${cls} ${on ? "on" : ""}" data-act="sort" data-key="${key}">${esc(label())}<span class="arrow">${arrow}</span></div>`;
+    };
+    return `
+        <div class="cols">
+            <div class="col no"></div>
+            ${head("clan", SORT_COLS[0][1], "c-clan")}
+            ${head("name", SORT_COLS[1][1], "c-name")}
+            ${head("rating", SORT_COLS[2][1], "c-rating")}
+            ${head("tank", SORT_COLS[3][1], "c-tank")}
         </div>`;
 }
 
@@ -538,12 +530,8 @@ function render() {
     const keep = {};
     root.querySelectorAll("[data-scroll]").forEach((el, i) => (keep[i] = el.scrollTop));
     const body = ui.raw ? renderRaw() : `${renderCandidates()}${renderTeam()}${renderSide()}`;
-    root.innerHTML = `${renderHeader()}<div class="body">${body}</div>${renderFooter()}${renderReservePopup()}${renderFilterPopup()}<div id="tip" class="tip"></div>`;
+    root.innerHTML = `${renderHeader()}<div class="body">${body}</div>${renderFooter()}${renderReservePopup()}<div id="tip" class="tip"></div>`;
     tipTarget = null;
-    if (!data.filterOptions) {
-        ui.filterSel = null;
-        ui.filterSlot = -1;
-    }
     root.querySelectorAll("[data-scroll]").forEach((el, i) => {
         if (keep[i]) el.scrollTop = keep[i];
     });
@@ -610,25 +598,15 @@ document.addEventListener("click", (e) => {
         send({ action: "reserveOpen", slot: open ? -1 : slot });
     } else if (act === "reserveSelect") {
         send({ action: "reserveSelect", id: id, remove: el.getAttribute("data-remove") === "1" });
-    } else if (act === "filterClass") send({ action: "filterClass", slot: slot, state: Number(el.getAttribute("data-state")) || 0 });
-    else if (act === "filterReset") send({ action: "filterReset", slot: slot });
-    else if (act === "filterOpen") send({ action: "filterOpen", slot: slot });
-    else if (act === "filterToggle") {
-        if (ui.filterSel) {
-            if (ui.filterSel.has(id)) ui.filterSel.delete(id);
-            else ui.filterSel.add(id);
-            render();
-        }
-    } else if (act === "filterNone") {
-        if (ui.filterSel) ui.filterSel.clear();
+    } else if (act === "sort") {
+        // first click ascending, second descending, third back to slot order
+        const key = el.getAttribute("data-key");
+        const cur = ui.sort || {};
+        let dir = 1;
+        if (cur.key === key) dir = cur.dir === 1 ? -1 : cur.dir === -1 ? 0 : 1;
+        ui.sort = dir ? { key: key, dir: dir } : null;
+        send({ action: "sort", key: dir ? key : "", dir: dir });
         render();
-    } else if (act === "filterCancel") {
-        data.filterOptions = null;
-        send({ action: "filterOpen", slot: -1 });
-        render();
-    } else if (act === "filterApply") {
-        const o = data.filterOptions;
-        if (o && ui.filterSel) send({ action: "filterVehicles", slot: o.slot, cds: Array.from(ui.filterSel).join(",") });
     } else if (act === "chatSend") sendChat();
     else if (act === "chooseVehicle") send({ action: "chooseVehicle", cd: Number(el.getAttribute("data-cd")) || 0 });
     else if (act === "ready" || act === "invite" || act === "toggleOpen" || act === "configure") send({ action: act });
@@ -699,11 +677,7 @@ document.addEventListener("keydown", (e) => {
     }
     if (e.keyCode === 116 && data.dev) send({ action: "devReload" });
     else if (e.keyCode === 27) {
-        if (data.filterOptions) {
-            data.filterOptions = null;
-            send({ action: "filterOpen", slot: -1 });
-            render();
-        } else if (data.reserveOptions) {
+        if (data.reserveOptions) {
             data.reserveOptions = null;
             send({ action: "reserveOpen", slot: -1 });
             render();
@@ -719,6 +693,7 @@ document.addEventListener("keydown", (e) => {
 // WG pushes the battle timer every second (with the same room data again): only rebuild the
 // DOM when something besides the timer changed, so clicks and hover are not interrupted
 let lastKey = "";
+let sortLoaded = false;
 
 function readModel() {
     try {
@@ -734,6 +709,11 @@ function readModel() {
             return;
         }
         lastKey = key;
+        if (!sortLoaded) {
+            sortLoaded = true;
+            const saved = (data.settings || {}).sort;
+            if (saved && saved.key && saved.dir) ui.sort = { key: saved.key, dir: saved.dir };
+        }
         if (ui.selCand && (!(data.candidates || []).some((c) => c.dbID === ui.selCand) || slotOf(ui.selCand) !== -1)) ui.selCand = 0;
         render();
         if (data.frame && !sizeLogged) {

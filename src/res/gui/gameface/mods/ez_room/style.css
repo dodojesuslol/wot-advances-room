@@ -131,7 +131,7 @@ body {
 .slot {
     display: flex;
     align-items: center;
-    height: 29rem;
+    height: 28rem;
     margin-bottom: 2rem;
     padding-right: 8rem;
     background-color: rgba(255, 255, 255, 0.035);
@@ -141,7 +141,7 @@ body {
 .slot.closed { opacity: 0.4; }
 .slot.hl { background-color: rgba(150, 205, 110, 0.12); border-left-color: #96cd6e; }
 .slot .no { width: 24rem; flex-shrink: 0; text-align: right; padding-right: 8rem; color: rgba(233, 231, 220, 0.4); font-size: 11rem; }
-.slot .who { width: 160rem; flex-shrink: 0; display: flex; align-items: center; overflow: hidden; }
+.slot .who { width: 150rem; flex-shrink: 0; display: flex; align-items: center; overflow: hidden; }
 .slot .who .name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .slot .name.free { color: rgba(233, 231, 220, 0.3); }
 .slot .rating { width: 44rem; flex-shrink: 0; text-align: right; padding-right: 8rem; color: rgba(233, 231, 220, 0.5); font-size: 11rem; }
@@ -365,63 +365,18 @@ body {
 .rcount { flex-shrink: 0; font-size: 11rem; color: rgba(233, 231, 220, 0.7); }
 .ropt.sel .rcount { color: #ff9a72; }
 
-/* slot filters */
-.filters { flex-shrink: 0; display: flex; align-items: center; margin-left: 6rem; }
-.fico {
-    width: 18rem;
-    height: 18rem;
-    margin-left: 2rem;
-    background-size: contain;
-    background-repeat: no-repeat;
-    background-position: center;
-    opacity: 0.3;
-}
-.fico.on { opacity: 1; }
-.fico.edit { cursor: pointer; }
-.fico.edit:hover { opacity: 0.8; }
-.ibtn.fveh.on { border-color: rgba(255, 196, 108, 0.6); color: #ffd79a; }
-.fcount { margin-left: 4rem; font-size: 11rem; color: #ffd79a; }
-
-/* vehicle filter list */
-.modal {
-    position: absolute;
-    left: 0;
-    top: 0;
-    width: 100%;
-    height: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background-color: rgba(0, 0, 0, 0.55);
-}
-.mbox {
-    width: 760rem;
-    height: 540rem;
-    display: flex;
-    flex-direction: column;
-    background-color: rgba(20, 20, 21, 0.98);
-    border: 1rem solid rgba(255, 196, 108, 0.35);
-}
-.mbody { flex-grow: 1; height: 0; overflow-y: hidden; padding: 6rem 10rem; }
-.mfoot { flex-shrink: 0; display: flex; align-items: center; padding: 8rem 10rem; border-top: 1rem solid rgba(255, 255, 255, 0.07); }
-.fgroup { display: flex; margin-bottom: 8rem; }
-.fghead { width: 28rem; flex-shrink: 0; padding-top: 4rem; }
-.fgrid { flex-grow: 1; width: 0; display: flex; flex-wrap: wrap; }
-.fchip {
-    width: 172rem;
-    height: 28rem;
-    margin: 0 4rem 4rem 0;
-    display: flex;
-    align-items: center;
-    border: 1rem solid rgba(255, 255, 255, 0.08);
-    background-color: rgba(255, 255, 255, 0.03);
-    cursor: pointer;
-}
-.fchip:hover { background-color: rgba(255, 255, 255, 0.08); }
-.fchip.sel { border-color: rgba(255, 196, 108, 0.8); background-color: rgba(255, 196, 108, 0.14); }
-.fchip.nohangar .fname { color: rgba(233, 231, 220, 0.55); }
-.fchip .vicon { width: 50rem; height: 18rem; }
-.fname { flex-grow: 1; width: 0; font-size: 12rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* team table columns */
+.cols { flex-shrink: 0; display: flex; align-items: center; height: 22rem; padding: 2rem 12rem 0 7rem; }
+.col { font-size: 11rem; color: rgba(233, 231, 220, 0.5); cursor: pointer; white-space: nowrap; }
+.col:hover { color: #eeede9; }
+.col.on { color: #ffd79a; }
+.col.no { width: 32rem; flex-shrink: 0; cursor: default; }
+.col.c-clan { width: 64rem; flex-shrink: 0; }
+.col.c-name { width: 150rem; flex-shrink: 0; }
+.col.c-rating { width: 44rem; flex-shrink: 0; text-align: right; padding-right: 8rem; }
+.col.c-tank { flex-grow: 1; padding-left: 4rem; }
+.arrow { margin-left: 3rem; font-size: 9rem; }
+.slot .clan { width: 64rem; flex-shrink: 0; font-size: 11rem; color: rgba(233, 231, 220, 0.55); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* tooltip */
 .tip {

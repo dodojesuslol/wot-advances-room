@@ -20,12 +20,35 @@ from helpers import dependency, getClientLanguage
 from helpers.i18n import makeString
 from skeletons.gui.impl import IGuiLoader
 
-__version__ = '0.6.0'
+__version__ = '0.7.0'
 _logger = logging.getLogger('EZ_ROOM')
 _logger.setLevel(logging.INFO)
 _LAYOUT_PATH = ('ez_room', 'views', 'EzRoomView')
 _UI_DIR = 'res/gui/gameface/mods/ez_room'
 _SNAPSHOT_FILE = os.path.join('mods', 'configs', 'ez_room', 'last_room.json')  # dev only, for the preview
+_SETTINGS_FILE = os.path.join('mods', 'configs', 'ez_room', 'settings.json')  # UI settings (team table sort)
+
+
+def _loadSettings():
+    try:
+        if os.path.isfile(_SETTINGS_FILE):
+            with open(_SETTINGS_FILE, 'r') as f:
+                data = json.load(f)
+            return data if isinstance(data, dict) else {}
+    except Exception:
+        _logger.exception('reading %s failed', _SETTINGS_FILE)
+    return {}
+
+
+def _saveSettings(settings):
+    try:
+        folder = os.path.dirname(_SETTINGS_FILE)
+        if not os.path.isdir(folder):
+            os.makedirs(folder)
+        with open(_SETTINGS_FILE, 'w') as f:
+            json.dump(settings, f)
+    except Exception:
+        _logger.exception('writing %s failed', _SETTINGS_FILE)
 
 # set by the loader in dev mode: contents of dev.json ({'src': 'X:/.../src', optional 'layer', 'offset'})
 DEV = None
@@ -256,34 +279,6 @@ def _packReserveOptions(view, slotIndex):
     return {'slot': slotIndex, 'title': _u(rally_vo.getReserveGroupTitle(groupType)), 'items': items}
 
 
-# --- slot filters (commander, free slots for legionnaires) ----------------------------
-# Class filter: the room's onFiltersChange/resetFilters (same as Flash). Vehicle filter: same as
-# the room's handler for WG's multi-select popover (__onUpdateFilterVehicles).
-def _packFilterOptions(view, slotIndex):
-    from gui.Scaleform.daapi.view.lobby.fortifications.fort_vehicle_select_popover import getVehicleCriteria
-    from gui.shared.gui_items.Vehicle import VEHICLE_TYPES_ORDER, getSmallIconPath
-    import nations
-    entity = view.prbEntity
-    levelsRange = entity.getRosterSettings().getLevelsRange()
-    selected = []
-    try:
-        selected = list(entity.getSlotFilters().get(slotIndex, {}).get('vehicle_cds', []) or [])
-    except Exception:
-        _logger.exception('slot filter lookup failed')
-    items = []
-    for vehicle in view.itemsCache.items.getVehicles(getVehicleCriteria(levelsRange, inHangar=False)).itervalues():
-        items.append({'cd': vehicle.intCD,
-                      'name': _u(vehicle.shortUserName),
-                      'type': vehicle.type,
-                      'typeIdx': VEHICLE_TYPES_ORDER.index(vehicle.type) if vehicle.type in VEHICLE_TYPES_ORDER else 9,
-                      'nation': nations.NAMES[vehicle.nationID],
-                      'level': vehicle.level,
-                      'inHangar': bool(vehicle.isInInventory),
-                      'icon': _img(getSmallIconPath(vehicle.name))})
-    items.sort(key=lambda i: (i['typeIdx'], i['nation'], i['name']))
-    return {'slot': slotIndex, 'selected': selected, 'items': items}
-
-
 def _actionButton(vo):
     # WG's ready button state; label is an i18n key ('#cyberSport:window/unit/ready')
     if not isinstance(vo, dict):
@@ -299,7 +294,7 @@ def _actionButton(vo):
     return vo
 
 
-def _pack(bridge, frame=None, reserveSlot=-1, filterSlot=-1):
+def _pack(bridge, frame=None, reserveSlot=-1):
     view = bridge.view
     calls = bridge.calls
     first = lambda name, default=None: calls[name][0] if name in calls and calls[name] else default
@@ -356,13 +351,8 @@ def _pack(bridge, frame=None, reserveSlot=-1, filterSlot=-1):
         'highlight': first('as_highlightSlotsS'),
         'chat': _packChat(bridge),
         'reserveOptions': None,
+        'settings': _loadSettings(),
     }
-    data['filterOptions'] = None
-    if filterSlot >= 0 and view is not None:
-        try:
-            data['filterOptions'] = _packFilterOptions(view, filterSlot)
-        except Exception:
-            _logger.exception('filter options failed')
     if reserveSlot >= 0 and view is not None:
         try:
             data['reserveOptions'] = _packReserveOptions(view, reserveSlot)
@@ -405,7 +395,6 @@ class EzRoomView(ViewImpl):
         self._tracking = False
         self._loggedRect = False
         self._reserveSlot = -1  # reserve slot whose list is open
-        self._filterSlot = -1   # slot whose vehicle filter list is open
 
     @property
     def viewModel(self):
@@ -460,7 +449,7 @@ class EzRoomView(ViewImpl):
 
     def onRoomChanged(self):
         try:
-            data = _pack(self._bridge, self._frame, self._reserveSlot, self._filterSlot)
+            data = _pack(self._bridge, self._frame, self._reserveSlot)
             self.viewModel.setData(json.dumps(data))
         except Exception:
             _logger.exception('packing room data failed')
@@ -512,22 +501,10 @@ class EzRoomView(ViewImpl):
                 if view is not None:
                     view._selectReserve({'newId': int(args.get('id')), 'oldId': None, 'isRemove': bool(args.get('remove'))})
                 self.onRoomChanged()
-            elif action == 'filterClass':
-                bridge.call('onFiltersChange', int(args.get('slot')), int(args.get('state')))
-            elif action == 'filterReset':
-                bridge.call('resetFilters', int(args.get('slot')))
-            elif action == 'filterOpen':
-                self._filterSlot = int(args.get('slot', -1))
-                self.onRoomChanged()
-            elif action == 'filterVehicles':
-                slotIndex = int(args.get('slot'))
-                cds = [int(cd) for cd in (args.get('cds') or u'').split(',') if cd]
-                self._filterSlot = -1
-                view = bridge.view
-                if view is not None:
-                    view._StrongholdBattleRoom__setVehicles(slotIndex, cds or None)
-                    view._updateMembersData()
-                self.onRoomChanged()
+            elif action == 'sort':
+                settings = _loadSettings()
+                settings['sort'] = {'key': args.get('key') or u'', 'dir': int(args.get('dir') or 0)}
+                _saveSettings(settings)
             elif action == 'chatSend':
                 text = (args.get('text') or u'').strip()
                 component = _chatComponent(bridge)
