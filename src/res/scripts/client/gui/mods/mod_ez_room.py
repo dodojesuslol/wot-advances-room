@@ -122,7 +122,7 @@ class RoomBridge(object):
     def _push(self):
         self._pushPending = False
         window = self.window
-        if window is None:
+        if window is None or window.content is None:
             return
         try:
             window.content.onRoomChanged()

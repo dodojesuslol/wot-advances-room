@@ -20,7 +20,7 @@ from helpers import dependency, getClientLanguage
 from helpers.i18n import makeString
 from skeletons.gui.impl import IGuiLoader
 
-__version__ = '0.7.0'
+__version__ = '0.7.1'
 _logger = logging.getLogger('EZ_ROOM')
 _logger.setLevel(logging.INFO)
 _LAYOUT_PATH = ('ez_room', 'views', 'EzRoomView')
@@ -442,7 +442,13 @@ class EzRoomView(ViewImpl):
     def _finalize(self):
         self._tracking = False
         try:
-            self._bridge.onWindowGone(self.getParentWindow())
+            bridge = self._bridge
+            window = bridge.window
+            if window is not None and window.content in (None, self):
+                # destroyed by the game, not by us (bridge.close clears bridge.window first): WG's
+                # fullscreen manager closes every other FULLSCREEN_WINDOW when one opens
+                bridge.window = None
+                _reopenAfterExternalClose(bridge, window.uniqueID)
         except Exception:
             _logger.exception('finalize failed')
         super(EzRoomView, self)._finalize()
@@ -573,7 +579,9 @@ class EzRoomView(ViewImpl):
                 from advances_picker import impl as picker
                 entity = view.prbEntity
                 levelsRange = entity.getRosterSettings().getLevelsRange()
-                pickerLoader._reopen(levelsRange, picker._frozenCDs(view), currentCD)
+                frozen = picker._frozenCDs(view)
+                # the picker is a FULLSCREEN_WINDOW too: hide the overlay ourselves, back after it closes
+                _whileWgWindow(bridge, lambda: pickerLoader._reopen(levelsRange, frozen, currentCD))
                 return
         except Exception:
             _logger.exception('opening EZ TANK PICKER failed, using WG selector')
@@ -620,6 +628,32 @@ def _whileWgWindow(bridge, opener):
         if (state['seen'] and count <= baseline) or (not state['seen'] and state['waited'] >= _WATCH_TIMEOUT):
             bridge.open(manual=True)
             return
+        BigWorld.callback(0.25, poll)
+
+    BigWorld.callback(0.25, poll)
+
+
+def _reopenAfterExternalClose(bridge, ownID):
+    # reopen once the window that pushed us out is gone (window count drops below its peak)
+    try:
+        state = {'max': _wgWindowCount(ownID)}
+    except Exception:
+        _logger.exception('counting windows failed')
+        return
+    _logger.info('overlay closed by the game, waiting to reopen it')
+
+    def poll():
+        if bridge.view is None or bridge.window is not None or bridge.hidden:
+            return  # room gone, reopened by hand, or hidden on purpose
+        try:
+            count = _wgWindowCount(ownID)
+        except Exception:
+            _logger.exception('counting windows failed')
+            return
+        if count < state['max']:
+            bridge.open(manual=True)
+            return
+        state['max'] = max(state['max'], count)
         BigWorld.callback(0.25, poll)
 
     BigWorld.callback(0.25, poll)

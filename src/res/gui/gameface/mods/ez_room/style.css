@@ -276,15 +276,7 @@ body {
 }
 .chatlog { flex-grow: 1; height: 0; overflow-y: hidden; padding: 0 10rem 4rem; }
 .cline { margin: 0; font-size: 13rem; line-height: 17rem; color: #979589; word-wrap: break-word; }
-.smiley {
-    display: inline-block;
-    width: 16rem;
-    height: 16rem;
-    margin: 0 2rem;
-    vertical-align: middle;
-    background-size: contain;
-    background-repeat: no-repeat;
-}
+.smiley { width: 16rem; height: 16rem; margin: 0 2rem; vertical-align: middle; }
 .chatin { flex-shrink: 0; display: flex; align-items: center; padding: 8rem 10rem 10rem; }
 .chatin input {
     flex-grow: 1;

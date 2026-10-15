@@ -363,7 +363,7 @@ function smileys(text) {
     return text.replace(/(^|\s|&nbsp;)(\S+)(?=$|\s|&nbsp;)/g, (all, pre, word) => {
         const w = word.replace(/&gt;/g, ">");
         const hit = SMILEYS.find((sm) => sm[0] === w);
-        return hit ? `${pre}<span class="smiley" style="background-image:url(img://gui/maps/icons/emoji/smiley_${hit[1]}.png)"></span>` : all;
+        return hit ? `${pre}<img class="smiley" src="img://gui/maps/icons/emoji/smiley_${hit[1]}.png" />` : all;
     });
 }
 
