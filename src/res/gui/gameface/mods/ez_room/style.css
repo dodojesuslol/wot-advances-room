@@ -183,16 +183,20 @@ body {
 .gleft { width: 14rem; flex-shrink: 0; padding-top: 1rem; display: flex; flex-direction: column; }
 .grow-l { height: 20rem; flex-shrink: 0; display: flex; align-items: center; font-size: 10rem; color: rgba(233, 231, 220, 0.5); }
 .gmap {
-    width: 200rem;
-    height: 200rem;
+    /* 200 x 200 inside the 1 px border: border-box set explicitly, Gameface and Firefox count the
+       border differently otherwise (0.7.11: only 9 cells per row in game) */
+    box-sizing: border-box;
+    width: 202rem;
+    height: 202rem;
     flex-shrink: 0;
     display: flex;
-    flex-wrap: wrap;
+    flex-direction: column;
     background-color: rgba(30, 32, 28, 0.9);
     background-size: 100% 100%;
     border: 1rem solid rgba(255, 255, 255, 0.12);
 }
-.gcell { width: 20rem; height: 20rem; box-sizing: border-box; border-right: 1rem solid rgba(0, 0, 0, 0.35); border-bottom: 1rem solid rgba(0, 0, 0, 0.35); }
+.grow-c { display: flex; flex-shrink: 0; width: 200rem; height: 20rem; }
+.gcell { flex-shrink: 0; width: 20rem; height: 20rem; box-sizing: border-box; border-right: 1rem solid rgba(0, 0, 0, 0.35); border-bottom: 1rem solid rgba(0, 0, 0, 0.35); }
 .chat { flex-grow: 1; }
 
 .raw { flex-grow: 1; }

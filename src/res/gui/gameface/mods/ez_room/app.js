@@ -429,8 +429,13 @@ const GRID_COLS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"];
 function renderMapGrid() {
     const cols = GRID_COLS.map((c) => `<div class="gcol">${c}</div>`).join("");
     const rows = GRID_ROWS.map((r) => `<div class="grow-l">${r}</div>`).join("");
+    // 10 fixed rows of 10 cells: nothing can wrap into an extra row if a pixel is missing
     let cells = "";
-    for (let i = 0; i < 100; i++) cells += `<div class="gcell"></div>`;
+    for (let r = 0; r < 10; r++) {
+        let row = "";
+        for (let c = 0; c < 10; c++) row += `<div class="gcell"></div>`;
+        cells += `<div class="grow-c">${row}</div>`;
+    }
     return `
         <div class="mapgrid">
             <div class="gtop"><div class="gcorner"></div>${cols}</div>
