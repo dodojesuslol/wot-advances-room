@@ -342,7 +342,7 @@ function renderReadyBar() {
     return `
         <div class="readybar">
             <div class="state ${ui.selCand ? "hint" : ""}">${esc(hint)}</div>
-            <div class="btn main ${ab.isEnabled ? "" : "off"} ${ab.isReady ? "isready" : ""}" ${ab.isEnabled ? `data-act="ready"` : ""} data-tip="${esc(ab.toolTipData || "")}">${esc(label)}</div>
+            <div class="btn readybtn ${ab.isEnabled ? "" : "off"} ${ab.isReady ? "unready" : "ready"}" ${ab.isEnabled ? `data-act="ready"` : ""} data-tip="${esc(ab.toolTipData || "")}">${esc(label)}</div>
         </div>`;
 }
 

@@ -131,7 +131,7 @@ body {
 .slot {
     display: flex;
     align-items: center;
-    height: 28rem;
+    height: 27rem;
     margin-bottom: 2rem;
     padding-right: 8rem;
     background-color: rgba(255, 255, 255, 0.035);
@@ -241,15 +241,33 @@ body {
 .btn.wide { margin: 0 0 6rem 0; text-align: center; }
 .pnote { color: rgba(233, 231, 220, 0.5); font-size: 11rem; text-align: center; }
 
+/* ready bar: WG's state text above, button centred below (like the Flash room) */
 .readybar {
     flex-shrink: 0;
     display: flex;
+    flex-direction: column;
     align-items: center;
-    height: 40rem;
+    justify-content: center;
+    height: 50rem;
     padding: 0 8rem;
     border-top: 1rem solid rgba(255, 255, 255, 0.07);
 }
-.readybar .state { flex-grow: 1; width: 0; color: #ff9a72; font-size: 12rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.readybar .state { max-width: 100%; margin-bottom: 4rem; color: #ff9a72; font-size: 12rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.btn.readybtn {
+    margin-left: 0;
+    min-width: 140rem;
+    padding: 5rem 22rem;
+    border: none;
+    text-align: center;
+    color: #ffffff;
+    font-size: 13rem;
+    font-weight: bold;
+}
+.btn.readybtn.ready { background-image: linear-gradient(to bottom, #7fbf55, #4e8a2c); }
+.btn.readybtn.ready:hover { background-image: linear-gradient(to bottom, #94d468, #5c9c36); }
+.btn.readybtn.unready { background-image: linear-gradient(to bottom, #e0553f, #a8301f); }
+.btn.readybtn.unready:hover { background-image: linear-gradient(to bottom, #f06a52, #bb3a27); }
+.btn.readybtn.off { background-image: none; background-color: rgba(255, 255, 255, 0.08); color: rgba(233, 231, 220, 0.35); cursor: default; }
 .readybar .state.hint { color: #c4e2a8; }
 .btn.main {
     margin-left: 8rem;
