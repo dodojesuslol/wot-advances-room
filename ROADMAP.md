@@ -1,6 +1,6 @@
 # EZ ROOM – Roadmap: Funktionsgleichheit mit dem WG-Original
 
-Stand: v0.7.4 (2026-10-15). Ziel: Jede Funktion des Flash-Raums (`fortClanBattleRoom.swf` + `fortBattleRoomWindow.swf`)
+Stand: v0.7.5 (2026-10-15). Ziel: Jede Funktion des Flash-Raums (`fortClanBattleRoom.swf` + `fortBattleRoomWindow.swf`)
 einzeln mit dem Original vergleichen und alles, was fehlt, nachbauen. Zum Vergleich in einem echten Raum über den
 „Original“-Button umschalten (Esc / Mods-Button bringt die neue Oberfläche zurück).
 
@@ -49,7 +49,7 @@ Legende: ✅ vorhanden · 🟡 teilweise · ❌ fehlt · 🚫 bewusst weggelasse
 | B13 | Prestige-Stufe (`prestigeLevel`) | ❌ | |
 | B14 | Freien Platz nehmen | ✅ | `assignSlotRequest(slot, -1)` |
 | B15 | Platz verlassen / Kommandant: Spieler raus, kicken | ✅ | `leaveSlotRequest`, `requestToKickUser` |
-| B16 | Drag & Drop Freiwillige → Platz | 🟡 | ersetzt durch Klick-Zuweisung |
+| B16 | Drag & Drop Freiwillige → Platz | 🟡 | v0.7.5, im Spiel testen: Kommandant klickt Freiwilligen → nächster freier erlaubter Platz (`getAvailableSlots`, kleinste Nummer); ziehen → grüne Plätze, loslassen = genau dieser Platz. Zwei-Klick-Verfahren entfernt (Nutzerwunsch) |
 | B17 | Gesperrte / geschlossene Plätze, Legionärs-Suchplätze („Spieler wird gesucht“) | 🟡 | Label kommt mit, Optik prüfen |
 | B18 | Rechtsklick-Menü | ✅ | `BackportContextMenuWindow` mit `UNIT_USER` |
 | B19 | Spieler-Tooltip (WG-Nutzerinfo) und Panzer-Tooltip | ❌ | WG-Backport-Tooltips statt eigener |

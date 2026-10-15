@@ -20,7 +20,7 @@ from helpers import dependency, getClientLanguage
 from helpers.i18n import makeString
 from skeletons.gui.impl import IGuiLoader
 
-__version__ = '0.7.4'
+__version__ = '0.7.5'
 _logger = logging.getLogger('EZ_ROOM')
 _logger.setLevel(logging.INFO)
 _LAYOUT_PATH = ('ez_room', 'views', 'EzRoomView')
@@ -597,6 +597,8 @@ class EzRoomView(ViewImpl):
                 bridge.call('assignSlotRequest', int(args.get('slot')), int(args.get('dbID')))
             elif action == 'leaveSlot':
                 bridge.call('leaveSlotRequest', int(args.get('dbID')))
+            elif action == 'assignNext':
+                self._assignNext(int(args.get('dbID')))
             elif action == 'highlight':
                 # fills data.highlight with the slots this player may go to (as_highlightSlotsS)
                 bridge.call('onSlotsHighlihgtingNeed', int(args.get('dbID')))
@@ -642,6 +644,23 @@ class EzRoomView(ViewImpl):
                 _logger.warning('unknown action %r', args)
         except Exception:
             _logger.exception('action %r failed', args)
+
+    def _assignNext(self, dbID):
+        # commander clicked a volunteer: lowest free slot WG allows for him (same list as WG's
+        # green slot highlighting, BaseRallyRoomView.getAvailableSlots)
+        bridge = self._bridge
+        view = bridge.view
+        if view is None:
+            return
+        members = bridge.calls.get('as_setMembersS')
+        slots = list(members[1]) if members and len(members) > 1 else []
+        free = lambda i: 0 <= i < len(slots) and isinstance(slots[i], dict) and not slots[i].get('player') \
+            and not slots[i].get('isClosed') and not slots[i].get('isLocked')
+        for slotIdx in sorted(view.getAvailableSlots(dbID)):
+            if free(slotIdx):
+                bridge.call('assignSlotRequest', slotIdx, dbID)
+                return
+        _logger.info('no free slot for %s', dbID)
 
     def _contextMenu(self, dbID):
         # WG's player menu (UNIT_USER), opened the way WG's Gameface platoon view does it, with

@@ -9,7 +9,7 @@ let data = {};
 let sizeLogged = false;
 const ui = {
     raw: false,
-    selCand: 0, // commander: candidate picked to be put into a slot
+    selCand: 0, // commander: volunteer being dragged onto a slot (green slots = WG's allowed ones)
     kickArm: 0, // dbID whose kick button was clicked once (second click kicks)
     sort: null, // team table sort {key: "clan"|"name"|"rating"|"tank", dir: 1|-1}; null = slot order
 };
@@ -163,7 +163,7 @@ function renderCandidates() {
                   const c = own ? "" : color((p.colors || [])[0]);
                   const pick = isCommander() && rally().canAssignToSlot;
                   return `
-                    <div data-user="${p.dbID}" class="cand ${p.isOffline ? "offline" : ""} ${own ? "own" : ""} ${pick ? "pickable" : ""} ${ui.selCand === p.dbID ? "sel" : ""}" ${pick ? `data-act="pickCand" data-id="${p.dbID}"` : ""}>
+                    <div data-user="${p.dbID}" class="cand ${p.isOffline ? "offline" : ""} ${own ? "own" : ""} ${pick ? "pickable" : ""} ${ui.selCand === p.dbID ? "sel" : ""}" ${pick ? `data-cand="${p.dbID}" data-tip="${esc(L("Klick: nächster freier Platz · Ziehen: auf einen Platz", "Click: next free slot · Drag: onto a slot"))}"` : ""}>
                         ${p.isInvite ? `<div class="inv" title="invited"></div>` : ""}
                         <div class="name" ${c ? `style="color:${c}"` : ""}>${esc(p.userName || p.fullName)}</div>
                         <div class="rating">${esc(p.rating || "")}</div>
@@ -210,8 +210,7 @@ function renderSlot(slot, idx) {
     const mine = !!(p && p.dbID === me);
     // what a click on the row does
     let rowAct = "";
-    if (highlight) rowAct = `data-act="assign" data-slot="${idx}"`;
-    else if (!p && slot.canBeTaken && !(data.me || {}).isInSlot && !isCommander()) rowAct = `data-act="takeSlot" data-slot="${idx}"`;
+    if (!p && slot.canBeTaken && !(data.me || {}).isInSlot && !isCommander()) rowAct = `data-act="takeSlot" data-slot="${idx}"`;
     const acts = [];
     if (mine) acts.push(`<div class="ibtn" data-act="leaveSlot" data-id="${p.dbID}" title="leave">${L("Verlassen", "Leave")}</div>`);
     else if (p && isCommander() && slot.isRemoveAvailable) {
@@ -246,7 +245,7 @@ function renderSlot(slot, idx) {
           ? `<div class="veh none pick" ${vehAct}>${L("Panzer wählen", "Choose tank")}</div>`
           : `<div class="veh none">${p ? L("Kein Panzer", "No tank") : rowAct.indexOf("takeSlot") !== -1 ? `<span class="take">${L("Platz nehmen", "Take slot")}</span>` : ""}</div>`;
     return `
-        <div ${p ? `data-user="${p.dbID}"` : ""} class="slot ${p ? "taken" : "open"} ${mine ? "mine" : ""} ${slot.isClosed ? "closed" : ""} ${highlight ? "hl" : ""} ${rowAct ? "clickable" : ""}" ${rowAct}>
+        <div ${p ? `data-user="${p.dbID}"` : ""} class="slot ${p ? "taken" : "open"} ${mine ? "mine" : ""} ${slot.isClosed ? "closed" : ""} ${highlight ? "hl" : ""} ${rowAct ? "clickable" : ""}" ${rowAct} ${highlight && !p ? `data-drop="${idx}"` : ""}>
             <div class="no">${idx + 1}</div>
             ${who}
             <div class="rating">${p ? esc(slot.rating || "") : ""}</div>
@@ -337,7 +336,7 @@ function renderColumns() {
 function renderReadyBar() {
     const ab = data.actionButton || {};
     const state = txt(ab.stateString);
-    const hint = ui.selCand ? L("Grün markierten Platz anklicken (Esc = abbrechen)", "Click a green slot (Esc = cancel)") : state;
+    const hint = ui.selCand ? L("Auf einen grünen Platz ziehen (Esc = abbrechen)", "Drop onto a green slot (Esc = cancel)") : state;
     const label = txt(ab.label) || L("Bereit!", "Ready!");
     return `
         <div class="readybar">
@@ -582,14 +581,6 @@ document.addEventListener("click", (e) => {
     else if (act === "raw") {
         ui.raw = !ui.raw;
         render();
-    } else if (act === "pickCand") {
-        ui.selCand = ui.selCand === id ? 0 : id;
-        if (ui.selCand) send({ action: "highlight", dbID: id });
-        render();
-    } else if (act === "assign") {
-        send({ action: "assign", slot: slot, dbID: ui.selCand });
-        ui.selCand = 0;
-        render();
     } else if (act === "takeSlot") send({ action: "takeSlot", slot: slot });
     else if (act === "leaveSlot") send({ action: "leaveSlot", dbID: id });
     else if (act === "kick") {
@@ -622,6 +613,72 @@ document.addEventListener("click", (e) => {
     } else if (act === "chatSend") sendChat();
     else if (act === "chooseVehicle") send({ action: "chooseVehicle", cd: Number(el.getAttribute("data-cd")) || 0 });
     else if (act === "ready" || act === "invite" || act === "toggleOpen" || act === "configure") send({ action: act });
+});
+
+// commander: click a volunteer = WG puts him into the next free allowed slot (Python picks it),
+// drag him onto a green slot = exactly that slot. Mouse events only (Gameface has no HTML5 DnD).
+const DRAG_START_PX = 6;
+let drag = null; // {id, x, y, started, name}
+
+function dragGhost(show, e, name) {
+    let g = document.getElementById("dragghost");
+    if (!show) {
+        if (g) g.parentNode.removeChild(g);
+        return;
+    }
+    if (!g) {
+        g = document.createElement("div");
+        g.id = "dragghost";
+        g.className = "dragghost";
+        g.textContent = name || "";
+        document.body.appendChild(g);
+    }
+    // beside the cursor, so the slot under the cursor gets the mouse events
+    g.style.left = e.clientX + 14 + "px";
+    g.style.top = e.clientY + 10 + "px";
+}
+
+function endDrag() {
+    drag = null;
+    dragGhost(false);
+    if (ui.selCand) {
+        ui.selCand = 0;
+        render();
+    }
+}
+
+document.addEventListener("mousedown", (e) => {
+    if (e.button !== 0) return;
+    const el = closest(e.target, "data-cand");
+    if (!el || closest(e.target, "data-act")) return; // kick button etc. inside the row
+    e.preventDefault();
+    const nameEl = el.querySelector(".name");
+    drag = { id: Number(el.getAttribute("data-cand")), x: e.clientX, y: e.clientY, started: false, name: nameEl ? nameEl.textContent : "" };
+});
+
+document.addEventListener("mousemove", (e) => {
+    if (!drag) return;
+    if (!drag.started) {
+        if (Math.abs(e.clientX - drag.x) + Math.abs(e.clientY - drag.y) < DRAG_START_PX) return;
+        drag.started = true;
+        ui.selCand = drag.id;
+        send({ action: "highlight", dbID: drag.id });
+        render();
+    }
+    dragGhost(true, e, drag.name);
+});
+
+document.addEventListener("mouseup", (e) => {
+    if (!drag || e.button !== 0) return;
+    const d = drag;
+    if (!d.started) {
+        drag = null;
+        send({ action: "assignNext", dbID: d.id });
+        return;
+    }
+    const target = closest(e.target, "data-drop");
+    if (target) send({ action: "assign", slot: Number(target.getAttribute("data-drop")), dbID: d.id });
+    endDrag();
 });
 
 // tooltips: any element with data-tip; WG format "{HEADER}..{/HEADER}{BODY}..{/BODY}" or plain text
@@ -694,8 +751,12 @@ document.addEventListener("keydown", (e) => {
             send({ action: "reserveOpen", slot: -1 });
             render();
         } else if (ui.selCand || ui.kickArm) {
-            ui.selCand = ui.kickArm = 0;
-            render();
+            ui.kickArm = 0;
+            if (drag) endDrag();
+            else {
+                ui.selCand = 0;
+                render();
+            }
         } else send({ action: "hide" });
     }
 });

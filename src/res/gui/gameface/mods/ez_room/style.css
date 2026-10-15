@@ -434,3 +434,14 @@ body {
 }
 @keyframes ezspin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 .waittext { color: #ffe4c0; font-size: 14rem; font-weight: bold; text-align: center; }
+
+/* commander drags a volunteer onto a slot */
+.dragghost {
+    position: absolute;
+    padding: 3rem 8rem;
+    background-color: rgba(24, 24, 25, 0.95);
+    border: 1rem solid #f28a3a;
+    color: #ffe4c0;
+    font-size: 12rem;
+    pointer-events: none;
+}
