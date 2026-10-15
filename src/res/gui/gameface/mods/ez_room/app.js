@@ -10,6 +10,7 @@ let sizeLogged = false;
 const ui = {
     raw: false,
     selCand: 0, // commander: volunteer being dragged onto a slot (green slots = WG's allowed ones)
+    hoverRow: "", // data-user of the row under the mouse (its buttons are shown, see markHover)
     sort: null, // team table sort {key: "clan"|"name"|"rating"|"tank", dir: 1|-1}; null = slot order
 };
 
@@ -594,6 +595,7 @@ function render() {
     const body = ui.raw ? renderRaw() : `${renderCandidates()}${renderTeam()}${renderSide()}`;
     root.innerHTML = `${renderHeader()}<div class="body">${body}${ui.raw ? "" : renderWaiting()}</div>${renderFooter()}${renderReservePopup()}<div id="tip" class="tip"></div>`;
     tipTarget = null;
+    markHover();
     root.querySelectorAll("[data-scroll]").forEach((el, i) => {
         if (keep[i]) el.scrollTop = keep[i];
     });
@@ -606,6 +608,29 @@ function render() {
     const newLog = document.getElementById("chatlog");
     if (newLog && chatStick) newLog.scrollTop = newLog.scrollHeight;
 }
+
+// Row buttons (Raus / kick) belong to the row under the mouse. Tracked here instead of CSS :hover:
+// in Gameface the row lost :hover when the mouse reached its own button (flicker) and after every
+// re-render until the mouse moved again.
+function markHover() {
+    const root = document.getElementById("root");
+    if (!root) return;
+    root.querySelectorAll(".hov").forEach((el) => {
+        el.className = el.className.replace(/\s*\bhov\b/g, "");
+    });
+    if (!ui.hoverRow) return;
+    root.querySelectorAll(`[data-user="${ui.hoverRow}"]`).forEach((el) => {
+        el.className += " hov";
+    });
+}
+
+document.addEventListener("mousemove", (e) => {
+    const row = closest(e.target, "data-user");
+    const id = row ? row.getAttribute("data-user") : "";
+    if (id === ui.hoverRow) return;
+    ui.hoverRow = id;
+    markHover();
+});
 
 // Gameface has no Element.closest
 function closest(el, attr) {

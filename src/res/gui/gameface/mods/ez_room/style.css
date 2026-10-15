@@ -221,11 +221,11 @@ body {
 .veh.pick:hover .vname, .veh.none.pick:hover { color: #ffffff; }
 .veh.none.pick { color: #ffc46c; }
 
-/* row buttons: laid over the end of the row and shown at once on hover (the row layout never
-   changes, so nothing flickers and the tank names keep their width) */
+/* row buttons: laid over the end of the row and shown at once for the row under the mouse
+   (.hov, set by app.js markHover; the row layout never changes, tank names keep their width) */
 .slot, .cand { position: relative; }
 .acts { position: absolute; right: 0; top: 0; bottom: 0; display: flex; align-items: center; padding: 0 6rem 0 14rem; background-color: rgba(30, 30, 31, 0.97); visibility: hidden; }
-.acts.always, .slot:hover .acts, .cand:hover .acts { visibility: visible; }
+.acts.always, .slot.hov .acts, .cand.hov .acts { visibility: visible; }
 .acts.always { position: static; padding: 0 0 0 6rem; background-color: transparent; }
 .ibtn {
     margin-left: 4rem;
