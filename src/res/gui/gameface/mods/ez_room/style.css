@@ -215,6 +215,7 @@ body {
 .clickable { cursor: pointer; }
 .slot.clickable:hover { background-color: rgba(255, 255, 255, 0.1); }
 .slot.mine { background-color: rgba(255, 196, 108, 0.1); border-left-color: #ffc46c; }
+.slot.ready, .slot.mine.ready { background-color: rgba(110, 190, 70, 0.22); border-left-color: #7fd04f; }
 .take { color: #c4e2a8; }
 .slot.clickable:hover .take { color: #e6f5d6; }
 .veh.pick { cursor: pointer; padding-right: 6rem; }

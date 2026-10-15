@@ -207,6 +207,8 @@ function renderSlot(slot, idx) {
     const highlight = ui.selCand && (data.highlight || []).indexOf(idx) !== -1;
     if (slot.isLocked) return "";
     const mine = !!(p && p.dbID === me);
+    // ready players: whole row green (same info as the green status dot)
+    const ready = !!(p && slot.playerStatus !== STATUS.BATTLE && (slot.playerStatus === STATUS.READY || p.readyState));
     // what a click on the row does
     let rowAct = "";
     if (!p && slot.canBeTaken && !(data.me || {}).isInSlot && !isCommander()) rowAct = `data-act="takeSlot" data-slot="${idx}"`;
@@ -244,7 +246,7 @@ function renderSlot(slot, idx) {
           ? `<div class="veh none pick" ${vehAct}>${L("Panzer wählen", "Choose tank")}</div>`
           : `<div class="veh none">${p ? L("Kein Panzer", "No tank") : rowAct.indexOf("takeSlot") !== -1 ? `<span class="take">${L("Platz nehmen", "Take slot")}</span>` : ""}</div>`;
     return `
-        <div ${p ? `data-user="${p.dbID}"` : ""} class="slot ${p ? "taken" : "open"} ${mine ? "mine" : ""} ${slot.isClosed ? "closed" : ""} ${highlight ? "hl" : ""} ${rowAct ? "clickable" : ""}" ${rowAct} ${highlight && !p ? `data-drop="${idx}"` : ""}>
+        <div ${p ? `data-user="${p.dbID}"` : ""} class="slot ${p ? "taken" : "open"} ${mine ? "mine" : ""} ${ready ? "ready" : ""} ${slot.isClosed ? "closed" : ""} ${highlight ? "hl" : ""} ${rowAct ? "clickable" : ""}" ${rowAct} ${highlight && !p ? `data-drop="${idx}"` : ""}>
             <div class="no">${idx + 1}</div>
             ${who}
             <div class="rating">${p ? esc(slot.rating || "") : ""}</div>
