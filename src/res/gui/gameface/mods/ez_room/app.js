@@ -304,7 +304,8 @@ function smileys(text) {
 }
 
 // WG's chat lines are Flash HTML: keep <font color> as coloured spans, drop every other tag
-// (the user text inside is already escaped by WG)
+// (the user text inside is already escaped by WG). Gameface puts spans below each other unless
+// the parent has the cohinline attribute (WG's own Gameface text components do the same).
 function chatHtml(line) {
     let out = "";
     let open = 0;
@@ -339,7 +340,7 @@ function renderChat() {
     return `
         <div class="panel chat">
             <div class="ptitle chattitle">${L("Chat-Kanal", "Chat channel")}</div>
-            <div class="chatlog" id="chatlog" data-scroll="40">${lines.map((l) => `<div class="cline">${chatHtml(l)}</div>`).join("")}</div>
+            <div class="chatlog" id="chatlog" data-scroll="40">${lines.map((l) => `<p class="cline" cohinline="true">${chatHtml(l)}</p>`).join("")}</div>
             <div class="chatin">
                 <input id="chatinput" type="text" maxlength="512" ${chat.joined ? "" : `placeholder="${L("Nicht verbunden", "Not connected")}"`} />
                 <div class="sendbtn" data-act="chatSend"><div class="ret-v"></div><div class="ret-h"></div><div class="ret-tip"></div></div>
