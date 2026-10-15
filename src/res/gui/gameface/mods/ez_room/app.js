@@ -120,7 +120,7 @@ function renderCandidates() {
                   const c = own ? "" : color((p.colors || [])[0]);
                   const pick = isCommander() && rally().canAssignToSlot;
                   return `
-                    <div class="cand ${p.isOffline ? "offline" : ""} ${own ? "own" : ""} ${pick ? "pickable" : ""} ${ui.selCand === p.dbID ? "sel" : ""}" ${pick ? `data-act="pickCand" data-id="${p.dbID}"` : ""}>
+                    <div data-user="${p.dbID}" class="cand ${p.isOffline ? "offline" : ""} ${own ? "own" : ""} ${pick ? "pickable" : ""} ${ui.selCand === p.dbID ? "sel" : ""}" ${pick ? `data-act="pickCand" data-id="${p.dbID}"` : ""}>
                         ${p.isInvite ? `<div class="inv" title="invited"></div>` : ""}
                         <div class="name" ${c ? `style="color:${c}"` : ""}>${esc(p.userName || p.fullName)}</div>
                         <div class="rating">${esc(p.rating || "")}</div>
@@ -202,7 +202,7 @@ function renderSlot(slot, idx) {
           ? `<div class="veh none pick" ${vehAct}>${L("Panzer wählen", "Choose tank")}</div>`
           : `<div class="veh none">${p ? L("Kein Panzer", "No tank") : rowAct.indexOf("takeSlot") !== -1 ? `<span class="take">${L("Platz nehmen", "Take slot")}</span>` : ""}</div>`;
     return `
-        <div class="slot ${p ? "taken" : "open"} ${mine ? "mine" : ""} ${slot.isClosed ? "closed" : ""} ${highlight ? "hl" : ""} ${rowAct ? "clickable" : ""}" ${rowAct}>
+        <div ${p ? `data-user="${p.dbID}"` : ""} class="slot ${p ? "taken" : "open"} ${mine ? "mine" : ""} ${slot.isClosed ? "closed" : ""} ${highlight ? "hl" : ""} ${rowAct ? "clickable" : ""}" ${rowAct}>
             <div class="no">${idx + 1}</div>
             ${who}
             <div class="rating">${p ? esc(slot.rating || "") : ""}</div>
@@ -373,6 +373,17 @@ document.addEventListener("click", (e) => {
         render();
     } else if (act === "chooseVehicle") send({ action: "chooseVehicle", cd: Number(el.getAttribute("data-cd")) || 0 });
     else if (act === "ready" || act === "invite" || act === "toggleOpen" || act === "configure") send({ action: act });
+});
+
+// right click on a player: WG's player context menu (opened by Python)
+document.addEventListener("mousedown", (e) => {
+    if (e.button !== 2) return;
+    const el = closest(e.target, "data-user");
+    if (!el) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const id = Number(el.getAttribute("data-user"));
+    if (id && id !== (data.me || {}).dbID) send({ action: "contextMenu", dbID: id });
 });
 
 document.addEventListener(

@@ -20,7 +20,7 @@ from helpers import dependency, getClientLanguage
 from helpers.i18n import makeString
 from skeletons.gui.impl import IGuiLoader
 
-__version__ = '0.3.0'
+__version__ = '0.3.1'
 _logger = logging.getLogger('EZ_ROOM')
 _logger.setLevel(logging.INFO)
 _LAYOUT_PATH = ('ez_room', 'views', 'EzRoomView')
@@ -374,6 +374,8 @@ class EzRoomView(ViewImpl):
                 bridge.call('toggleReadyStateRequest')
             elif action == 'toggleOpen':
                 bridge.call('toggleRoomStatus')
+            elif action == 'contextMenu':
+                self._contextMenu(int(args.get('dbID')))
             elif action == 'chooseVehicle':
                 self._chooseVehicle(int(args.get('cd') or 0))
             elif action == 'invite':
@@ -391,6 +393,37 @@ class EzRoomView(ViewImpl):
         except Exception:
             _logger.exception('action %r failed', args)
 
+
+    def _contextMenu(self, dbID):
+        # WG's player menu (UNIT_USER), opened the way WG's Gameface platoon view does it, with
+        # the same player VO the Flash room would pass
+        bridge = self._bridge
+        view = bridge.view
+        if view is None:
+            return
+        vo = None
+        members = bridge.calls.get('as_setMembersS')
+        for slot in (members[1] if members and len(members) > 1 else ()):
+            player = slot.get('player') if isinstance(slot, dict) else None
+            if player and player.get('dbID') == dbID:
+                vo = player
+                break
+        if vo is None:
+            dp = getattr(view, '_candidatesDP', None)
+            for item in (dp.collection if dp is not None else ()):
+                if isinstance(item, dict) and item.get('dbID') == dbID:
+                    vo = item
+                    break
+        if vo is None:
+            _logger.warning('context menu: player %s not found', dbID)
+            return
+        if 'currentPlayer' in (vo.get('tags') or ()):
+            return
+        from gui.impl.backport import BackportContextMenuWindow
+        from gui.impl.backport.backport_context_menu import createContextMenuData
+        from gui.Scaleform.genConsts.CONTEXT_MENU_HANDLER_TYPE import CONTEXT_MENU_HANDLER_TYPE
+        window = BackportContextMenuWindow(createContextMenuData(CONTEXT_MENU_HANDLER_TYPE.UNIT_USER, vo), self.getParentWindow())
+        window.load()
 
     def _chooseVehicle(self, currentCD=0):
         # EZ TANK PICKER if installed (its loader handles its dev mode), else WG's own selector
