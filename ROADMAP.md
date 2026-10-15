@@ -1,6 +1,6 @@
 # EZ ROOM – Roadmap: Funktionsgleichheit mit dem WG-Original
 
-Stand: v0.7.2 (2026-10-15). Ziel: Jede Funktion des Flash-Raums (`fortClanBattleRoom.swf` + `fortBattleRoomWindow.swf`)
+Stand: v0.7.3 (2026-10-15). Ziel: Jede Funktion des Flash-Raums (`fortClanBattleRoom.swf` + `fortBattleRoomWindow.swf`)
 einzeln mit dem Original vergleichen und alles, was fehlt, nachbauen. Zum Vergleich in einem echten Raum über den
 „Original“-Button umschalten (Esc / Mods-Button bringt die neue Oberfläche zurück).
 
@@ -93,7 +93,7 @@ Legende: ✅ vorhanden · 🟡 teilweise · ❌ fehlt · 🚫 bewusst weggelasse
 
 | # | Funktion im Original | Status | Hinweise / WG-API |
 |---|---|---|---|
-| F1 | **Automatische Gegnersuche / Warteschlange** (Panel im Fenster) | ❌ | WICHTIG: `RallyMainWindowWithSearchMeta.as_changeAutoSearchStateS` u. a. am Fenster, liegt unter unserer Oberfläche → anzeigen oder Oberfläche dann ausblenden |
+| F1 | **Automatische Gegnersuche / Warteschlange** (Panel im Fenster) | 🟡 | v0.7.3, im Spiel testen: bleibt WG-Original (Nutzerwunsch). Startet die Suche (`as_changeAutoSearchStateS`), blendet sich die Oberfläche aus; endet sie (`as_hideAutoSearchS`), kommt sie zurück |
 | F2 | **Warte-Overlay** („Daten werden geladen“, `showStrongholdWaiting`) | ❌ | `invalidateStrongholdWaiting` |
 | F3 | Wartungsmodus (`onStrongholdMaintenance`) | ❌ | |
 | F4 | Cooldowns: Buttons kurz gesperrt (`as_setCoolDownS`) | ❌ | |

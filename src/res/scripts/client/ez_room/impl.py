@@ -20,7 +20,7 @@ from helpers import dependency, getClientLanguage
 from helpers.i18n import makeString
 from skeletons.gui.impl import IGuiLoader
 
-__version__ = '0.7.2'
+__version__ = '0.7.3'
 _logger = logging.getLogger('EZ_ROOM')
 _logger.setLevel(logging.INFO)
 _LAYOUT_PATH = ('ez_room', 'views', 'EzRoomView')
@@ -246,6 +246,61 @@ def _installChatHook():
 
     ChannelComponent.as_addMessageS = as_addMessageS
     ChannelComponent._ezRoomChatHook = True
+
+
+# --- enemy search stays WG's original -------------------------------------------------
+# While WG's room window shows its auto search form (as_changeAutoSearchStateS ...
+# as_hideAutoSearchS) the overlay is hidden so the original form is visible and usable; it comes
+# back when the search ends.
+
+def _searchActive(bridge):
+    windowView = _roomWindowView(bridge)
+    return bool(getattr(windowView, 'currentState', '')) if windowView is not None else False
+
+
+def _installSearchHooks():
+    # once per client session; the wrappers only use the loader module
+    from gui.Scaleform.daapi.view.lobby.fortifications.stronghold_battle_room_window import StrongholdBattleRoomWindow
+    if StrongholdBattleRoomWindow.__dict__.get('_ezRoomSearchHooks'):
+        return
+    origShow = StrongholdBattleRoomWindow.as_changeAutoSearchStateS
+    origHide = StrongholdBattleRoomWindow.as_hideAutoSearchS
+
+    def bridgeOf(windowView):
+        import sys
+        loader = sys.modules.get('gui.mods.mod_ez_room')
+        bridge = loader.currentBridge() if loader is not None else None
+        if bridge is None or bridge.roomWindowView() is not windowView:
+            return None
+        return bridge
+
+    def as_changeAutoSearchStateS(self, value):
+        result = origShow(self, value)
+        try:
+            bridge = bridgeOf(self)
+            if bridge is not None and bridge.window is not None:
+                logging.getLogger('EZ_ROOM').info('enemy search started: overlay hidden, WG form visible')
+                bridge.searchHid = True
+                bridge.close(hide=True)
+        except Exception:
+            logging.getLogger('EZ_ROOM').exception('search start hook failed')
+        return result
+
+    def as_hideAutoSearchS(self):
+        result = origHide(self)
+        try:
+            bridge = bridgeOf(self)
+            if bridge is not None and getattr(bridge, 'searchHid', False):
+                logging.getLogger('EZ_ROOM').info('enemy search ended: overlay back')
+                bridge.searchHid = False
+                BigWorld.callback(0.1, lambda: bridge.open(manual=True))
+        except Exception:
+            logging.getLogger('EZ_ROOM').exception('search end hook failed')
+        return result
+
+    StrongholdBattleRoomWindow.as_changeAutoSearchStateS = as_changeAutoSearchStateS
+    StrongholdBattleRoomWindow.as_hideAutoSearchS = as_hideAutoSearchS
+    StrongholdBattleRoomWindow._ezRoomSearchHooks = True
 
 
 # --- reserves ------------------------------------------------------------------------
@@ -700,7 +755,24 @@ def openOverlay(bridge, devConfig=None):
         _installChatHook()
     except Exception:
         _logger.exception('installing chat hook failed')
+    try:
+        _installSearchHooks()
+    except Exception:
+        _logger.exception('installing search hooks failed')
+    if _searchActive(bridge):
+        # WG's search form is up: it stays visible, the overlay comes back when it ends
+        bridge.searchHid = True
+        _logger.info('enemy search running, overlay stays hidden')
+        return None
     window = EzRoomWindow(layoutID, bridge, layer, devConfig)
     window.load()
     _logger.info('overlay opened (layer %s, room window %r)', layerName, _roomRect(bridge))
     return window
+
+
+# hooks as early as possible (the packaged impl is imported when the client starts), so a search
+# that starts before the overlay opens is seen too
+try:
+    _installSearchHooks()
+except Exception:
+    _logger.exception('installing search hooks failed')
