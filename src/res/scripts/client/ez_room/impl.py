@@ -20,7 +20,7 @@ from helpers import dependency, getClientLanguage
 from helpers.i18n import makeString
 from skeletons.gui.impl import IGuiLoader
 
-__version__ = '0.5.1'
+__version__ = '0.5.2'
 _logger = logging.getLogger('EZ_ROOM')
 _logger.setLevel(logging.INFO)
 _LAYOUT_PATH = ('ez_room', 'views', 'EzRoomView')
@@ -500,7 +500,6 @@ class EzRoomView(ViewImpl):
         except Exception:
             _logger.exception('action %r failed', args)
 
-
     def _contextMenu(self, dbID):
         # WG's player menu (UNIT_USER), opened the way WG's Gameface platoon view does it, with
         # the same player VO the Flash room would pass
@@ -559,16 +558,17 @@ _WATCH_LAYERS = (WindowLayer.WINDOW, WindowLayer.TOP_WINDOW, WindowLayer.FULLSCR
 _WATCH_TIMEOUT = 3.0  # s to wait for the WG window to appear
 
 
-def _wgWindowCount(bridge):
+def _wgWindowCount(ignoreID):
+    # our own overlay window is ignored (it may still be listed for a moment while destroyed)
     gui = dependency.instance(IGuiLoader)
-    own = bridge.window
-    ownID = own.uniqueID if own is not None else -1
-    return len(gui.windowsManager.findWindows(lambda w: w.layer in _WATCH_LAYERS and w.uniqueID != ownID))
+    return len(gui.windowsManager.findWindows(lambda w: w.layer in _WATCH_LAYERS and w.uniqueID != ignoreID))
 
 
 def _whileWgWindow(bridge, opener):
+    own = bridge.window
+    ownID = own.uniqueID if own is not None else -1
     try:
-        baseline = _wgWindowCount(bridge)
+        baseline = _wgWindowCount(ownID)
     except Exception:
         _logger.exception('counting windows failed')
         opener()
@@ -581,7 +581,7 @@ def _whileWgWindow(bridge, opener):
         if bridge.view is None or bridge.window is not None:
             return  # room gone, or overlay reopened by hand
         try:
-            count = _wgWindowCount(bridge)
+            count = _wgWindowCount(ownID)
         except Exception:
             _logger.exception('counting windows failed')
             count = baseline
@@ -598,10 +598,9 @@ def _whileWgWindow(bridge, opener):
 
 class EzRoomWindow(WindowImpl):
     # plain window (no decorator) laid exactly over the content of WG's room window
+    # (same setup as WG's OfferBannerWindow: no parent, default area, moved after load)
     __slots__ = ()
 
-
-    # (same setup as WG's OfferBannerWindow: no parent, default area, moved after load)
     def __init__(self, layoutID, bridge, layer, config):
         super(EzRoomWindow, self).__init__(
             WindowFlags.WINDOW,

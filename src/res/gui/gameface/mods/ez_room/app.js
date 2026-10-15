@@ -437,6 +437,7 @@ let chatStick = true; // keep the chat scrolled to the newest line
 
 function render() {
     applyFrame();
+    lastKey = JSON.stringify(Object.assign({}, data, { timer: null, timerAge: null }));
     const root = document.getElementById("root");
     const input = document.getElementById("chatinput");
     if (input) {
@@ -569,13 +570,25 @@ document.addEventListener("keydown", (e) => {
 
 // --- model binding ---------------------------------------------------------------
 
+// WG pushes the battle timer every second (with the same room data again): only rebuild the
+// DOM when something besides the timer changed, so clicks and hover are not interrupted
+let lastKey = "";
+
 function readModel() {
     try {
         const raw = window.model && window.model.data;
         if (!raw) return;
-        data = JSON.parse(raw);
-        if (ui.selCand && (!(data.candidates || []).some((c) => c.dbID === ui.selCand) || slotOf(ui.selCand) !== -1)) ui.selCand = 0;
+        const next = JSON.parse(raw);
+        const key = JSON.stringify(Object.assign({}, next, { timer: null, timerAge: null }));
+        data = next;
         timerBase = { at: Date.now() };
+        if (key === lastKey) {
+            const el = document.getElementById("timer");
+            if (el) el.textContent = timerText();
+            return;
+        }
+        lastKey = key;
+        if (ui.selCand && (!(data.candidates || []).some((c) => c.dbID === ui.selCand) || slotOf(ui.selCand) !== -1)) ui.selCand = 0;
         render();
         if (data.frame && !sizeLogged) {
             sizeLogged = true;
