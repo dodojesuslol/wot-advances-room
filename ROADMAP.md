@@ -24,7 +24,7 @@ Legende: ✅ vorhanden · 🟡 teilweise · ❌ fehlt · 🚫 bewusst weggelasse
 | A4 | Richtungs-/Gebäudegrafik (grüne Burg → Flaggen → ⚔ → rote Burg) | ❌ | `as_setDirectionS(value, animationNotAvailable)`, `as_updateReadyDirectionsS`; `makeDirectionVO` liefert `attack1..5`/`defense1..5`/`definition` |
 | A5 | Eigener Clan / Gegner-Clan mit Bereit-Anzeige | 🟡 | Namen + Glow da; WGs Bereit-Lämpchen-Optik fehlt |
 | A6 | Gefechts-Timer, normale und Alarm-Farbe (#ffdd99 / #ff7f00), Glow | 🟡 | Zeit läuft; Alarmfarbe fehlt (`as_setTimerDeltaS`: htmlFormatter/alertHtmlFormatter, state) |
-| A7 | **Timer-Alarm-Ton** (Flash ruft `onTimerAlert()` → `playBattleRoomTimerAlert`) | ❌ | WICHTIG: muss die Oberfläche selbst auslösen, wenn der Timer die Alarmschwelle erreicht |
+| A7 | Timer-Alarm-Ton (Flash ruft `onTimerAlert()` → `playBattleRoomTimerAlert`) | 🚫 | nicht nachbauen (Nutzer): der Flash-Timer läuft unter der Oberfläche weiter und spielt den Original-Ton selbst |
 | A8 | „Warten auf Gefecht“-Text (`waitForBattleDescr`) | ✅ | |
 | A9 | 4 Reserve-Plätze + Auswahl | ✅ | eigene Liste statt Popover |
 | A10 | Reserve-Liste: erweiterte Werte (Schaden, Radius, Crew-Bonus …) | ❌ | `FortReserveSelectPopover.__buildReserveParams` |
