@@ -1,6 +1,6 @@
 # EZ ROOM – Roadmap: Funktionsgleichheit mit dem WG-Original
 
-Stand: v0.7.10 (2026-10-15). Ziel: Jede Funktion des Flash-Raums (`fortClanBattleRoom.swf` + `fortBattleRoomWindow.swf`)
+Stand: v0.7.11 (2026-10-15). Ziel: Jede Funktion des Flash-Raums (`fortClanBattleRoom.swf` + `fortBattleRoomWindow.swf`)
 einzeln mit dem Original vergleichen und alles, was fehlt, nachbauen. Zum Vergleich in einem echten Raum über den
 „Original“-Button umschalten (Esc / Mods-Button bringt die neue Oberfläche zurück).
 
@@ -74,7 +74,7 @@ Legende: ✅ vorhanden · 🟡 teilweise · ❌ fehlt · 🚫 bewusst weggelasse
 | # | Funktion im Original | Status | Hinweise / WG-API |
 |---|---|---|---|
 | D1 | Kartenname / „Zufallskarte“ (mit Würfel-Grafik) | 🟡 | Name da, Würfel-Grafik fehlt |
-| D2 | Minimap-Bild mit Raster A–K / 1–0 | ✅ | |
+| D2 | Minimap-Bild mit Raster A–K / 1–0 | 🟡 | v0.7.11, im Spiel testen: echte quadratische Minikarte `gui/maps/icons/map/<geometry>.png` (300×300; vorher fälschlich map/stats = 500×235 Landschaftsbild), Raster in festen px (200×200, Felder 20×20), mittig. WGs eigener Pfad (`MinimapLobby._resilientMapIconPathGetter`: map/<gameplay>/c_<geometry>) existiert im Client nicht |
 | D3 | Basen / Startpunkte auf der Minimap (`MinimapLobby.setArena`, `setPlayerTeam`) | ❌ | |
 | D4 | **Minimap-Markierungen des Kommandanten** (`MinimapGrid`, eigener Chat-Kanal) | ❌ | Kommandant klickt Planquadrate, alle sehen sie |
 

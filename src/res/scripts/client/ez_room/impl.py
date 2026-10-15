@@ -20,7 +20,7 @@ from helpers import dependency, getClientLanguage
 from helpers.i18n import makeString
 from skeletons.gui.impl import IGuiLoader
 
-__version__ = '0.7.10'
+__version__ = '0.7.11'
 _logger = logging.getLogger('EZ_ROOM')
 _logger.setLevel(logging.INFO)
 _LAYOUT_PATH = ('ez_room', 'views', 'EzRoomView')
@@ -176,12 +176,22 @@ def _title(bridge):
 
 
 def _mapIcon(mapID):
+    # square top-down minimap (gui/maps/icons/map/<geometry>.png, 300x300); '' for a random map or
+    # when the client has none for this map (map/stats/ are 500x235 landscape shots, not minimaps)
     if not mapID:
         return u''
     try:
-        return u'img://gui/maps/icons/map/stats/%s.png' % getArenaGeometryName(mapID)
+        path = 'gui/maps/icons/map/%s.png' % getArenaGeometryName(mapID)
     except Exception:
         return u''
+    try:
+        import ResMgr
+        if not ResMgr.isFile(path):
+            _logger.info('no minimap %s', path)
+            return u''
+    except Exception:
+        _logger.exception('minimap lookup failed')
+    return u'img://' + path
 
 
 def _me(view):
