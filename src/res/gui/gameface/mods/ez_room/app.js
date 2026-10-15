@@ -282,6 +282,27 @@ function renderReadyBar() {
         </div>`;
 }
 
+// text smileys -> WG's emoji icons (gui/maps/icons/emoji), like the Flash chat shows them
+const SMILEYS = [
+    [">:(", "mad"], [">:-(", "mad"], [":@", "madah"],
+    [":-)", "happy"], [":)", "happy"], ["=)", "happy"], [":D", "happy"], [":-D", "happy"],
+    [";-)", "wink"], [";)", "wink"],
+    [":-(", "sad"], [":(", "sad"],
+    [":-P", "tongue"], [":P", "tongue"], [":p", "tongue"],
+    [":-O", "oh"], [":O", "oh"], [":o", "oh"],
+    [":-*", "kiss"], [":*", "kiss"],
+    [":-|", "norm"], [":|", "norm"],
+    [":-/", "hmm"], [":/", "hmm"],
+];
+function smileys(text) {
+    // only stand-alone smileys (start/space before, end/space after), so links like https:// stay
+    return text.replace(/(^|\s|&nbsp;)(\S+)(?=$|\s|&nbsp;)/g, (all, pre, word) => {
+        const w = word.replace(/&gt;/g, ">");
+        const hit = SMILEYS.find((sm) => sm[0] === w);
+        return hit ? `${pre}<span class="smiley" style="background-image:url(img://gui/maps/icons/emoji/smiley_${hit[1]}.png)"></span>` : all;
+    });
+}
+
 // WG's chat lines are Flash HTML: keep <font color> as coloured spans, drop every other tag
 // (the user text inside is already escaped by WG)
 function chatHtml(line) {
@@ -293,7 +314,7 @@ function chatHtml(line) {
         .forEach((part) => {
             if (!part) return;
             if (part[0] !== "<") {
-                out += part;
+                out += smileys(part);
                 return;
             }
             const m = /^<font\b[^>]*color\s*=\s*['"]?(#[0-9a-fA-F]{6})/i.exec(part);
@@ -317,11 +338,11 @@ function renderChat() {
     const lines = chat.lines || [];
     return `
         <div class="panel chat">
-            <div class="ptitle">${L("Chat", "Chat")}</div>
+            <div class="ptitle chattitle">${L("Chat-Kanal", "Chat channel")}</div>
             <div class="chatlog" id="chatlog" data-scroll="40">${lines.map((l) => `<div class="cline">${chatHtml(l)}</div>`).join("")}</div>
             <div class="chatin">
-                <input id="chatinput" type="text" maxlength="512" placeholder="${chat.joined ? L("Nachricht …", "Message …") : L("Nicht verbunden", "Not connected")}" />
-                <div class="ibtn send" data-act="chatSend">➤</div>
+                <input id="chatinput" type="text" maxlength="512" ${chat.joined ? "" : `placeholder="${L("Nicht verbunden", "Not connected")}"`} />
+                <div class="sendbtn" data-act="chatSend"><div class="ret-v"></div><div class="ret-h"></div><div class="ret-tip"></div></div>
             </div>
         </div>`;
 }

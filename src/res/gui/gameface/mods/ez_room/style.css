@@ -263,60 +263,62 @@ body {
 .btn.main.off { background-image: none; background-color: rgba(255, 255, 255, 0.08); color: rgba(233, 231, 220, 0.35); cursor: default; }
 .btn.main.isready { background-image: linear-gradient(to bottom, #8fc66a, #5e9a3c); }
 
-/* chat */
-.chatlog { flex-grow: 1; height: 0; overflow-y: hidden; padding: 6rem 10rem; }
-.cline { font-size: 12rem; line-height: 16rem; color: #c8c6bc; margin-bottom: 2rem; word-wrap: break-word; }
-.chatin { flex-shrink: 0; display: flex; align-items: center; padding: 6rem; border-top: 1rem solid rgba(255, 255, 255, 0.07); }
+/* chat: close to WG's Flash chat box (Chat-Kanal) */
+.chat { flex-grow: 1; }
+.ptitle.chattitle {
+    height: 32rem;
+    border-bottom: none;
+    color: #e9e2bf;
+    font-size: 16rem;
+    text-transform: none;
+}
+.chatlog { flex-grow: 1; height: 0; overflow-y: hidden; padding: 0 10rem 4rem; }
+.cline { font-size: 13rem; line-height: 17rem; color: #979589; word-wrap: break-word; }
+.smiley {
+    display: inline-block;
+    width: 16rem;
+    height: 16rem;
+    margin: 0 2rem;
+    vertical-align: middle;
+    background-size: contain;
+    background-repeat: no-repeat;
+}
+.chatin { flex-shrink: 0; display: flex; align-items: center; padding: 8rem 10rem 10rem; }
 .chatin input {
     flex-grow: 1;
     width: 0;
-    height: 24rem;
-    padding: 0 8rem;
-    border: 1rem solid rgba(255, 255, 255, 0.15);
-    border-radius: 3rem;
-    background-color: rgba(0, 0, 0, 0.35);
-    color: #eeede9;
+    height: 22rem;
+    padding: 0 6rem;
+    border: 1rem solid #3c3a33;
+    border-radius: 0;
+    background-color: #0c0c0b;
+    color: #e9e2bf;
     font-family: Warhelios;
-    font-size: 12rem;
+    font-size: 13rem;
 }
-.chatin input:focus { border-color: rgba(255, 196, 108, 0.6); }
-.ibtn.send { padding: 3rem 9rem; }
-
-/* reserves */
-#root { position: relative; }
-.reserves { display: flex; align-items: center; margin-left: 8rem; }
-.rslot {
+.chatin input:focus { border-color: #6b6550; }
+.sendbtn {
     position: relative;
-    width: 36rem;
-    height: 36rem;
-    margin-left: 4rem;
-    border: 1rem solid rgba(255, 255, 255, 0.12);
-    border-radius: 3rem;
-    background-color: rgba(0, 0, 0, 0.35);
+    flex-shrink: 0;
+    width: 34rem;
+    height: 22rem;
+    margin-left: 6rem;
+    border: 1rem solid #55524a;
+    border-radius: 2rem;
+    background-image: linear-gradient(to bottom, #4d4b44, #2b2a26);
+    cursor: pointer;
 }
-.rslot.on { cursor: pointer; }
-.rslot.on:hover, .rslot.open { border-color: rgba(255, 196, 108, 0.7); }
-.rslot.off { opacity: 0.55; }
-.rslot.set { border-color: rgba(255, 196, 108, 0.35); }
-.ricon { width: 100%; height: 100%; background-size: contain; background-repeat: no-repeat; background-position: center; }
-.rlvl { position: absolute; right: 2rem; bottom: 0; font-size: 10rem; color: #ffe4c0; }
-
-.rpopup {
+.sendbtn:hover { background-image: linear-gradient(to bottom, #5c5a52, #34332e); }
+/* return arrow drawn with three boxes */
+.ret-v { position: absolute; left: 21rem; top: 5rem; width: 2rem; height: 7rem; background-color: #e9e2bf; }
+.ret-h { position: absolute; left: 12rem; top: 10rem; width: 11rem; height: 2rem; background-color: #e9e2bf; }
+.ret-tip {
     position: absolute;
-    top: 54rem;
-    right: 150rem;
-    width: 330rem;
-    background-color: rgba(18, 18, 19, 0.97);
-    border: 1rem solid rgba(255, 196, 108, 0.35);
-    box-shadow: 0 6rem 18rem rgba(0, 0, 0, 0.6);
+    left: 8rem;
+    top: 7rem;
+    width: 0;
+    height: 0;
+    border-top: 4rem solid transparent;
+    border-bottom: 4rem solid transparent;
+    border-right: 5rem solid #e9e2bf;
 }
-.ropt { display: flex; align-items: center; padding: 6rem 10rem; cursor: pointer; border-bottom: 1rem solid rgba(255, 255, 255, 0.05); }
-.ropt:hover { background-color: rgba(255, 255, 255, 0.06); }
-.ropt.sel { background-color: rgba(255, 196, 108, 0.12); }
-.ropt.none { opacity: 0.4; cursor: default; }
-.ropt .ricon { width: 40rem; height: 40rem; flex-shrink: 0; }
-.rtext { flex-grow: 1; width: 0; margin: 0 8rem; }
-.rtitle { color: #ffe4c0; font-weight: bold; font-size: 12rem; }
-.rdesc { color: rgba(233, 231, 220, 0.6); font-size: 11rem; }
-.rcount { flex-shrink: 0; font-size: 11rem; color: rgba(233, 231, 220, 0.7); }
-.ropt.sel .rcount { color: #ff9a72; }
