@@ -87,6 +87,10 @@ class RoomBridge(object):
     def view(self):
         return self._view()
 
+    def roomWindowView(self):
+        # WG's Flash room window view (StrongholdBattleRoomWindow); as_getGeometryS() = (x, y, w, h)
+        return _roomWindowView() if _roomWindowView is not None else None
+
     def roomWindow(self):
         # wulf window of WG's Flash room window (position/size the overlay follows)
         windowView = _roomWindowView() if _roomWindowView is not None else None

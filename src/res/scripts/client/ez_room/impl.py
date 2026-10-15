@@ -19,7 +19,7 @@ from gui.shared.utils.functions import getArenaGeometryName
 from helpers import getClientLanguage
 from helpers.i18n import makeString
 
-__version__ = '0.2.1'
+__version__ = '0.2.2'
 _logger = logging.getLogger('EZ_ROOM')
 _logger.setLevel(logging.INFO)
 _LAYOUT_PATH = ('ez_room', 'views', 'EzRoomView')
@@ -46,6 +46,31 @@ def _rect(window):
     except Exception:
         _logger.exception('reading window rect failed')
         return None
+
+
+def _roomWindowView(bridge):
+    getter = getattr(bridge, 'roomWindowView', None)
+    if getter is not None:
+        return getter()
+    # loader < 0.2.2 (dev reload into an older client): read its module global
+    import sys
+    loader = sys.modules.get('gui.mods.mod_ez_room')
+    ref = getattr(loader, '_roomWindowView', None) if loader is not None else None
+    return ref() if ref is not None else None
+
+
+def _roomRect(bridge):
+    # geometry of WG's Flash room window, straight from Flash (the wulf window reports 0,0,0,0)
+    view = _roomWindowView(bridge)
+    if view is None:
+        return None
+    try:
+        geom = view.as_getGeometryS()
+        if geom and len(geom) >= 4 and geom[2] and geom[3]:
+            return tuple(float(v) for v in geom[:4])
+    except Exception:
+        _logger.exception('as_getGeometryS failed')
+    return None
 
 
 def _frame(roomRect, config):
@@ -259,7 +284,7 @@ class EzRoomView(ViewImpl):
 
     def _track(self):
         try:
-            roomRect = _rect(self._bridge.roomWindow())
+            roomRect = _roomRect(self._bridge)
             if roomRect is not None and roomRect != self._roomRect:
                 self._roomRect = roomRect
                 frame = _frame(roomRect, self._config)
@@ -270,7 +295,8 @@ class EzRoomView(ViewImpl):
                     window.move(frame[0], frame[1])
                 if not self._loggedRect:
                     self._loggedRect = True
-                    _logger.info('room window rect %r -> overlay frame %r, overlay window rect %r', roomRect, frame, _rect(window))
+                    _logger.info('room window rect %r -> overlay frame %r', roomRect, frame)
+                    BigWorld.callback(1.0, lambda: _logger.info('overlay window after move: %r', _rect(self.getParentWindow())))
                 if sizeChanged:
                     self.onRoomChanged()
         except Exception:
@@ -366,11 +392,10 @@ def openOverlay(bridge, devConfig=None):
         return None
     layerName = (devConfig or {}).get('layer') or 'WINDOW'
     layer = getattr(WindowLayer, layerName, WindowLayer.WINDOW)
-    roomWindow = bridge.roomWindow()
-    if roomWindow is None:
+    if _roomWindowView(bridge) is None:
         _logger.warning('room window not found, overlay not opened')
         return None
     window = EzRoomWindow(layoutID, bridge, layer, devConfig)
     window.load()
-    _logger.info('overlay opened (layer %s, room window %r)', layerName, _rect(roomWindow))
+    _logger.info('overlay opened (layer %s, room window %r)', layerName, _roomRect(bridge))
     return window
