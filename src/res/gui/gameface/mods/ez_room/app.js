@@ -1,13 +1,18 @@
 // EZ ROOM for ADV: web UI for the Advances battle room. Data comes from the Python view as one
 // JSON string (model.data) built from what WG's room sends to its Flash UI; actions go back
-// through model.onAction({...}). Step 1 (prototype): display only.
+// through model.onAction({...}), which runs the room's own handlers (same as WG's Flash UI).
 
 const ROMAN = ["", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI"];
 const STATUS = { NORMAL: 0, READY: 2, BATTLE: 3, LOCKED: 4, CREATOR: 5 };
 
 let data = {};
 let sizeLogged = false;
-const ui = { raw: false };
+const ui = {
+    raw: false,
+    selCand: 0, // commander: candidate picked to be put into a slot
+    kickArm: 0, // dbID whose kick button was clicked once (second click kicks)
+};
+let kickTimer = 0;
 
 function L(de, en) {
     return data.lang === "de" ? de : en;
@@ -48,6 +53,24 @@ function img(path) {
 function color(c) {
     if (typeof c !== "number") return "";
     return "#" + ("000000" + c.toString(16)).slice(-6);
+}
+
+function me() {
+    return data.me || {};
+}
+function rally() {
+    return data.rally || {};
+}
+function isCommander() {
+    return !!(me().isCommander || rally().isCommander);
+}
+function slotOf(dbID) {
+    return (data.slots || []).findIndex((s) => s && s.player && s.player.dbID === dbID);
+}
+
+function kickButton(dbID) {
+    const armed = ui.kickArm === dbID;
+    return `<div class="ibtn kick ${armed ? "armed" : ""}" data-act="kick" data-id="${dbID}" title="kick">${armed ? L("Sicher?", "Sure?") : "✕"}</div>`;
 }
 
 // --- parts -----------------------------------------------------------------------
@@ -95,11 +118,13 @@ function renderCandidates() {
                   if (!p.dbID) return "";
                   const own = p.dbID === me;
                   const c = own ? "" : color((p.colors || [])[0]);
+                  const pick = isCommander() && rally().canAssignToSlot;
                   return `
-                    <div class="cand ${p.isOffline ? "offline" : ""} ${own ? "own" : ""}">
+                    <div class="cand ${p.isOffline ? "offline" : ""} ${own ? "own" : ""} ${pick ? "pickable" : ""} ${ui.selCand === p.dbID ? "sel" : ""}" ${pick ? `data-act="pickCand" data-id="${p.dbID}"` : ""}>
                         ${p.isInvite ? `<div class="inv" title="invited"></div>` : ""}
                         <div class="name" ${c ? `style="color:${c}"` : ""}>${esc(p.userName || p.fullName)}</div>
                         <div class="rating">${esc(p.rating || "")}</div>
+                        ${isCommander() && !own ? `<div class="acts">${kickButton(p.dbID)}</div>` : ""}
                     </div>`;
               })
               .join("")
@@ -108,7 +133,20 @@ function renderCandidates() {
         <div class="panel cands">
             <div class="ptitle">${L("Freiwillige", "Volunteers")}<span class="count">${players.length}</span></div>
             <div class="plist" data-scroll="60">${rows}</div>
+            ${renderRoomActions()}
         </div>`;
+}
+
+function renderRoomActions() {
+    const opened = data.opened || [];
+    const conf = data.configure || {};
+    const btns = [];
+    if (rally().canInvite) btns.push(`<div class="btn wide" data-act="invite">${L("Einladen", "Invite")}</div>`);
+    if (isCommander() && opened[0] && conf.isRoomStatusEnabled !== false) btns.push(`<div class="btn wide" data-act="toggleOpen" title="${esc(txt(opened[2]))}">${esc(txt(opened[0]))}</div>`);
+    if (isCommander() && conf.isEnabled) btns.push(`<div class="btn wide" data-act="configure">${L("Konfigurieren", "Configure")}</div>`);
+    const status = txt(opened[1]);
+    if (!btns.length && !status) return "";
+    return `<div class="pfoot">${btns.join("")}${status ? `<div class="pnote">${esc(status)}</div>` : ""}</div>`;
 }
 
 function slotStatus(slot) {
@@ -124,8 +162,19 @@ function renderSlot(slot, idx) {
     const me = (data.me || {}).dbID;
     const p = slot.player;
     const v = slot.selectedVehicle;
-    const highlight = (data.highlight || []).indexOf(idx) !== -1;
+    const highlight = ui.selCand && (data.highlight || []).indexOf(idx) !== -1;
     if (slot.isLocked) return "";
+    const mine = !!(p && p.dbID === me);
+    // what a click on the row does
+    let rowAct = "";
+    if (highlight) rowAct = `data-act="assign" data-slot="${idx}"`;
+    else if (!p && slot.canBeTaken && !(data.me || {}).isInSlot && !isCommander()) rowAct = `data-act="takeSlot" data-slot="${idx}"`;
+    const acts = [];
+    if (mine) acts.push(`<div class="ibtn" data-act="leaveSlot" data-id="${p.dbID}" title="leave">${L("Verlassen", "Leave")}</div>`);
+    else if (p && isCommander() && slot.isRemoveAvailable) {
+        acts.push(`<div class="ibtn" data-act="leaveSlot" data-id="${p.dbID}" title="to volunteers">${L("Raus", "Out")}</div>`);
+        acts.push(kickButton(p.dbID));
+    }
     let who;
     if (p) {
         const own = p.dbID === me;
@@ -140,21 +189,25 @@ function renderSlot(slot, idx) {
         const label = txt(slot.slotLabel) || (slot.isClosed ? L("Gesperrt", "Closed") : L("Freier Platz", "Free slot"));
         who = `<div class="who"><div class="name free">${esc(label)}</div></div>`;
     }
+    const vehAct = mine ? `data-act="chooseVehicle" data-cd="${v ? v.intCD : 0}"` : "";
     const veh = v
         ? `
-            <div class="veh ${v.isReadyToFight === false || v.enabled === false ? "bad" : ""}">
+            <div class="veh ${mine ? "pick" : ""} ${v.isReadyToFight === false || v.enabled === false ? "bad" : ""}" ${vehAct}>
                 ${v.smallIconPath ? `<div class="vicon" style="background-image:url(${img(v.smallIconPath)})"></div>` : ""}
                 <div class="tier">${ROMAN[v.level] || ""}</div>
                 <div class="vname">${esc(v.shortUserName || v.userName)}</div>
                 ${v.state ? `<div class="vstate">${esc(txt(v.state))}</div>` : ""}
             </div>`
-        : `<div class="veh none">${p ? L("Kein Panzer", "No tank") : ""}</div>`;
+        : mine
+          ? `<div class="veh none pick" ${vehAct}>${L("Panzer wählen", "Choose tank")}</div>`
+          : `<div class="veh none">${p ? L("Kein Panzer", "No tank") : rowAct.indexOf("takeSlot") !== -1 ? `<span class="take">${L("Platz nehmen", "Take slot")}</span>` : ""}</div>`;
     return `
-        <div class="slot ${p ? "taken" : "open"} ${slot.isClosed ? "closed" : ""} ${highlight ? "hl" : ""}">
+        <div class="slot ${p ? "taken" : "open"} ${mine ? "mine" : ""} ${slot.isClosed ? "closed" : ""} ${highlight ? "hl" : ""} ${rowAct ? "clickable" : ""}" ${rowAct}>
             <div class="no">${idx + 1}</div>
             ${who}
             <div class="rating">${p ? esc(slot.rating || "") : ""}</div>
             ${veh}
+            ${acts.length ? `<div class="acts ${mine ? "always" : ""}">${acts.join("")}</div>` : ""}
             <div class="status">${slotStatus(slot)}</div>
         </div>`;
 }
@@ -171,6 +224,19 @@ function renderTeam() {
                 ${vt ? `<span class="muted">${esc(txt(vt[0]))}</span>` : ""}
             </div>
             <div class="slots" data-scroll="60">${slots.map(renderSlot).join("")}</div>
+            ${renderReadyBar()}
+        </div>`;
+}
+
+function renderReadyBar() {
+    const ab = data.actionButton || {};
+    const state = txt(ab.stateString);
+    const hint = ui.selCand ? L("Grün markierten Platz anklicken (Esc = abbrechen)", "Click a green slot (Esc = cancel)") : state;
+    const label = txt(ab.label) || L("Bereit!", "Ready!");
+    return `
+        <div class="readybar">
+            <div class="state ${ui.selCand ? "hint" : ""}">${esc(hint)}</div>
+            <div class="btn main ${ab.isEnabled ? "" : "off"} ${ab.isReady ? "isready" : ""}" ${ab.isEnabled ? `data-act="ready"` : ""}>${esc(label)}</div>
         </div>`;
 }
 
@@ -193,11 +259,9 @@ function renderSide() {
 }
 
 function renderFooter() {
-    const opened = data.opened || [];
     const comment = txt(data.comment);
     return `
         <div class="footer">
-            <div class="muted">${esc(txt(opened[1]))}</div>
             ${comment ? `<div class="comment">${esc(comment)}</div>` : ""}
             <div class="grow"></div>
             <div class="muted small">EZ ROOM ${esc(data.version || "")}${data.dev ? " · DEV (F5)" : ""}</div>
@@ -276,12 +340,39 @@ function closest(el, attr) {
 document.addEventListener("click", (e) => {
     const el = closest(e.target, "data-act");
     if (!el) return;
+    e.stopPropagation();
     const act = el.getAttribute("data-act");
+    const id = Number(el.getAttribute("data-id"));
+    const slot = Number(el.getAttribute("data-slot"));
     if (act === "hide") send({ action: "hide" });
     else if (act === "raw") {
         ui.raw = !ui.raw;
         render();
-    }
+    } else if (act === "pickCand") {
+        ui.selCand = ui.selCand === id ? 0 : id;
+        if (ui.selCand) send({ action: "highlight", dbID: id });
+        render();
+    } else if (act === "assign") {
+        send({ action: "assign", slot: slot, dbID: ui.selCand });
+        ui.selCand = 0;
+        render();
+    } else if (act === "takeSlot") send({ action: "takeSlot", slot: slot });
+    else if (act === "leaveSlot") send({ action: "leaveSlot", dbID: id });
+    else if (act === "kick") {
+        if (ui.kickArm === id) {
+            ui.kickArm = 0;
+            send({ action: "kick", dbID: id });
+        } else {
+            ui.kickArm = id;
+            if (kickTimer) clearTimeout(kickTimer);
+            kickTimer = setTimeout(() => {
+                ui.kickArm = 0;
+                render();
+            }, 3000);
+        }
+        render();
+    } else if (act === "chooseVehicle") send({ action: "chooseVehicle", cd: Number(el.getAttribute("data-cd")) || 0 });
+    else if (act === "ready" || act === "invite" || act === "toggleOpen" || act === "configure") send({ action: act });
 });
 
 document.addEventListener(
@@ -300,7 +391,12 @@ document.addEventListener(
 
 document.addEventListener("keydown", (e) => {
     if (e.keyCode === 116 && data.dev) send({ action: "devReload" });
-    else if (e.keyCode === 27) send({ action: "hide" });
+    else if (e.keyCode === 27) {
+        if (ui.selCand || ui.kickArm) {
+            ui.selCand = ui.kickArm = 0;
+            render();
+        } else send({ action: "hide" });
+    }
 });
 
 // --- model binding ---------------------------------------------------------------
@@ -310,6 +406,7 @@ function readModel() {
         const raw = window.model && window.model.data;
         if (!raw) return;
         data = JSON.parse(raw);
+        if (ui.selCand && (!(data.candidates || []).some((c) => c.dbID === ui.selCand) || slotOf(ui.selCand) !== -1)) ui.selCand = 0;
         timerBase = { at: Date.now() };
         render();
         if (data.frame && !sizeLogged) {

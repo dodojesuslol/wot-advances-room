@@ -14,4 +14,4 @@ through the room's own request methods.
   room state is written to `mods/configs/ez_room/last_room.json`.
 - Preview: `tools/preview/shot.sh <mock|last_room.json> out.png`
 
-Status: step 1 (display only). Next: actions, then chat/map/context menus, then merge with EZ TANK PICKER.
+Status: step 2 (actions). Next: chat/map/context menus, then merge with EZ TANK PICKER.

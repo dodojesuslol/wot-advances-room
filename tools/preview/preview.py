@@ -16,7 +16,7 @@ window.model = { data: %(data)s, dev: "", onAction: function (a) { console.log(J
 window.engine = { whenReady: Promise.resolve(), on: function () {} };
 window.viewEnv = { addDataChangedCallback: function () {} };
 </script><script>%(js)s</script><script>
-setTimeout(function () { var s = %(click)s; if (s) s.split('|').forEach(function (q) { document.querySelector(q).click(); }); }, 50);
+engine.whenReady.then(function () {}).then(function () { var s = %(click)s; if (s) s.split('|').forEach(function (q) { var el = document.querySelector(q); if (!el) { window.onerror('no element for ' + q, '', 0); return; } el.click(); }); });
 </script></body></html>''' % {'res': res, 'css': css, 'js': js, 'click': json.dumps(click),
                                'data': json.dumps(json.dumps(data).replace('img://', 'file://' + res + '/'))}
 open(out, 'w').write(html)

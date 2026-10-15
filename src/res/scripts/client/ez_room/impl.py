@@ -16,10 +16,11 @@ from gui.impl.pub.window_impl import WindowImpl
 from gui.Scaleform.daapi.view.lobby.rally import vo_converters
 from gui.Scaleform.locale.FORTIFICATIONS import FORTIFICATIONS
 from gui.shared.utils.functions import getArenaGeometryName
-from helpers import getClientLanguage
+from helpers import dependency, getClientLanguage
 from helpers.i18n import makeString
+from skeletons.gui.impl import IGuiLoader
 
-__version__ = '0.2.3'
+__version__ = '0.3.0'
 _logger = logging.getLogger('EZ_ROOM')
 _logger.setLevel(logging.INFO)
 _LAYOUT_PATH = ('ez_room', 'views', 'EzRoomView')
@@ -170,6 +171,20 @@ def _me(view):
         return {}
 
 
+def _actionButton(vo):
+    # WG's ready button state; label is an i18n key ('#cyberSport:window/unit/ready')
+    if not isinstance(vo, dict):
+        return vo
+    vo = dict(vo)
+    try:
+        label = vo.get('label')
+        if isinstance(label, basestring) and label.startswith('#'):
+            vo['label'] = makeString(label)
+    except Exception:
+        _logger.exception('action button label failed')
+    return vo
+
+
 def _pack(bridge, frame=None):
     view = bridge.view
     calls = bridge.calls
@@ -219,7 +234,7 @@ def _pack(bridge, frame=None):
         'reservesEnabled': first('as_setReservesEnabledS', []),
         'opened': calls.get('as_setOpenedS'),
         'configure': first('as_setConfigureButtonStateS'),
-        'actionButton': first('as_setActionButtonStateS'),
+        'actionButton': _actionButton(first('as_setActionButtonStateS')),
         'comment': first('as_setCommentS', u''),
         'vehiclesTitle': calls.get('as_setVehiclesTitleS'),
         'teamHeaderText': first('as_updateTeamHeaderTextS'),
@@ -341,8 +356,30 @@ class EzRoomView(ViewImpl):
         args = args or {}
         action = args.get('action')
         try:
+            bridge = self._bridge
             if action == 'hide':
-                self._bridge.close(hide=True)
+                bridge.close(hide=True)
+            elif action == 'takeSlot':
+                bridge.call('assignSlotRequest', int(args.get('slot')), -1)
+            elif action == 'assign':
+                bridge.call('assignSlotRequest', int(args.get('slot')), int(args.get('dbID')))
+            elif action == 'leaveSlot':
+                bridge.call('leaveSlotRequest', int(args.get('dbID')))
+            elif action == 'highlight':
+                # fills data.highlight with the slots this player may go to (as_highlightSlotsS)
+                bridge.call('onSlotsHighlihgtingNeed', int(args.get('dbID')))
+            elif action == 'kick':
+                bridge.call('requestToKickUser', int(args.get('dbID')))
+            elif action == 'ready':
+                bridge.call('toggleReadyStateRequest')
+            elif action == 'toggleOpen':
+                bridge.call('toggleRoomStatus')
+            elif action == 'chooseVehicle':
+                self._chooseVehicle(int(args.get('cd') or 0))
+            elif action == 'invite':
+                _whileWgWindow(bridge, lambda: bridge.call('inviteFriendRequest'))
+            elif action == 'configure':
+                _whileWgWindow(bridge, lambda: bridge.call('openConfigureWindow'))
             elif action == 'devReload' and DEV:
                 self._bridge.reopen()
             elif action == 'log':
@@ -353,6 +390,70 @@ class EzRoomView(ViewImpl):
                 _logger.warning('unknown action %r', args)
         except Exception:
             _logger.exception('action %r failed', args)
+
+
+    def _chooseVehicle(self, currentCD=0):
+        # EZ TANK PICKER if installed (its loader handles its dev mode), else WG's own selector
+        bridge = self._bridge
+        view = bridge.view
+        if view is None:
+            return
+        try:
+            import sys
+            pickerLoader = sys.modules.get('gui.mods.mod_advances_picker')
+            if pickerLoader is not None:
+                from advances_picker import impl as picker
+                entity = view.prbEntity
+                levelsRange = entity.getRosterSettings().getLevelsRange()
+                pickerLoader._reopen(levelsRange, picker._frozenCDs(view), currentCD)
+                return
+        except Exception:
+            _logger.exception('opening EZ TANK PICKER failed, using WG selector')
+        _whileWgWindow(bridge, lambda: bridge.call('chooseVehicleRequest'))
+
+
+# --- WG windows opened from the overlay ---------------------------------------------
+# Flash windows (invites, configure, WG's vehicle selector) open on layer WINDOW, below the
+# overlay: hide the overlay until the extra window is closed again.
+_WATCH_LAYERS = (WindowLayer.WINDOW, WindowLayer.TOP_WINDOW, WindowLayer.FULLSCREEN_WINDOW)
+_WATCH_TIMEOUT = 3.0  # s to wait for the WG window to appear
+
+
+def _wgWindowCount(bridge):
+    gui = dependency.instance(IGuiLoader)
+    own = bridge.window
+    ownID = own.uniqueID if own is not None else -1
+    return len(gui.windowsManager.findWindows(lambda w: w.layer in _WATCH_LAYERS and w.uniqueID != ownID))
+
+
+def _whileWgWindow(bridge, opener):
+    try:
+        baseline = _wgWindowCount(bridge)
+    except Exception:
+        _logger.exception('counting windows failed')
+        opener()
+        return
+    bridge.close(hide=True)
+    opener()
+    state = {'seen': False, 'waited': 0.0}
+
+    def poll():
+        if bridge.view is None or bridge.window is not None:
+            return  # room gone, or overlay reopened by hand
+        try:
+            count = _wgWindowCount(bridge)
+        except Exception:
+            _logger.exception('counting windows failed')
+            count = baseline
+        if count > baseline:
+            state['seen'] = True
+        state['waited'] += 0.25
+        if (state['seen'] and count <= baseline) or (not state['seen'] and state['waited'] >= _WATCH_TIMEOUT):
+            bridge.open(manual=True)
+            return
+        BigWorld.callback(0.25, poll)
+
+    BigWorld.callback(0.25, poll)
 
 
 class EzRoomWindow(WindowImpl):

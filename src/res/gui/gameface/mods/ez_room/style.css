@@ -206,3 +206,59 @@ body {
     white-space: nowrap;
 }
 .comment { margin-left: 12rem; color: #ffd79a; overflow: hidden; text-overflow: ellipsis; }
+
+/* actions */
+.clickable { cursor: pointer; }
+.slot.clickable:hover { background-color: rgba(255, 255, 255, 0.1); }
+.slot.mine { background-color: rgba(255, 196, 108, 0.1); border-left-color: #ffc46c; }
+.take { color: #c4e2a8; }
+.slot.clickable:hover .take { color: #e6f5d6; }
+.veh.pick { cursor: pointer; padding-right: 6rem; }
+.veh.pick:hover .vname, .veh.none.pick:hover { color: #ffffff; }
+.veh.none.pick { color: #ffc46c; }
+
+.acts { display: none; flex-shrink: 0; align-items: center; margin-left: 6rem; }
+.acts.always, .slot:hover .acts, .cand:hover .acts { display: flex; }
+.ibtn {
+    margin-left: 4rem;
+    padding: 2rem 7rem;
+    border: 1rem solid rgba(255, 255, 255, 0.2);
+    border-radius: 3rem;
+    font-size: 11rem;
+    color: rgba(233, 231, 220, 0.8);
+    cursor: pointer;
+    white-space: nowrap;
+}
+.ibtn:hover { border-color: rgba(255, 255, 255, 0.5); color: #ffffff; }
+.ibtn.kick:hover, .ibtn.kick.armed { border-color: #ff7a52; color: #ff9a72; }
+
+.cand.pickable { cursor: pointer; }
+.cand.sel { background-color: rgba(150, 205, 110, 0.18); }
+
+.pfoot { flex-shrink: 0; padding: 8rem; border-top: 1rem solid rgba(255, 255, 255, 0.07); }
+.btn.wide { margin: 0 0 6rem 0; text-align: center; }
+.pnote { color: rgba(233, 231, 220, 0.5); font-size: 11rem; text-align: center; }
+
+.readybar {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    height: 40rem;
+    padding: 0 8rem;
+    border-top: 1rem solid rgba(255, 255, 255, 0.07);
+}
+.readybar .state { flex-grow: 1; width: 0; color: #ff9a72; font-size: 12rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.readybar .state.hint { color: #c4e2a8; }
+.btn.main {
+    margin-left: 8rem;
+    padding: 6rem 22rem;
+    border: none;
+    background-color: #e0662a;
+    background-image: linear-gradient(to bottom, #f5913e, #d4521f);
+    color: #fff6e6;
+    font-size: 13rem;
+    font-weight: bold;
+}
+.btn.main:hover { background-image: linear-gradient(to bottom, #ffa452, #e05f28); }
+.btn.main.off { background-image: none; background-color: rgba(255, 255, 255, 0.08); color: rgba(233, 231, 220, 0.35); cursor: default; }
+.btn.main.isready { background-image: linear-gradient(to bottom, #8fc66a, #5e9a3c); }
