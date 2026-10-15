@@ -11,6 +11,8 @@ const ui = {
     raw: false,
     selCand: 0, // commander: candidate picked to be put into a slot
     kickArm: 0, // dbID whose kick button was clicked once (second click kicks)
+    filterSel: null, // vehicle filter list: Set of selected CDs while the list is open
+    filterSlot: -1,
 };
 let kickTimer = 0;
 
@@ -191,6 +193,75 @@ function renderRoomActions() {
     return `<div class="pfoot">${btns.join("")}${status ? `<div class="pnote">${esc(status)}</div>` : ""}</div>`;
 }
 
+// slot class filter bits (FILTER_STATE in WG's fortifications vo_converters)
+const FILTER_TYPES = [["lightTank", 1], ["mediumTank", 2], ["heavyTank", 4], ["AT-SPG", 16], ["SPG", 8]];
+
+function filterTip(type) {
+    const items = (data.filters && data.filters.items) || [];
+    const bit = (FILTER_TYPES.find((t) => t[0] === type) || [])[1];
+    const it = items.find((i) => i.filterValue === bit);
+    return it ? it.tooltip : "";
+}
+
+// legionnaire filters of a free slot: editable for the commander, read-only for everyone else
+function renderSlotFilters(slot, idx) {
+    if (slot.player || slot.isClosed || !slot.isFiltersEnabled) return "";
+    const state = slot.filterState || 0;
+    const vehicles = slot.vehicles || [];
+    const edit = isCommander();
+    if (!edit && !state && !vehicles.length) return "";
+    const icons = FILTER_TYPES.map(([type, bit]) => {
+        const on = (state & bit) !== 0;
+        if (!edit && !on) return "";
+        return `<div class="fico ${on ? "on" : ""} ${edit ? "edit" : ""}" ${edit ? `data-act="filterClass" data-slot="${idx}" data-state="${state ^ bit}"` : ""} data-tip="${esc(filterTip(type))}" style="background-image:url(img://gui/maps/icons/filters/tanks/${type}.png)"></div>`;
+    }).join("");
+    const veh = edit
+        ? `<div class="ibtn fveh ${vehicles.length ? "on" : ""}" data-act="filterOpen" data-slot="${idx}">${L("Panzer", "Tanks")}${vehicles.length ? " " + vehicles.length : ""}</div>`
+        : vehicles.length
+          ? `<div class="fcount">${vehicles.length} ${L("Panzer", "tanks")}</div>`
+          : "";
+    const reset = edit && (state || vehicles.length) ? `<div class="ibtn" data-act="filterReset" data-slot="${idx}" data-tip="${esc(L("Filter zurücksetzen", "Reset filters"))}">✕</div>` : "";
+    return `<div class="filters">${icons}${veh}${reset}</div>`;
+}
+
+function renderFilterPopup() {
+    const o = data.filterOptions;
+    if (!o) return "";
+    if (ui.filterSlot !== o.slot || !ui.filterSel) {
+        ui.filterSlot = o.slot;
+        ui.filterSel = new Set(o.selected || []);
+    }
+    const groups = {};
+    (o.items || []).forEach((v) => (groups[v.type] = groups[v.type] || []).push(v));
+    const body = FILTER_TYPES.filter(([type]) => groups[type])
+        .map(
+            ([type]) => `
+            <div class="fgroup">
+                <div class="fghead"><div class="fico on" style="background-image:url(img://gui/maps/icons/filters/tanks/${type}.png)"></div></div>
+                <div class="fgrid">${groups[type]
+                    .map(
+                        (v) => `<div class="fchip ${ui.filterSel.has(v.cd) ? "sel" : ""} ${v.inHangar ? "" : "nohangar"}" data-act="filterToggle" data-id="${v.cd}">
+                            <div class="vicon" style="background-image:url(${img(v.icon)})"></div><div class="fname">${esc(v.name)}</div></div>`
+                    )
+                    .join("")}</div>
+            </div>`
+        )
+        .join("");
+    return `
+        <div class="modal" data-popup="1">
+            <div class="mbox">
+                <div class="ptitle">${L("Erlaubte Panzer für Platz", "Allowed tanks for slot")} ${o.slot + 1}<span class="grow"></span><span class="muted">${ui.filterSel.size} ${L("gewählt", "selected")}</span></div>
+                <div class="mbody" data-scroll="80">${body}</div>
+                <div class="mfoot">
+                    <div class="btn" data-act="filterNone">${L("Keine", "None")}</div>
+                    <span class="grow"></span>
+                    <div class="btn" data-act="filterCancel">${L("Abbrechen", "Cancel")}</div>
+                    <div class="btn main" data-act="filterApply">${L("Übernehmen", "Apply")}</div>
+                </div>
+            </div>
+        </div>`;
+}
+
 function slotStatus(slot) {
     const p = slot.player;
     if (!p) return "";
@@ -234,7 +305,7 @@ function renderSlot(slot, idx) {
     const vehAct = mine ? `data-act="chooseVehicle" data-cd="${v ? v.intCD : 0}"` : "";
     const veh = v
         ? `
-            <div class="veh ${mine ? "pick" : ""} ${v.isReadyToFight === false || v.enabled === false ? "bad" : ""}" ${vehAct}>
+            <div class="veh ${mine ? "pick" : ""} ${v.isReadyToFight === false || v.enabled === false ? "bad" : ""}" ${vehAct} data-tip="${esc(v.userName || "")}">
                 ${v.smallIconPath ? `<div class="vicon" style="background-image:url(${img(v.smallIconPath)})"></div>` : ""}
                 <div class="tier">${ROMAN[v.level] || ""}</div>
                 <div class="vname">${esc(v.shortUserName || v.userName)}</div>
@@ -249,6 +320,7 @@ function renderSlot(slot, idx) {
             ${who}
             <div class="rating">${p ? esc(slot.rating || "") : ""}</div>
             ${veh}
+            ${renderSlotFilters(slot, idx)}
             ${acts.length ? `<div class="acts ${mine ? "always" : ""}">${acts.join("")}</div>` : ""}
             <div class="status">${slotStatus(slot)}</div>
         </div>`;
@@ -278,7 +350,7 @@ function renderReadyBar() {
     return `
         <div class="readybar">
             <div class="state ${ui.selCand ? "hint" : ""}">${esc(hint)}</div>
-            <div class="btn main ${ab.isEnabled ? "" : "off"} ${ab.isReady ? "isready" : ""}" ${ab.isEnabled ? `data-act="ready"` : ""}>${esc(label)}</div>
+            <div class="btn main ${ab.isEnabled ? "" : "off"} ${ab.isReady ? "isready" : ""}" ${ab.isEnabled ? `data-act="ready"` : ""} data-tip="${esc(ab.toolTipData || "")}">${esc(label)}</div>
         </div>`;
 }
 
@@ -359,16 +431,32 @@ function sendChat() {
     chatStick = true;
 }
 
+// 10 x 10 grid with A-K / 1-0 labels like WG's lobby minimap, map image below it
+const GRID_ROWS = ["A", "B", "C", "D", "E", "F", "G", "H", "J", "K"];
+const GRID_COLS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"];
+function renderMapGrid() {
+    const cols = GRID_COLS.map((c) => `<div class="gcol">${c}</div>`).join("");
+    const rows = GRID_ROWS.map((r) => `<div class="grow-l">${r}</div>`).join("");
+    let cells = "";
+    for (let i = 0; i < 100; i++) cells += `<div class="gcell"></div>`;
+    return `
+        <div class="mapgrid">
+            <div class="gtop"><div class="gcorner"></div>${cols}</div>
+            <div class="gmid">
+                <div class="gleft">${rows}</div>
+                <div class="gmap" ${data.mapIcon ? `style="background-image:url(${data.mapIcon})"` : ""}>${cells}</div>
+            </div>
+        </div>`;
+}
+
 function renderSide() {
     const room = data.room || {};
     const map = txt(room.mapName);
     return `
         <div class="side">
             <div class="panel map">
-                <div class="ptitle">${L("Karte", "Map")}</div>
-                <div class="mapimg" ${data.mapIcon ? `style="background-image:url(${data.mapIcon})"` : ""}>
-                    <div class="mapname">${esc(map)}</div>
-                </div>
+                <div class="ptitle">${esc(map || L("Karte", "Map"))}</div>
+                ${renderMapGrid()}
             </div>
             ${renderChat()}
         </div>`;
@@ -450,7 +538,12 @@ function render() {
     const keep = {};
     root.querySelectorAll("[data-scroll]").forEach((el, i) => (keep[i] = el.scrollTop));
     const body = ui.raw ? renderRaw() : `${renderCandidates()}${renderTeam()}${renderSide()}`;
-    root.innerHTML = `${renderHeader()}<div class="body">${body}</div>${renderFooter()}${renderReservePopup()}`;
+    root.innerHTML = `${renderHeader()}<div class="body">${body}</div>${renderFooter()}${renderReservePopup()}${renderFilterPopup()}<div id="tip" class="tip"></div>`;
+    tipTarget = null;
+    if (!data.filterOptions) {
+        ui.filterSel = null;
+        ui.filterSlot = -1;
+    }
     root.querySelectorAll("[data-scroll]").forEach((el, i) => {
         if (keep[i]) el.scrollTop = keep[i];
     });
@@ -517,9 +610,57 @@ document.addEventListener("click", (e) => {
         send({ action: "reserveOpen", slot: open ? -1 : slot });
     } else if (act === "reserveSelect") {
         send({ action: "reserveSelect", id: id, remove: el.getAttribute("data-remove") === "1" });
+    } else if (act === "filterClass") send({ action: "filterClass", slot: slot, state: Number(el.getAttribute("data-state")) || 0 });
+    else if (act === "filterReset") send({ action: "filterReset", slot: slot });
+    else if (act === "filterOpen") send({ action: "filterOpen", slot: slot });
+    else if (act === "filterToggle") {
+        if (ui.filterSel) {
+            if (ui.filterSel.has(id)) ui.filterSel.delete(id);
+            else ui.filterSel.add(id);
+            render();
+        }
+    } else if (act === "filterNone") {
+        if (ui.filterSel) ui.filterSel.clear();
+        render();
+    } else if (act === "filterCancel") {
+        data.filterOptions = null;
+        send({ action: "filterOpen", slot: -1 });
+        render();
+    } else if (act === "filterApply") {
+        const o = data.filterOptions;
+        if (o && ui.filterSel) send({ action: "filterVehicles", slot: o.slot, cds: Array.from(ui.filterSel).join(",") });
     } else if (act === "chatSend") sendChat();
     else if (act === "chooseVehicle") send({ action: "chooseVehicle", cd: Number(el.getAttribute("data-cd")) || 0 });
     else if (act === "ready" || act === "invite" || act === "toggleOpen" || act === "configure") send({ action: act });
+});
+
+// tooltips: any element with data-tip; WG format "{HEADER}..{/HEADER}{BODY}..{/BODY}" or plain text
+function tipHtml(raw) {
+    const t = String(raw || "");
+    const h = /\{HEADER\}([\s\S]*?)\{\/HEADER\}/.exec(t);
+    const b = /\{BODY\}([\s\S]*?)\{\/BODY\}/.exec(t);
+    if (!h && !b) return t.trim() ? `<div class="tbody">${esc(txt(t))}</div>` : "";
+    return `${h ? `<div class="thead">${esc(txt(h[1]))}</div>` : ""}${b ? `<div class="tbody">${esc(txt(b[1])).replace(/\n/g, "<br/>")}</div>` : ""}`;
+}
+let tipTarget = null;
+document.addEventListener("mousemove", (e) => {
+    const tip = document.getElementById("tip");
+    if (!tip) return;
+    const el = closest(e.target, "data-tip");
+    if (el !== tipTarget) {
+        tipTarget = el;
+        const html = el ? tipHtml(el.getAttribute("data-tip")) : "";
+        tip.innerHTML = html;
+        tip.style.display = html ? "block" : "none";
+    }
+    if (tipTarget) {
+        const w = document.body.offsetWidth || 1013;
+        const h = document.body.offsetHeight || 653;
+        const tw = tip.offsetWidth || 260;
+        const th = tip.offsetHeight || 60;
+        tip.style.left = Math.min(e.clientX + 14, w - tw - 4) + "px";
+        tip.style.top = (e.clientY + 18 + th > h ? e.clientY - th - 8 : e.clientY + 18) + "px";
+    }
 });
 
 // right click on a player: WG's player context menu (opened by Python)
@@ -558,7 +699,11 @@ document.addEventListener("keydown", (e) => {
     }
     if (e.keyCode === 116 && data.dev) send({ action: "devReload" });
     else if (e.keyCode === 27) {
-        if (data.reserveOptions) {
+        if (data.filterOptions) {
+            data.filterOptions = null;
+            send({ action: "filterOpen", slot: -1 });
+            render();
+        } else if (data.reserveOptions) {
             data.reserveOptions = null;
             send({ action: "reserveOpen", slot: -1 });
             render();
