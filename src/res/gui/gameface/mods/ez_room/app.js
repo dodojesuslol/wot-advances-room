@@ -524,18 +524,52 @@ setInterval(() => updateTimer(document.getElementById("timer")), 500);
 
 // view size = room content area of WG's window (px); Gameface windows are sized from JS
 // (viewEnv.resizeViewPx, same as WG's own OfferBannerWindow)
+// Right after the view opens, resizeViewPx can be ignored (game.log: viewSizePx 0x0, only the
+// top-left corner drawn): check the real size and set it again every 0.2 s until it sticks.
+const RESIZE_RETRY_MS = 200;
+const RESIZE_RETRY_MAX = 25; // 5 s
 let appliedSize = "";
+let resizeTimer = 0;
+
+function viewSizeOk(w, h) {
+    try {
+        const size = viewEnv.getViewSizePx();
+        return Math.abs(size.width - w) <= 1 && Math.abs(size.height - h) <= 1;
+    } catch (e) {
+        return true; // no way to check (browser preview)
+    }
+}
+
+function resizeView(w, h, attempt) {
+    try {
+        if (window.viewEnv && viewEnv.resizeViewPx) viewEnv.resizeViewPx(w, h);
+    } catch (e) {
+        send({ action: "log", msg: "resizeViewPx failed: " + e });
+    }
+    resizeTimer = setTimeout(() => {
+        resizeTimer = 0;
+        if (appliedSize !== w + "x" + h) return; // a newer size is being applied
+        if (viewSizeOk(w, h)) {
+            if (attempt > 0) send({ action: "log", msg: "view size " + w + "x" + h + " ok after " + (attempt + 1) + " tries" });
+            return;
+        }
+        if (attempt + 1 >= RESIZE_RETRY_MAX) {
+            send({ action: "log", msg: "view size " + w + "x" + h + " not applied after " + RESIZE_RETRY_MAX + " tries" });
+            return;
+        }
+        send({ action: "log", msg: "view size not applied yet, retry " + (attempt + 1) });
+        resizeView(w, h, attempt + 1);
+    }, RESIZE_RETRY_MS);
+}
+
 function applyFrame() {
     const f = data.frame;
     if (!f || f.length < 4 || f[2] <= 0 || f[3] <= 0) return;
     const key = f[2] + "x" + f[3];
     if (key === appliedSize) return;
     appliedSize = key;
-    try {
-        if (window.viewEnv && viewEnv.resizeViewPx) viewEnv.resizeViewPx(f[2], f[3]);
-    } catch (e) {
-        send({ action: "log", msg: "resizeViewPx failed: " + e });
-    }
+    if (resizeTimer) clearTimeout(resizeTimer);
+    resizeView(f[2], f[3], 0);
     document.documentElement.style.width = document.body.style.width = "100%";
     document.documentElement.style.height = document.body.style.height = "100%";
 }
