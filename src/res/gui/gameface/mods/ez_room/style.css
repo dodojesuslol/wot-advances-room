@@ -21,6 +21,7 @@ body {
 }
 
 #root {
+    position: relative;
     width: 100%;
     height: 100%;
     display: flex;
@@ -47,11 +48,10 @@ body {
 .hcenter .timer { margin: 0; }
 .titles { flex-grow: 1; width: 0; min-width: 0; overflow: hidden; }
 .title { font-size: 18rem; font-weight: bold; color: #eeede9; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.sub { font-size: 11rem; color: rgba(233, 231, 220, 0.55); margin-top: 2rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sub { display: flex; align-items: center; font-size: 11rem; color: rgba(233, 231, 220, 0.55); margin-top: 2rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .back { display: inline-block; font-size: 11rem; color: #ffe4c0; margin-top: 3rem; white-space: nowrap; cursor: pointer; }
 .back:hover { color: #f28a3a; }
 /* WG's divisionInfo ⓘ after the description (library/infoIcon.png) */
-.sub { display: flex; align-items: center; }
 .dinfo { width: 14rem; height: 14rem; margin-left: 4rem; flex-shrink: 0; background-image: url(img://gui/maps/icons/library/infoIcon.png); background-size: 14rem 14rem; cursor: default; }
 .btn.disabled { opacity: 0.4; cursor: default; }
 .center { flex-shrink: 0; display: flex; justify-content: center; margin: 0 10rem; }
@@ -197,16 +197,12 @@ body {
 .veh { flex-grow: 1; width: 0; display: flex; align-items: center; overflow: hidden; }
 .veh.none { color: rgba(233, 231, 220, 0.3); font-size: 11rem; }
 .veh.bad .vname { color: #ff9a72; }
-.vicon { width: 56rem; height: 20rem; flex-shrink: 0; background-size: contain; background-repeat: no-repeat; background-position: center; }
 .tier { width: 26rem; flex-shrink: 0; text-align: center; color: rgba(233, 231, 220, 0.55); font-size: 11rem; }
 .vname { color: #ffe4c0; font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .vstate { margin-left: 6rem; color: #ff9a72; font-size: 10rem; white-space: nowrap; }
 
 .status { width: 20rem; flex-shrink: 0; display: flex; justify-content: flex-end; }
 .sicon { width: 16rem; height: 16rem; flex-shrink: 0; background-size: 16rem 16rem; }
-.dot { width: 8rem; height: 8rem; border-radius: 4rem; background-color: rgba(255, 255, 255, 0.15); }
-.dot.ready { background-color: #96cd6e; }
-.dot.battle { background-color: #f28a3a; }
 
 .side { width: 240rem; flex-shrink: 0; display: flex; flex-direction: column; }
 .map { flex-shrink: 0; margin-bottom: 8rem; }
@@ -220,6 +216,7 @@ body {
 .gleft { width: 14rem; flex-shrink: 0; padding-top: 1rem; display: flex; flex-direction: column; }
 .grow-l { height: 20rem; flex-shrink: 0; display: flex; align-items: center; font-size: 10rem; color: rgba(233, 231, 220, 0.5); }
 .gmap {
+    position: relative;
     /* 200 x 200 inside the 1 px border: border-box set explicitly, Gameface and Firefox count the
        border differently otherwise (0.7.11: only 9 cells per row in game) */
     box-sizing: border-box;
@@ -233,7 +230,6 @@ body {
     border: 1rem solid rgba(255, 255, 255, 0.12);
 }
 /* commander markings: WG's MinimapClick dot (MinimapLobby.swf, steady frame), 40 px glow centred */
-.gmap { position: relative; }
 .gmap.clickable { cursor: pointer; }
 /* random map: WG's dice (MinimapLobby.swf sprite 9, 111 x 77 in WG's 207 px grid) on WG's dark back */
 .gmap.random { background-color: #0f0e0b; }
@@ -241,7 +237,6 @@ body {
 .gpoint { position: absolute; width: 40rem; height: 40rem; background-image: url(img://gui/maps/icons/ez_room/gridclick.png); background-size: 40rem 40rem; pointer-events: none; }
 .grow-c { display: flex; flex-shrink: 0; width: 200rem; height: 20rem; }
 .gcell { flex-shrink: 0; width: 20rem; height: 20rem; box-sizing: border-box; border-right: 1rem solid rgba(0, 0, 0, 0.35); border-bottom: 1rem solid rgba(0, 0, 0, 0.35); }
-.chat { flex-grow: 1; }
 
 .raw { flex-grow: 1; }
 .rawname { padding: 8rem 16rem 2rem; color: #ffc46c; font-size: 13rem; }
@@ -277,8 +272,7 @@ body {
 .slot, .cand { position: relative; }
 .acts { position: absolute; right: 0; top: 0; bottom: 0; display: flex; align-items: center; padding: 0 6rem 0 14rem; background-color: rgba(30, 30, 31, 0.97); visibility: hidden; }
 .acts.always, .slot.hov .acts, .cand.hov .acts { visibility: visible; }
-.acts.always { position: static; padding: 0 0 0 6rem; background-color: transparent; }
-.acts.always { position: relative; }
+.acts.always { position: relative; padding: 0 0 0 6rem; background-color: transparent; }
 .roleover { position: absolute; right: 100%; top: 0; bottom: 0; display: flex; align-items: center; padding: 0 2rem 0 10rem; background-color: rgba(30, 30, 31, 0.97); visibility: hidden; }
 .slot.hov .roleover { visibility: visible; }
 .ibtn {
@@ -336,19 +330,6 @@ body {
 .btn.readybtn.unready:hover { background-image: linear-gradient(to bottom, #f06a52, #bb3a27); }
 .btn.readybtn.off { background-image: none; background-color: rgba(255, 255, 255, 0.08); color: rgba(233, 231, 220, 0.35); cursor: default; }
 .readybar .state.hint { color: #c4e2a8; }
-.btn.main {
-    margin-left: 8rem;
-    padding: 6rem 22rem;
-    border: none;
-    background-color: #e0662a;
-    background-image: linear-gradient(to bottom, #f5913e, #d4521f);
-    color: #fff6e6;
-    font-size: 13rem;
-    font-weight: bold;
-}
-.btn.main:hover { background-image: linear-gradient(to bottom, #ffa452, #e05f28); }
-.btn.main.off { background-image: none; background-color: rgba(255, 255, 255, 0.08); color: rgba(233, 231, 220, 0.35); cursor: default; }
-.btn.main.isready { background-image: linear-gradient(to bottom, #8fc66a, #5e9a3c); }
 
 /* chat: close to WG's Flash chat box (Chat-Kanal) */
 .chat { flex-grow: 1; }
@@ -403,7 +384,6 @@ body {
 }
 
 /* reserves */
-#root { position: relative; }
 .reserves { flex-shrink: 0; display: flex; align-items: center; margin-left: 4rem; }
 .rslot {
     position: relative;

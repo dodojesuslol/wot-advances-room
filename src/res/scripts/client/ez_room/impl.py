@@ -13,8 +13,6 @@ from frameworks.wulf import ViewFlags, ViewModel, ViewSettings, WindowFlags, Win
 from gui.impl.gen import R
 from gui.impl.pub import ViewImpl
 from gui.impl.pub.window_impl import WindowImpl
-from gui.Scaleform.daapi.view.lobby.rally import vo_converters
-from gui.Scaleform.locale.FORTIFICATIONS import FORTIFICATIONS
 from gui.Scaleform.locale.TOOLTIPS import TOOLTIPS
 from gui.shared.utils.functions import getArenaGeometryName
 from helpers import dependency, getClientLanguage
@@ -22,27 +20,36 @@ from helpers.i18n import makeString
 from adisp import adisp_process
 from skeletons.gui.impl import IGuiLoader
 
-__version__ = '0.7.30'
+__version__ = '0.7.31'
 _logger = logging.getLogger('EZ_ROOM')
 _logger.setLevel(logging.INFO)
 _LAYOUT_PATH = ('ez_room', 'views', 'EzRoomView')
 _UI_DIR = 'res/gui/gameface/mods/ez_room'
 _SNAPSHOT_FILE = os.path.join('mods', 'configs', 'ez_room', 'last_room.json')  # dev only, for the preview
-_SETTINGS_FILE = os.path.join('mods', 'configs', 'ez_room', 'settings.json')  # UI settings (team table sort)
+_SETTINGS_FILE = os.path.join('mods', 'configs', 'ez_room', 'settings.json')  # UI settings (table sorting)
+
+
+_settings = None  # cache of settings.json (read once, then only written)
 
 
 def _loadSettings():
-    try:
-        if os.path.isfile(_SETTINGS_FILE):
-            with open(_SETTINGS_FILE, 'r') as f:
-                data = json.load(f)
-            return data if isinstance(data, dict) else {}
-    except Exception:
-        _logger.exception('reading %s failed', _SETTINGS_FILE)
-    return {}
+    global _settings
+    if _settings is None:
+        _settings = {}
+        try:
+            if os.path.isfile(_SETTINGS_FILE):
+                with open(_SETTINGS_FILE, 'r') as f:
+                    data = json.load(f)
+                if isinstance(data, dict):
+                    _settings = data
+        except Exception:
+            _logger.exception('reading %s failed', _SETTINGS_FILE)
+    return dict(_settings)
 
 
 def _saveSettings(settings):
+    global _settings
+    _settings = dict(settings)
     try:
         folder = os.path.dirname(_SETTINGS_FILE)
         if not os.path.isdir(folder):
@@ -122,16 +129,6 @@ def _u(value):
     return value if value is not None else u''
 
 
-def _img(path):
-    # Flash style '../maps/icons/x.png' -> Gameface 'img://gui/maps/icons/x.png'
-    path = _u(path)
-    if path.startswith(u'..'):
-        return u'img://gui' + path[2:]
-    if path.startswith(u'gui/'):
-        return u'img://' + path
-    return path
-
-
 def _clean(value, depth=0):
     # VOs -> JSON-safe values (utf-8 byte strings to unicode, unknown objects to repr)
     if depth > 12:
@@ -158,22 +155,6 @@ def _devUI():
         return json.dumps({'css': files['style.css'], 'js': files['app.js']})
     except Exception:
         _logger.exception('dev: reading UI files failed')
-        return u''
-
-
-def _title(bridge):
-    if not bridge.title:
-        return u''
-    isSortie, direction, multiplier = bridge.title
-    try:
-        if isSortie:
-            return _u(makeString(FORTIFICATIONS.STRONGHOLDTITLE_SORTIE))
-        title = _u(makeString(FORTIFICATIONS.STRONGHOLDTITLE_STRONGHOLD)) % {'direction': _u(vo_converters.getDirection(direction))}
-        if multiplier > 1:
-            title += u' (x%s)' % multiplier
-        return title
-    except Exception:
-        _logger.exception('title failed')
         return u''
 
 
@@ -572,7 +553,6 @@ def _pack(bridge, frame=None, reserveSlot=-1, speakEvents=None):
         'frame': list(frame) if frame else None,
         'lang': _lang(),
         'dev': bool(DEV),
-        'title': _title(bridge),
         'back': _backLink(),
         'divisionTip': _divisionTip(),
         'configureTips': _configureTips(),
@@ -600,8 +580,6 @@ def _pack(bridge, frame=None, reserveSlot=-1, speakEvents=None):
         'actionButton': _actionButton(first('as_setActionButtonStateS')),
         'comment': first('as_setCommentS', u''),
         'vehiclesTitle': calls.get('as_setVehiclesTitleS'),
-        'teamHeaderText': first('as_updateTeamHeaderTextS'),
-        'filters': first('as_setFiltersDataS'),
         'highlight': first('as_highlightSlotsS'),
         'chat': _packChat(bridge),
         'waiting': _packWaiting(bridge),

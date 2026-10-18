@@ -78,7 +78,6 @@ class RoomBridge(object):
         self.calls = {}      # as_*S name -> last args
         self.slotCalls = {}  # as_*S name -> {slotIdx: args}
         self.times = {}      # as_*S name -> time.time() of the last call (seconds)
-        self.title = None    # (isSortie, direction, resourceMultiplier) from _updateTitle
         self.minimap = {'texture': u'', 'points': []}  # what WG's lobby minimap got (as_*S of MinimapLobby)
         self.grid = {'points': [], 'clickEnabled': False}  # commander markings (as_*S of MinimapGrid)
         self.window = None
@@ -92,17 +91,6 @@ class RoomBridge(object):
     def roomWindowView(self):
         # WG's Flash room window view (StrongholdBattleRoomWindow); as_getGeometryS() = (x, y, w, h)
         return _roomWindowView() if _roomWindowView is not None else None
-
-    def roomWindow(self):
-        # wulf window of WG's Flash room window (position/size the overlay follows)
-        windowView = _roomWindowView() if _roomWindowView is not None else None
-        if windowView is None:
-            return None
-        try:
-            return windowView.getParentWindow()
-        except Exception:
-            _logger.exception('room window lookup failed')
-            return None
 
     def record(self, name, args):
         if name in _PER_SLOT and args:
@@ -167,11 +155,6 @@ class RoomBridge(object):
         self.close()
         BigWorld.callback(0.1, self.open)
 
-    def onWindowGone(self, window):
-        # called by the view's _finalize (window closed by the game or by us)
-        if self.window is window:
-            self.window = None
-
 
 _bridge = None  # bridge of the room that is open right now
 _roomWindowView = None  # weakref to the StrongholdBattleRoomWindow (Flash window view)
@@ -221,7 +204,6 @@ def _wrapNotify(orig):
 
 _origPopulate = StrongholdBattleRoom._populate
 _origDispose = StrongholdBattleRoom._dispose
-_origUpdateTitle = StrongholdBattleRoom._updateTitle
 
 
 # WG's lobby minimap in the room (MinimapLobby.build): record exactly what Flash gets for the
@@ -303,14 +285,6 @@ def _dispose(self):
     _origDispose(self)
 
 
-def _updateTitle(self, isSortie, direction, resourceMultiplier):
-    _origUpdateTitle(self, isSortie, direction, resourceMultiplier)
-    bridge = _bridge
-    if bridge is not None and bridge.view is self:
-        bridge.title = (isSortie, direction, resourceMultiplier)
-        bridge.changed()
-
-
 _origWindowPopulate = StrongholdBattleRoomWindow._populate
 _origWindowDispose = StrongholdBattleRoomWindow._dispose
 
@@ -377,7 +351,6 @@ StrongholdBattleRoom._populate = _populate
 StrongholdBattleRoomWindow._populate = _windowPopulate
 StrongholdBattleRoomWindow._dispose = _windowDispose
 StrongholdBattleRoom._dispose = _dispose
-StrongholdBattleRoom._updateTitle = _updateTitle
 StrongholdBattleRoom._rebuildCandidatesDP = _wrapNotify(StrongholdBattleRoom._rebuildCandidatesDP)
 StrongholdBattleRoom.initCandidatesDP = _wrapNotify(StrongholdBattleRoom.initCandidatesDP)
 if os.path.isfile(_GUARD_FILE):

@@ -97,9 +97,10 @@ function renderHeader() {
     // the header with the clan names left and right; exported from fortCmp.swf (ConnectedDirectsUI)
     const dir = data.direction && data.direction[0];
     const showDir = !!dir && (mine || enemy);
+    // with the direction row the clans sit there and the timer is centred in the header (.hcenter)
     let center = "";
     if (showDir) {
-        center = "";
+        // nothing in the middle column
     } else if (mine || enemy) {
         center = `
             <div class="vs">
@@ -245,7 +246,7 @@ function renderCandidates() {
                   const pick = isCommander() && rally().canAssignToSlot;
                   return `
                     <div data-user="${p.dbID}" class="cand ${p.isOffline ? "offline" : ""} ${own ? "own" : ""} ${pick ? "pickable" : ""} ${ui.selCand === p.dbID ? "sel" : ""}" ${pick ? `data-cand="${p.dbID}" data-tip="${esc(L("Klick: nächster freier Platz · Ziehen: auf einen Platz", "Click: next free slot · Drag: onto a slot"))}"` : ""}>
-                        ${p.isInvite ? `<div class="inv" title="invited"></div>` : ""}
+                        ${p.isInvite ? `<div class="inv"></div>` : ""}
                         ${p.statusIcon ? `<div class="ustatus" style="background-image:url(${img(p.statusIcon)})"></div>` : ""}
                         ${badge(p)}
                         <div class="name ${speaking(p.dbID) ? "speak" : ""}" ${c ? `style="color:${c}"` : ""}>${esc(p.userName || p.fullName)}</div>
@@ -272,7 +273,7 @@ function renderRoomActions() {
     const conf = data.configure || {};
     const btns = [];
     if (rally().canInvite) btns.push(`<div class="btn wide" data-act="invite">${L("Einladen", "Invite")}</div>`);
-    if (isCommander() && opened[0] && conf.isRoomStatusEnabled !== false) btns.push(`<div class="btn wide" data-act="toggleOpen" title="${esc(txt(opened[2]))}">${esc(txt(opened[0]))}</div>`);
+    if (isCommander() && opened[0] && conf.isRoomStatusEnabled !== false) btns.push(`<div class="btn wide" data-act="toggleOpen" data-tip="${esc(txt(opened[2]))}">${esc(txt(opened[0]))}</div>`);
     // like WG: the commander always sees it, greyed out while WG locks it (with WG's tooltips)
     const ctips = data.configureTips || {};
     if (isCommander())
@@ -311,7 +312,7 @@ function renderSlot(slot, idx) {
     let rowAct = "";
     if (!p && slot.canBeTaken && !(data.me || {}).isInSlot && !isCommander()) rowAct = `data-act="takeSlot" data-slot="${idx}"`;
     const acts = [];
-    if (mine) acts.push(`<div class="ibtn" data-act="leaveSlot" data-id="${p.dbID}" title="leave">${L("Verlassen", "Leave")}</div>`);
+    if (mine) acts.push(`<div class="ibtn" data-act="leaveSlot" data-id="${p.dbID}">${L("Verlassen", "Leave")}</div>`);
     else if (p && isCommander() && slot.isRemoveAvailable) {
         acts.push(`<div class="ibtn" data-act="leaveSlot" data-id="${p.dbID}" data-tip="${esc(L("Zurück zu den Freiwilligen", "Back to the volunteers"))}">${L("Raus", "Out")}</div>`);
         acts.push(kickButton(p.dbID));
@@ -602,18 +603,11 @@ function randomMap() {
 
 let gridTimer = null;
 function renderGridPoints() {
-    const points = ((data.grid || {}).points || []).filter((p) => p.left > 0);
+    const now = Date.now();
+    const points = ((data.grid || {}).points || []).filter((p) => p.until > now);
     if (gridTimer) clearTimeout(gridTimer);
     gridTimer = null;
-    if (points.length) {
-        const next = Math.min.apply(null, points.map((p) => p.left));
-        const at = Date.now();
-        gridTimer = setTimeout(() => {
-            const gone = (Date.now() - at) / 1000;
-            (data.grid.points || []).forEach((p) => (p.left -= gone));
-            render();
-        }, next * 1000 + 30);
-    }
+    if (points.length) gridTimer = setTimeout(render, Math.min.apply(null, points.map((p) => p.until)) - now + 30);
     return points.map((p) => `<div class="gpoint" style="left:${Math.round(p.x * 200) - 20}rem;top:${Math.round(p.y * 200) - 20}rem"></div>`).join("");
 }
 
@@ -779,7 +773,7 @@ let chatStick = true; // keep the chat scrolled to the newest line
 
 function render() {
     applyFrame();
-    lastKey = JSON.stringify(Object.assign({}, data, { timer: null, timerAge: null }));
+    lastKey = changeKey(data);
     const root = document.getElementById("root");
     const input = document.getElementById("chatinput");
     if (input) {
@@ -950,7 +944,6 @@ document.addEventListener("click", (e) => {
             render();
         }, 2000);
         render();
-        tipTarget = null;
     } else if (act === "chatSend") sendChat();
     else if (act === "chooseVehicle") send({ action: "chooseVehicle", cd: Number(el.getAttribute("data-cd")) || 0 });
     else if (act === "ready" || act === "invite" || act === "toggleOpen" || act === "configure" || act === "back") send({ action: act });
@@ -1140,12 +1133,20 @@ document.addEventListener("keydown", (e) => {
 let lastKey = "";
 let sortLoaded = false;
 
+function changeKey(d) {
+    const grid = d.grid ? Object.assign({}, d.grid, { points: (d.grid.points || []).map((p) => [p.x, p.y]) }) : null;
+    return JSON.stringify(Object.assign({}, d, { timer: null, timerAge: null, grid: grid }));
+}
+
 function readModel() {
     try {
         const raw = window.model && window.model.data;
         if (!raw) return;
         const next = JSON.parse(raw);
-        const key = JSON.stringify(Object.assign({}, next, { timer: null, timerAge: null }));
+        // grid points: "left" seconds -> absolute end time; only their position counts for the key
+        const points = (next.grid && next.grid.points) || [];
+        points.forEach((p) => (p.until = Date.now() + p.left * 1000));
+        const key = changeKey(next);
         data = next;
         timerBase = { at: Date.now() };
         if (key === lastKey) {
