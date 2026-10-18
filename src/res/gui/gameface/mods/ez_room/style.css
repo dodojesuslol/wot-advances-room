@@ -199,6 +199,9 @@ body {
 .veh.bad .vname { color: #ff9a72; }
 .tier { width: 26rem; flex-shrink: 0; text-align: center; color: rgba(233, 231, 220, 0.55); font-size: 11rem; }
 .vname { color: #ffe4c0; font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vfold { width: 12rem; margin-right: 3rem; flex-shrink: 0; text-align: center; color: #ffd79a; font-size: 9rem; cursor: pointer; }
+.vfold:hover { color: #ffffff; }
+.vcount { margin-left: 5rem; padding: 0 4rem; border-radius: 3rem; background-color: rgba(255, 196, 108, 0.18); color: #ffd79a; font-size: 10rem; flex-shrink: 0; }
 .vstate { margin-left: 6rem; color: #ff9a72; font-size: 10rem; white-space: nowrap; }
 
 .status { width: 20rem; flex-shrink: 0; display: flex; justify-content: flex-end; }

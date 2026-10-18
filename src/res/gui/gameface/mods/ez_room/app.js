@@ -13,6 +13,7 @@ const ui = {
     dragOut: 0, // commander: team member being dragged onto the volunteers list (= leaveSlot)
     hoverRow: "", // data-user of the row under the mouse (its buttons are shown, see markHover)
     sort: null, // team table sort {key: "clan"|"name"|"rating"|"tank", dir: 1|-1}; null = slot order
+    foldTanks: {}, // sorted by tank: tank id -> true = only its first row is shown
 };
 
 function L(de, en) {
@@ -298,7 +299,7 @@ function slotStatus(slot) {
     return `<div class="sicon" style="background-image:url(img://gui/maps/icons/ez_room/status/${frame}.png)"></div>`;
 }
 
-function renderSlot(slot, idx) {
+function renderSlot(slot, idx, tankCount, tankId) {
     if (!slot || typeof slot !== "object") return "";
     const me = (data.me || {}).dbID;
     const p = slot.player;
@@ -349,7 +350,9 @@ function renderSlot(slot, idx) {
             <div class="veh ${mine ? "pick" : ""} ${v.isReadyToFight === false || v.enabled === false ? "bad" : ""}" ${vehAct} data-tip="${esc(v.userName || "")}">
                 <!-- no tank image (user, 0.7.19): more room for the name and the role icons -->
                 <div class="tier">${ROMAN[v.level] || ""}</div>
+                ${tankCount ? `<div class="vfold" data-act="foldTank" data-tank="${esc(tankId)}" data-tip="${esc(ui.foldTanks[tankId] ? L("Alle zeigen", "Show all") : L("Zuklappen", "Fold"))}">${ui.foldTanks[tankId] ? "▶" : "▼"}</div>` : tankId ? `<div class="vfold"></div>` : ""}
                 <div class="vname">${esc(v.shortUserName || v.userName)}</div>
+                ${tankCount ? `<div class="vcount" data-tip="${esc(L(`${tankCount} Spieler mit diesem Panzer`, `${tankCount} players with this tank`))}">×${tankCount}</div>` : ""}
                 ${roleIcons}
                 ${v.state ? `<div class="vstate">${esc(txt(v.state))}</div>` : ""}
             </div>`
@@ -387,6 +390,33 @@ function roleButton(dbID, kind, has) {
     return `<div class="ibtn rolebtn ${has ? "on" : ""}" data-act="role" data-id="${dbID}" data-kind="${kind}" data-give="${has ? 0 : 1}" data-tip="${esc(tip)}"><div class="ricon2" style="background-image:url(img://gui/maps/icons/ez_room/role/${ROLE[kind].img}.png)"></div></div>`;
 }
 
+// sorted by tank: the first row of each tank shows how many players take it (if more than one)
+// and an arrow that folds the other rows of that tank away (ui.foldTanks, not saved)
+function renderSlots() {
+    const rows = sortedSlots();
+    const counts = {};
+    const byTank = ui.sort && ui.sort.key === "tank" && ui.sort.dir;
+    if (byTank) rows.forEach(([slot]) => {
+        const k = tankKey(slot);
+        if (k) counts[k] = (counts[k] || 0) + 1;
+    });
+    const shown = {};
+    return rows
+        .map(([slot, idx]) => {
+            const k = byTank ? tankKey(slot) : "";
+            const first = k && !shown[k];
+            if (k && !first && ui.foldTanks[k]) return "";
+            if (k) shown[k] = true;
+            return renderSlot(slot, idx, first && counts[k] > 1 ? counts[k] : 0, k);
+        })
+        .join("");
+}
+
+function tankKey(slot) {
+    const v = slot && slot.player && slot.selectedVehicle;
+    return v ? String(v.intCD || v.shortUserName || v.userName || "") : "";
+}
+
 function renderTeam() {
     const slots = data.slots || [];
     const header = (data.tableHeader || [])[0];
@@ -399,7 +429,7 @@ function renderTeam() {
                 ${vt ? `<span class="muted">${esc(txt(vt[0]))}</span>` : ""}
             </div>
             ${renderColumns()}
-            <div class="slots" data-scroll="60">${sortedSlots().map(([slot, idx]) => renderSlot(slot, idx)).join("")}</div>
+            <div class="slots" data-scroll="60">${renderSlots()}</div>
             ${renderReadyBar()}
         </div>`;
 }
@@ -911,7 +941,11 @@ document.addEventListener("click", (e) => {
     } else if (act === "takeSlot") send({ action: "takeSlot", slot: slot });
     else if (act === "leaveSlot") send({ action: "leaveSlot", dbID: id });
     else if (act === "kick") send({ action: "kick", dbID: id });
-    else if (act === "role") send({ action: "role", dbID: id, kind: el.getAttribute("data-kind"), give: el.getAttribute("data-give") === "1" });
+    else if (act === "foldTank") {
+        const k = el.getAttribute("data-tank");
+        ui.foldTanks[k] = !ui.foldTanks[k];
+        render();
+    } else if (act === "role") send({ action: "role", dbID: id, kind: el.getAttribute("data-kind"), give: el.getAttribute("data-give") === "1" });
     else if (act === "reserveOpen") {
         const open = data.reserveOptions && data.reserveOptions.slot === slot;
         send({ action: "reserveOpen", slot: open ? -1 : slot });
