@@ -446,6 +446,9 @@ body {
 .col.c-name { width: 150rem; flex-shrink: 0; }
 .col.c-rating { width: 44rem; flex-shrink: 0; text-align: right; padding-right: 8rem; }
 .col.c-tank { flex-grow: 1; padding-left: 4rem; }
+.ccols { padding: 2rem 18rem 0 10rem; border-bottom: 1rem solid rgba(255, 255, 255, 0.05); }
+.col.cc-name { flex-grow: 1; }
+.col.cc-rating { flex-shrink: 0; text-align: right; }
 .arrow { margin-left: 3rem; font-size: 9rem; }
 .slot .clan { width: 64rem; flex-shrink: 0; font-size: 11rem; color: rgba(233, 231, 220, 0.55); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 

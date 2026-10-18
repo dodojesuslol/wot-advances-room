@@ -22,7 +22,7 @@ from helpers.i18n import makeString
 from adisp import adisp_process
 from skeletons.gui.impl import IGuiLoader
 
-__version__ = '0.7.24'
+__version__ = '0.7.25'
 _logger = logging.getLogger('EZ_ROOM')
 _logger.setLevel(logging.INFO)
 _LAYOUT_PATH = ('ez_room', 'views', 'EzRoomView')
@@ -747,7 +747,8 @@ class EzRoomView(ViewImpl):
                 self.onRoomChanged()
             elif action == 'sort':
                 settings = _loadSettings()
-                settings['sort'] = {'key': args.get('key') or u'', 'dir': int(args.get('dir') or 0)}
+                name = 'candSort' if args.get('target') == 'cand' else 'sort'
+                settings[name] = {'key': args.get('key') or u'', 'dir': int(args.get('dir') or 0)}
                 _saveSettings(settings)
             elif action == 'chatSend':
                 text = (args.get('text') or u'').strip()

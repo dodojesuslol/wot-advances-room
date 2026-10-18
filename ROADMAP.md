@@ -1,6 +1,6 @@
 # EZ ROOM – Roadmap: Funktionsgleichheit mit dem WG-Original
 
-Stand: v0.7.24 (2026-10-18). Ziel: Jede Funktion des Flash-Raums (`fortClanBattleRoom.swf` + `fortBattleRoomWindow.swf`)
+Stand: v0.7.25 (2026-10-18). Ziel: Jede Funktion des Flash-Raums (`fortClanBattleRoom.swf` + `fortBattleRoomWindow.swf`)
 einzeln mit dem Original vergleichen und alles, was fehlt, nachbauen. Zum Vergleich in einem echten Raum über den
 „Original“-Button umschalten (Esc / Mods-Button bringt die neue Oberfläche zurück).
 
@@ -61,7 +61,7 @@ Legende: ✅ vorhanden · 🟡 teilweise · ❌ fehlt · 🚫 bewusst weggelasse
 | # | Funktion im Original | Status | Hinweise / WG-API |
 |---|---|---|---|
 | C1 | Liste mit Gruppen „Clanmitglieder“ / „Legionäre“ | ✅ | |
-| C2 | Spalten Spieler / Wertung | 🟡 | ohne Spaltenköpfe |
+| C2 | Spalten Spieler / Wertung | 🟡 | v0.7.25 (im Spiel testen): Kopfzeile Spieler / Wertung, sortierbar (auf → ab → WG-Reihenfolge) innerhalb der Gruppen, Spieler nicht im Raum (isOffline) beim Sortieren immer unten, gespeichert als `candSort` |
 | C9 | Lange Freiwilligen-Liste scrollt (Fenster wächst nicht mehr) + eigene Scrollleiste, auch im Chat | ✅ | v0.7.16 (im Spiel bestätigt): `.pwrap` mit height 0 (Gameface ignoriert min-height 0), Leiste ziehen / auf die Leiste klicken / Mausrad |
 | C3 | Online-/Beschäftigt-Status-Icon (`statusIcon`) | ✅ | v0.7.21 (im Spiel bestätigt): WGs `library/userStatus/small/online|busy|offline.png` (16 px) vor dem Namen, Wert kommt fertig von WG (`makeCandidateIconPath`: grün nur Clan/Freunde, rot = Nicht stören, sonst grau) |
 | C4 | Eingeladen-Markierung | ✅ | blauer Punkt |

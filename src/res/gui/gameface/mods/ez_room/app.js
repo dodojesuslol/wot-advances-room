@@ -170,13 +170,67 @@ function renderReservePopup() {
         </div>`;
 }
 
+// volunteers table head "Spieler / Wertung": click asc -> desc -> WG's order; sorted inside each
+// group (clan members / legionaries), saved in settings.json as candSort
+function candSortValue(p, key) {
+    if (key === "rating") {
+        const n = parseInt(String(p.rating || "").replace(/[^0-9]/g, ""), 10);
+        return isNaN(n) ? -1 : n;
+    }
+    return String(p.userName || p.fullName || "").toLowerCase();
+}
+
+function sortedCandidates(list) {
+    const sort = ui.candSort;
+    if (!sort || !sort.key || !sort.dir) return list;
+    const out = [];
+    let group = [];
+    const flush = () => {
+        group.sort((a, b) => {
+            // players who are not in the room (offline) always at the bottom of their group
+            const oa = !!a[0].isOffline;
+            const ob = !!b[0].isOffline;
+            if (oa !== ob) return oa ? 1 : -1;
+            const va = candSortValue(a[0], sort.key);
+            const vb = candSortValue(b[0], sort.key);
+            const c = typeof va === "number" ? va - vb : va < vb ? -1 : va > vb ? 1 : 0;
+            return c * sort.dir || a[1] - b[1];
+        });
+        group.forEach((g) => out.push(g[0]));
+        group = [];
+    };
+    list.forEach((p, i) => {
+        if (p.dbID) group.push([p, i]);
+        else {
+            flush();
+            out.push(p);
+        }
+    });
+    flush();
+    return out;
+}
+
+function renderCandColumns() {
+    const sort = ui.candSort || {};
+    const head = (key, label, cls) => {
+        const on = sort.key === key && sort.dir;
+        const arrow = on ? (sort.dir > 0 ? "▲" : "▼") : "";
+        return `<div class="col ${cls} ${on ? "on" : ""}" data-act="candSort" data-key="${key}">${esc(label)}<span class="arrow">${arrow}</span></div>`;
+    };
+    return `
+        <div class="cols ccols">
+            ${head("name", L("Spieler", "Player"), "cc-name")}
+            ${head("rating", L("Wertung", "Rating"), "cc-rating")}
+        </div>`;
+}
+
 function renderCandidates() {
     // the list also holds group headers ({headerText}) and spacers ({emptyRender})
     const list = data.candidates || [];
     const players = list.filter((p) => p.dbID);
     const me = (data.me || {}).dbID;
     const rows = players.length
-        ? list
+        ? sortedCandidates(list)
               .map((p) => {
                   if (p.headerText) return `<div class="cgroup">${esc(txt(p.headerText))}</div>`;
                   if (!p.dbID) return "";
@@ -197,6 +251,7 @@ function renderCandidates() {
     return `
         <div class="panel cands ${ui.dragOut ? "dropout" : ""}" ${ui.dragOut ? `data-dropout="1"` : ""}>
             <div class="ptitle">${L("Freiwillige", "Volunteers")}<span class="count">${players.length}</span></div>
+            ${players.length ? renderCandColumns() : ""}
             <div class="pwrap">
                 <div class="plist" id="candlist" data-scroll="60">${rows}</div>
                 ${scrollbar("candlist")}
@@ -831,6 +886,14 @@ document.addEventListener("click", (e) => {
         ui.sort = dir ? { key: key, dir: dir } : null;
         send({ action: "sort", key: dir ? key : "", dir: dir });
         render();
+    } else if (act === "candSort") {
+        const key = el.getAttribute("data-key");
+        const cur = ui.candSort || {};
+        let dir = 1;
+        if (cur.key === key) dir = cur.dir === 1 ? -1 : cur.dir === -1 ? 0 : 1;
+        ui.candSort = dir ? { key: key, dir: dir } : null;
+        send({ action: "sort", target: "cand", key: dir ? key : "", dir: dir });
+        render();
     } else if (act === "chatSend") sendChat();
     else if (act === "chooseVehicle") send({ action: "chooseVehicle", cd: Number(el.getAttribute("data-cd")) || 0 });
     else if (act === "ready" || act === "invite" || act === "toggleOpen" || act === "configure" || act === "back") send({ action: act });
@@ -1026,6 +1089,8 @@ function readModel() {
             sortLoaded = true;
             const saved = (data.settings || {}).sort;
             if (saved && saved.key && saved.dir) ui.sort = { key: saved.key, dir: saved.dir };
+            const savedCand = (data.settings || {}).candSort;
+            if (savedCand && savedCand.key && savedCand.dir) ui.candSort = { key: savedCand.key, dir: savedCand.dir };
         }
         if (ui.selCand && (!(data.candidates || []).some((c) => c.dbID === ui.selCand) || slotOf(ui.selCand) !== -1)) ui.selCand = 0;
         render();
