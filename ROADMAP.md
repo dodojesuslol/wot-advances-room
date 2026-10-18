@@ -46,7 +46,7 @@ Legende: ✅ vorhanden · 🟡 teilweise · ❌ fehlt · 🚫 bewusst weggelasse
 | B10 | Panzer: Icon, Stufe, Name; Nationsflagge im Hintergrund | 🟡 | Stufe + Name da; Panzerbild seit v0.7.19 bewusst weg (Nutzer, mehr Platz); Flagge fehlt |
 | B11 | Panzer-Zustand (nicht bereit, „Zu reparieren“ …) | ✅ | |
 | B12 | **Eingefrorene Panzer** + „Auftauen“-Button (`vehBrokenIcon`) | ❌ | `onUnfrozenVehicleSlotClick(slotIndex)`, Slot-VO `hasFrozenVehicle`, `canUnfrozeVehicles` |
-| B13 | Prestige-Stufe (`prestigeLevel`) | ❌ | |
+| B13 | Prestige-Stufe (`prestigeLevel`) | 🚫 | nicht gewünscht (Nutzer, 2026-10-18) |
 | B14 | Freien Platz nehmen | ✅ | `assignSlotRequest(slot, -1)` |
 | B15 | Platz verlassen / Kommandant: Spieler raus, kicken | ✅ | v0.7.6: „Raus“ + „✕“ (Kick, ein Klick, keine Rückfrage) erscheinen sofort beim Überfahren über dem Zeilenende, ohne Flackern; Freiwillige: „✕“. `leaveSlotRequest`, `requestToKickUser` |
 | B16 | Drag & Drop Freiwillige → Platz | ✅ | v0.7.5: Kommandant klickt Freiwilligen → nächster freier erlaubter Platz (`getAvailableSlots`, kleinste Nummer); ziehen → grüne Plätze, loslassen = genau dieser Platz. Zwei-Klick-Verfahren entfernt (Nutzerwunsch); v0.7.13 (im Spiel bestätigt): Mitglied aus dem Team auf die Freiwilligen-Liste ziehen = `leaveSlotRequest` (wie „Raus“) |
