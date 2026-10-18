@@ -43,7 +43,7 @@ Legende: ✅ vorhanden · 🟡 teilweise · ❌ fehlt · 🚫 bewusst weggelasse
 | B7 | Kommandanten-Icon | 🟡 | eigene Raute statt WG-Icon |
 | B8 | Rollen-Icons Artillerieschlag / Inspiration (`roleIcon`, `gunnerIcon0-14`) | ✅ | v0.7.19–0.7.20 (im Spiel bestätigt): Buttons nur, wo WGs Kontextmenü den Punkt anbieten würde (`roleRights`, WGs Prüfungen); WGs Icons (`fortClanBattleRoom.swf` Sprite 142) hinter dem Panzernamen; Kommandant: Bild-Buttons beim Überfahren der Zeile (eigene Zeile: links neben „Verlassen“) = `GiveEquipmentCommanderCtx` wie WGs Kontextmenü (Nutzerwunsch). Panzerbilder in der Teamliste entfernt (Nutzer) |
 | B9 | Legionär-Kennzeichnung | ✅ | |
-| B10 | Panzer: Icon, Stufe, Name; Nationsflagge im Hintergrund | 🟡 | Flagge fehlt |
+| B10 | Panzer: Icon, Stufe, Name; Nationsflagge im Hintergrund | 🟡 | Stufe + Name da; Panzerbild seit v0.7.19 bewusst weg (Nutzer, mehr Platz); Flagge fehlt |
 | B11 | Panzer-Zustand (nicht bereit, „Zu reparieren“ …) | ✅ | |
 | B12 | **Eingefrorene Panzer** + „Auftauen“-Button (`vehBrokenIcon`) | ❌ | `onUnfrozenVehicleSlotClick(slotIndex)`, Slot-VO `hasFrozenVehicle`, `canUnfrozeVehicles` |
 | B13 | Prestige-Stufe (`prestigeLevel`) | ❌ | |
