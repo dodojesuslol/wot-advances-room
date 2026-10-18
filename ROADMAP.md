@@ -110,7 +110,7 @@ Legende: ✅ vorhanden · 🟡 teilweise · ❌ fehlt · 🚫 bewusst weggelasse
 |---|---|---|
 | G1 | Englische Oberfläche (Texte über `L(de, en)`) | 🟡 alles prüfen |
 | G2 | WG-eigene Tooltips (Backport) statt eigener Tooltip-Box | ❌ |
-| G3 | Schritt 4: EZ ROOM und EZ TANK PICKER zu einer Mod zusammenlegen | ❌ |
+| G3 | Schritt 4: EZ ROOM und EZ TANK PICKER zu einer Mod zusammenlegen | 🚫 | bleibt eigene Mod (Nutzer, 2026-10-19)
 | G4 | README / Release auf GitHub (Konto dodojesuslol, kein Klarname!) | ❌ |
 | G5 | Dev-Modus vor Release aus (`mods/configs/ez_room/dev.json` löschen) | ❌ |
 
