@@ -1,6 +1,6 @@
 # EZ ROOM – Roadmap: Funktionsgleichheit mit dem WG-Original
 
-Stand: v0.7.29 (2026-10-18). Ziel: Jede Funktion des Flash-Raums (`fortClanBattleRoom.swf` + `fortBattleRoomWindow.swf`)
+Stand: v0.7.30 (2026-10-18). Ziel: Jede Funktion des Flash-Raums (`fortClanBattleRoom.swf` + `fortBattleRoomWindow.swf`)
 einzeln mit dem Original vergleichen und alles, was fehlt, nachbauen. Zum Vergleich in einem echten Raum über den
 „Original“-Button umschalten (Esc / Mods-Button bringt die neue Oberfläche zurück).
 
@@ -88,7 +88,7 @@ Legende: ✅ vorhanden · 🟡 teilweise · ❌ fehlt · 🚫 bewusst weggelasse
 | E3 | Raum-Kommentar / Beschreibung anzeigen | ✅ | Fußzeile |
 | E4 | **Kommentar bearbeiten (Kommandant)** | 🚫 | vom Nutzer nicht gewünscht (2026-10-18), Entwurf verworfen |
 | E5 | Rechtsklick auf Namen im Chat | 🟡 | v0.7.28 (im Spiel testen): Autor (erstes `<font>`) mit `data-chatname`; Spieler im Raum → WGs Raum-Menü (UNIT_USER), sonst WGs normales Spielermenü (BASE_USER) über den UsersStorage; eigener Name ohne Menü |
-| E6 | Links im Chat klickbar | ❌ | prüfen, ob das Original das kann |
+| E6 | Links im Chat klickbar | 🟡 | Original kann es nicht (ChannelComponent.onLinkClick: „not longer supported“). Eigene Erweiterung v0.7.30 (im Spiel testen): Links blau/unterstrichen, Klick kopiert in die Zwischenablage (`BigWorld.wg_copyToClipboard`), nichts wird geöffnet |
 
 ## F. Fenster- und Zustandslogik
 

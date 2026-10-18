@@ -521,3 +521,7 @@ body {
 
 /* WG's player badge before the name (badgeVisualVO, 24x24 shown at 18) */
 .badge { width: 18rem; height: 18rem; margin-right: 4rem; flex-shrink: 0; background-size: 18rem 18rem; }
+
+/* chat links (own extension): click copies */
+.clink { color: #8fc0e8; text-decoration: underline; cursor: pointer; }
+.clink:hover { color: #b9dbf5; }

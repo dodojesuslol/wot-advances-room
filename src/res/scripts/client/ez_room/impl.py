@@ -22,7 +22,7 @@ from helpers.i18n import makeString
 from adisp import adisp_process
 from skeletons.gui.impl import IGuiLoader
 
-__version__ = '0.7.29'
+__version__ = '0.7.30'
 _logger = logging.getLogger('EZ_ROOM')
 _logger.setLevel(logging.INFO)
 _LAYOUT_PATH = ('ez_room', 'views', 'EzRoomView')
@@ -790,6 +790,11 @@ class EzRoomView(ViewImpl):
                 component = _chatComponent(bridge)
                 if text and component is not None:
                     component.sendMessage(text.encode('utf-8') if isinstance(text, unicode) else text)
+            elif action == 'copyLink':
+                # own extension: chat link to the clipboard (WG's own copy helper does the same call)
+                url = args.get('url') or u''
+                if url:
+                    BigWorld.wg_copyToClipboard(url if isinstance(url, unicode) else unicode(url, 'utf-8', errors='ignore'))
             elif action == 'contextMenuName':
                 self._contextMenuByName(args.get('name') or u'')
             elif action == 'contextMenu':

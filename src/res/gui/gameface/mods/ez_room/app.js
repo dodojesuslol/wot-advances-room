@@ -500,6 +500,28 @@ function smileys(text) {
 // WG's chat lines are Flash HTML: keep <font color> as coloured spans, drop every other tag
 // (the user text inside is already escaped by WG). Gameface puts spans below each other unless
 // the parent has the cohinline attribute (WG's own Gameface text components do the same).
+// links in chat text (own extension, WG's chat shows them as plain text): click copies the link to
+// the clipboard (nothing is opened). The text is already HTML-escaped by WG.
+const LINK_RE = /((?:https?:\/\/|www\.|discord\.gg\/)[^\s<]+)/gi;
+let copiedLink = "";
+let copiedTimer = null;
+
+function unescapeHtml(t) {
+    return t.replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&");
+}
+
+function linkify(text) {
+    return text
+        .split(LINK_RE)
+        .map((piece, i) => {
+            if (i % 2 === 0) return smileys(piece);
+            const url = unescapeHtml(piece);
+            const tip = `{HEADER}${url}{/HEADER}{BODY}${copiedLink === url ? L("Kopiert ✓", "Copied ✓") : L("Klick: Link kopieren", "Click: copy link")}{/BODY}`;
+            return `<span class="clink" data-act="copyLink" data-url="${esc(url)}" data-tip="${esc(tip)}">${piece}</span>`;
+        })
+        .join("");
+}
+
 function chatHtml(line) {
     let out = "";
     let open = 0;
@@ -510,7 +532,7 @@ function chatHtml(line) {
         .forEach((part) => {
             if (!part) return;
             if (part[0] !== "<") {
-                out += smileys(part);
+                out += linkify(part);
                 return;
             }
             const m = /^<font\b[^>]*color\s*=\s*['"]?(#[0-9a-fA-F]{6})/i.exec(part);
@@ -918,6 +940,17 @@ document.addEventListener("click", (e) => {
         ui.candSort = dir ? { key: key, dir: dir } : null;
         send({ action: "sort", target: "cand", key: dir ? key : "", dir: dir });
         render();
+    } else if (act === "copyLink") {
+        const url = el.getAttribute("data-url") || "";
+        send({ action: "copyLink", url: url });
+        copiedLink = url;
+        if (copiedTimer) clearTimeout(copiedTimer);
+        copiedTimer = setTimeout(() => {
+            copiedLink = "";
+            render();
+        }, 2000);
+        render();
+        tipTarget = null;
     } else if (act === "chatSend") sendChat();
     else if (act === "chooseVehicle") send({ action: "chooseVehicle", cd: Number(el.getAttribute("data-cd")) || 0 });
     else if (act === "ready" || act === "invite" || act === "toggleOpen" || act === "configure" || act === "back") send({ action: act });
