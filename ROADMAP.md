@@ -22,7 +22,7 @@ Legende: ✅ vorhanden · 🟡 teilweise · ❌ fehlt · 🚫 bewusst weggelasse
 | A2 | Beschreibung + ⓘ-Icon mit Tooltip (`headerDescr`) | 🟡 | Text da, ⓘ-Tooltip fehlt |
 | A3 | Zurück-Link „Zur Abteilungszusammenstellung gehen“ (`backBtn`) | ✅ | v0.7.14 (im Spiel bestätigt): Link unter der Beschreibung, Text + Tooltip aus WGs Sprachdateien, Klick = `StrongholdBattleRoomWindow.onBackClick()` → verlässt die Abteilung (wie Original, ohne Rückfrage) |
 | A4 | Richtungs-/Gebäudegrafik (grüne Burg → Flaggen → ⚔ → rote Burg) | ✅ | v0.7.15 (im Spiel bestätigt): eigene Zeile unter dem Kopf, Clans links/rechts, Timer genau mittig im Kopf; 13 Endbilder aus `fortCmp.swf` (`ConnectedDirectsUI`, jeweils ruhiges Bild vor dem nächsten Label) in `gui/maps/icons/ez_room/direction/<value>.png`; `as_updateReadyDirectionsS(false)` → Text „Richtungen werden ermittelt …“; keine Animation. Teamzeilen 27→22 px, damit alle 15 passen |
-| A5 | Eigener Clan / Gegner-Clan mit Bereit-Anzeige | 🟡 | Namen + Glow da; WGs Bereit-Lämpchen-Optik fehlt |
+| A5 | Eigener Clan / Gegner-Clan mit Bereit-Anzeige | ✅ | Namen + Glow da; WGs Bereit-Lämpchen dort nicht gewünscht (Nutzer, 2026-10-18) |
 | A6 | Gefechts-Timer, normale und Alarm-Farbe (#ffdd99 / #ff7f00) | ✅ | v0.7.7: letzte 10 s sofort orange + oranger Rand (Farben aus dem Timer-VO), ohne Animation |
 | A7 | Timer-Alarm-Ton (Flash ruft `onTimerAlert()` → `playBattleRoomTimerAlert`) | 🚫 | nicht nachbauen (Nutzer): der Flash-Timer läuft unter der Oberfläche weiter und spielt den Original-Ton selbst |
 | A8 | „Warten auf Gefecht“-Text (`waitForBattleDescr`) | ✅ | |
