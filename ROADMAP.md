@@ -1,6 +1,6 @@
 # EZ ROOM – Roadmap: Funktionsgleichheit mit dem WG-Original
 
-Stand: v0.7.16 (2026-10-18). Ziel: Jede Funktion des Flash-Raums (`fortClanBattleRoom.swf` + `fortBattleRoomWindow.swf`)
+Stand: v0.7.17 (2026-10-18). Ziel: Jede Funktion des Flash-Raums (`fortClanBattleRoom.swf` + `fortBattleRoomWindow.swf`)
 einzeln mit dem Original vergleichen und alles, was fehlt, nachbauen. Zum Vergleich in einem echten Raum über den
 „Original“-Button umschalten (Esc / Mods-Button bringt die neue Oberfläche zurück).
 
@@ -18,7 +18,7 @@ Legende: ✅ vorhanden · 🟡 teilweise · ❌ fehlt · 🚫 bewusst weggelasse
 
 | # | Funktion im Original | Status | Hinweise / WG-API |
 |---|---|---|---|
-| A1 | Titel des Fensters („Vorstoß vom Brückenkopf Süd (x2)“) | ✅ | `_updateTitle` (Loader-Hook) |
+| A1 | Titel des Fensters („Vorstoß vom Brückenkopf Süd (x2)“) | ✅ | v0.7.17: eigener Titel entfernt (Nutzer), steht schon in WGs Fensterrahmen |
 | A2 | Beschreibung + ⓘ-Icon mit Tooltip (`headerDescr`) | 🟡 | Text da, ⓘ-Tooltip fehlt |
 | A3 | Zurück-Link „Zur Abteilungszusammenstellung gehen“ (`backBtn`) | ✅ | v0.7.14 (im Spiel bestätigt): Link unter der Beschreibung, Text + Tooltip aus WGs Sprachdateien, Klick = `StrongholdBattleRoomWindow.onBackClick()` → verlässt die Abteilung (wie Original, ohne Rückfrage) |
 | A4 | Richtungs-/Gebäudegrafik (grüne Burg → Flaggen → ⚔ → rote Burg) | 🟡 | v0.7.15 (im Spiel testen): eigene Zeile unter dem Kopf, Clans links/rechts, Timer genau mittig im Kopf; 13 Endbilder aus `fortCmp.swf` (`ConnectedDirectsUI`, jeweils ruhiges Bild vor dem nächsten Label) in `gui/maps/icons/ez_room/direction/<value>.png`; `as_updateReadyDirectionsS(false)` → Text „Richtungen werden ermittelt …“; keine Animation. Teamzeilen 27→22 px, damit alle 15 passen |

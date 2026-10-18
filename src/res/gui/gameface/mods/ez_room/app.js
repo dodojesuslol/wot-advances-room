@@ -102,7 +102,7 @@ function renderHeader() {
     return `
         <div class="header">
             <div class="titles">
-                <div class="title">${esc(data.title || L("Vorstoß", "Advance"))}</div>
+                <!-- no own title: WG's window frame above already shows it -->
                 <div class="sub">${esc(txt(room.headerDescr))}</div>
                 ${data.back && data.back.label ? `<div class="back" data-act="back" data-tip="${esc(data.back.tip)}">‹ ${esc(data.back.label)}</div>` : ""}
             </div>
