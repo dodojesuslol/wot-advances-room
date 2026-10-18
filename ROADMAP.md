@@ -1,6 +1,6 @@
 # EZ ROOM – Roadmap: Funktionsgleichheit mit dem WG-Original
 
-Stand: v0.7.15 (2026-10-18). Ziel: Jede Funktion des Flash-Raums (`fortClanBattleRoom.swf` + `fortBattleRoomWindow.swf`)
+Stand: v0.7.16 (2026-10-18). Ziel: Jede Funktion des Flash-Raums (`fortClanBattleRoom.swf` + `fortBattleRoomWindow.swf`)
 einzeln mit dem Original vergleichen und alles, was fehlt, nachbauen. Zum Vergleich in einem echten Raum über den
 „Original“-Button umschalten (Esc / Mods-Button bringt die neue Oberfläche zurück).
 
@@ -62,6 +62,7 @@ Legende: ✅ vorhanden · 🟡 teilweise · ❌ fehlt · 🚫 bewusst weggelasse
 |---|---|---|---|
 | C1 | Liste mit Gruppen „Clanmitglieder“ / „Legionäre“ | ✅ | |
 | C2 | Spalten Spieler / Wertung | 🟡 | ohne Spaltenköpfe |
+| C9 | Lange Freiwilligen-Liste scrollt (Fenster wächst nicht mehr) + eigene Scrollleiste, auch im Chat | 🟡 | v0.7.16 (im Spiel testen): `.pwrap` mit height 0 (Gameface ignoriert min-height 0), Leiste ziehen / auf die Leiste klicken / Mausrad |
 | C3 | Online-/Beschäftigt-Status-Icon (`statusIcon`) | ❌ | |
 | C4 | Eingeladen-Markierung | ✅ | blauer Punkt |
 | C5 | Abzeichen | ❌ | |

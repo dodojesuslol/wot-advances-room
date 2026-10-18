@@ -138,6 +138,14 @@ body {
 .empty { padding: 10rem; color: rgba(233, 231, 220, 0.45); font-size: 13rem; }
 
 .cands { width: 210rem; flex-shrink: 0; }
+/* volunteers list + chat: fixed basis (height 0) so long content scrolls instead of stretching the
+   window (Gameface ignores min-height: 0 on flex items); own scrollbar at the right edge */
+.pwrap { position: relative; flex-grow: 1; height: 0; display: flex; flex-direction: column; }
+.pwrap .plist { flex-grow: 1; height: 0; padding-right: 8rem; }
+.pwrap .chatlog { padding-right: 14rem; }
+.sbar { position: absolute; right: 2rem; top: 4rem; bottom: 4rem; width: 6rem; border-radius: 3rem; background-color: rgba(255, 255, 255, 0.05); visibility: hidden; }
+.sthumb { position: absolute; left: 0; top: 0; width: 6rem; height: 20rem; border-radius: 3rem; background-color: rgba(255, 228, 192, 0.35); }
+.sthumb:hover { background-color: rgba(242, 138, 58, 0.8); }
 .cand { display: flex; align-items: center; height: 24rem; padding: 0 10rem; }
 .cgroup { padding: 8rem 10rem 3rem; color: rgba(233, 231, 220, 0.45); font-size: 11rem; text-transform: uppercase; }
 .inv { width: 6rem; height: 6rem; margin-right: 6rem; border-radius: 3rem; background-color: #4f9fe0; flex-shrink: 0; }

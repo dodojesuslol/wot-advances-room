@@ -191,7 +191,10 @@ function renderCandidates() {
     return `
         <div class="panel cands ${ui.dragOut ? "dropout" : ""}" ${ui.dragOut ? `data-dropout="1"` : ""}>
             <div class="ptitle">${L("Freiwillige", "Volunteers")}<span class="count">${players.length}</span></div>
-            <div class="plist" data-scroll="60">${rows}</div>
+            <div class="pwrap">
+                <div class="plist" id="candlist" data-scroll="60">${rows}</div>
+                ${scrollbar("candlist")}
+            </div>
             ${renderRoomActions()}
         </div>`;
 }
@@ -421,7 +424,10 @@ function renderChat() {
     return `
         <div class="panel chat">
             <div class="ptitle chattitle">${L("Chat-Kanal", "Chat channel")}</div>
-            <div class="chatlog" id="chatlog" data-scroll="40">${lines.map((l) => `<p class="cline" cohinline="true">${chatHtml(l)}</p>`).join("")}</div>
+            <div class="pwrap">
+                <div class="chatlog" id="chatlog" data-scroll="40">${lines.map((l) => `<p class="cline" cohinline="true">${chatHtml(l)}</p>`).join("")}</div>
+                ${scrollbar("chatlog")}
+            </div>
             <div class="chatin">
                 <input id="chatinput" type="text" maxlength="512" ${chat.joined ? "" : `placeholder="${L("Nicht verbunden", "Not connected")}"`} />
                 <div class="sendbtn" data-act="chatSend"><div class="ret-v"></div><div class="ret-h"></div><div class="ret-tip"></div></div>
@@ -631,7 +637,65 @@ function render() {
     updateTimer(document.getElementById("timer"));
     const newLog = document.getElementById("chatlog");
     if (newLog && chatStick) newLog.scrollTop = newLog.scrollHeight;
+    updateScrollbars();
 }
+
+// own scrollbars for the volunteers list and the chat (Gameface draws none): thumb size/position
+// from the list, updated after render and wheel; drag the thumb or click the track to scroll
+const SBAR_MIN_THUMB = 20;
+let sbarDrag = null; // {bar, y, top}
+
+function scrollbar(listId) {
+    return `<div class="sbar" data-sbar="${listId}"><div class="sthumb"></div></div>`;
+}
+
+function updateScrollbars() {
+    document.querySelectorAll("[data-sbar]").forEach((bar) => {
+        const list = document.getElementById(bar.getAttribute("data-sbar"));
+        const thumb = bar.firstElementChild;
+        if (!list || !thumb) return;
+        const ch = list.clientHeight;
+        const sh = list.scrollHeight;
+        if (sh <= ch + 1) {
+            bar.style.visibility = "hidden";
+            return;
+        }
+        bar.style.visibility = "visible";
+        const track = bar.clientHeight;
+        const th = Math.max(SBAR_MIN_THUMB, Math.round((track * ch) / sh));
+        thumb.style.height = th + "px";
+        thumb.style.top = Math.round(((track - th) * list.scrollTop) / (sh - ch)) + "px";
+    });
+}
+
+function scrollFromThumb(bar, top) {
+    const list = document.getElementById(bar.getAttribute("data-sbar"));
+    const thumb = bar.firstElementChild;
+    if (!list || !thumb) return;
+    const free = bar.clientHeight - thumb.clientHeight;
+    const t = Math.max(0, Math.min(free, top));
+    list.scrollTop = free > 0 ? ((list.scrollHeight - list.clientHeight) * t) / free : 0;
+    updateScrollbars();
+}
+
+document.addEventListener("mousedown", (e) => {
+    if (e.button !== 0) return;
+    const bar = closest(e.target, "data-sbar");
+    if (!bar) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const thumb = bar.firstElementChild;
+    if (e.target !== thumb) scrollFromThumb(bar, e.clientY - bar.getBoundingClientRect().top - thumb.clientHeight / 2);
+    sbarDrag = { bar: bar, y: e.clientY, top: thumb.offsetTop };
+});
+
+document.addEventListener("mousemove", (e) => {
+    if (sbarDrag) scrollFromThumb(sbarDrag.bar, sbarDrag.top + e.clientY - sbarDrag.y);
+});
+
+document.addEventListener("mouseup", () => {
+    sbarDrag = null;
+});
 
 // Row buttons (Raus / kick) belong to the row under the mouse. Tracked here instead of CSS :hover:
 // in Gameface the row lost :hover when the mouse reached its own button (flicker) and after every
@@ -828,6 +892,7 @@ document.addEventListener(
         e.stopPropagation();
         const step = Number(el.getAttribute("data-scroll")) || 60;
         el.scrollTop += e.deltaY > 0 ? -step : step; // Gameface: deltaY > 0 = wheel up
+        updateScrollbars();
     },
     { capture: true, passive: false }
 );
