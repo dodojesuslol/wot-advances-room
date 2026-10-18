@@ -86,7 +86,7 @@ Legende: ✅ vorhanden · 🟡 teilweise · ❌ fehlt · 🚫 bewusst weggelasse
 | E1 | Verlauf, live, Farben, Smileys | ✅ | `cohinline` nötig! |
 | E2 | Senden (Enter / ↵) | ✅ | |
 | E3 | Raum-Kommentar / Beschreibung anzeigen | ✅ | Fußzeile |
-| E4 | **Kommentar bearbeiten (Kommandant)** | ❌ | `editDescriptionRequest(text)` |
+| E4 | **Kommentar bearbeiten (Kommandant)** | 🚫 | vom Nutzer nicht gewünscht (2026-10-18), Entwurf verworfen |
 | E5 | Rechtsklick auf Namen im Chat | ❌ | |
 | E6 | Links im Chat klickbar | ❌ | prüfen, ob das Original das kann |
 
