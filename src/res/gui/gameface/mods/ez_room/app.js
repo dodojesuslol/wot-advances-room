@@ -275,9 +275,12 @@ function renderRoomActions() {
 function slotStatus(slot) {
     const p = slot.player;
     if (!p) return "";
-    if (slot.playerStatus === STATUS.BATTLE) return `<div class="dot battle" title="battle"></div>`;
-    if (slot.playerStatus === STATUS.READY || p.readyState) return `<div class="dot ready"></div>`;
-    return `<div class="dot"></div>`;
+    // WG's IndicationOfStatus_UI frames (guiControlsLobby.swf): normal / ready / inBattle / locked
+    let frame = "normal";
+    if (slot.playerStatus === STATUS.BATTLE) frame = "inBattle";
+    else if (slot.playerStatus === STATUS.LOCKED) frame = "locked";
+    else if (slot.playerStatus === STATUS.READY || p.readyState) frame = "ready";
+    return `<div class="sicon" style="background-image:url(img://gui/maps/icons/ez_room/status/${frame}.png)"></div>`;
 }
 
 function renderSlot(slot, idx) {
@@ -316,7 +319,7 @@ function renderSlot(slot, idx) {
         who = `
             <div class="clan">${esc(p.clanAbbrev ? "[" + p.clanAbbrev + "]" : "")}</div>
             <div class="who">
-                ${p.isCommander ? `<div class="crown" title="commander"></div>` : ""}
+                ${p.isCommander ? `<div class="crown" data-tip="${esc(L("Kommandant", "Commander"))}"></div>` : ""}
                 <div class="name ${own ? "own" : ""} ${p.isOffline ? "offline" : ""} ${speaking(p.dbID) ? "speak" : ""}" ${c ? `style="color:${c}"` : ""}>${esc(p.userName || p.fullName)}</div>
                 ${slot.isLegionaries ? `<div class="tag leg">${L("Legionär", "Legionnaire")}</div>` : ""}
             </div>`;

@@ -178,13 +178,14 @@ body {
 .slot .who .name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .slot .name.free { color: rgba(233, 231, 220, 0.3); }
 .slot .rating { width: 44rem; flex-shrink: 0; text-align: right; padding-right: 8rem; color: rgba(233, 231, 220, 0.5); font-size: 11rem; }
+/* WG's commander cap (IconLibrary.swf commanderMc) */
 .crown {
-    width: 8rem;
-    height: 8rem;
-    margin-right: 6rem;
+    width: 18rem;
+    height: 18rem;
+    margin: 0 3rem 0 -3rem;
     flex-shrink: 0;
-    background-color: #ffc46c;
-    transform: rotate(45deg);
+    background-image: url(img://gui/maps/icons/ez_room/commander.png);
+    background-size: 18rem 18rem;
 }
 .tag { margin-left: 6rem; padding: 1rem 4rem; border-radius: 3rem; font-size: 10rem; flex-shrink: 0; }
 .tag.leg { background-color: rgba(79, 159, 224, 0.2); color: #9cc8f0; }
@@ -197,7 +198,8 @@ body {
 .vname { color: #ffe4c0; font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .vstate { margin-left: 6rem; color: #ff9a72; font-size: 10rem; white-space: nowrap; }
 
-.status { width: 14rem; flex-shrink: 0; display: flex; justify-content: flex-end; }
+.status { width: 20rem; flex-shrink: 0; display: flex; justify-content: flex-end; }
+.sicon { width: 16rem; height: 16rem; flex-shrink: 0; background-size: 16rem 16rem; }
 .dot { width: 8rem; height: 8rem; border-radius: 4rem; background-color: rgba(255, 255, 255, 0.15); }
 .dot.ready { background-color: #96cd6e; }
 .dot.battle { background-color: #f28a3a; }

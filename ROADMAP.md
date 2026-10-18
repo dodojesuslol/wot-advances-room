@@ -1,6 +1,6 @@
 # EZ ROOM – Roadmap: Funktionsgleichheit mit dem WG-Original
 
-Stand: v0.7.25 (2026-10-18). Ziel: Jede Funktion des Flash-Raums (`fortClanBattleRoom.swf` + `fortBattleRoomWindow.swf`)
+Stand: v0.7.26 (2026-10-18). Ziel: Jede Funktion des Flash-Raums (`fortClanBattleRoom.swf` + `fortBattleRoomWindow.swf`)
 einzeln mit dem Original vergleichen und alles, was fehlt, nachbauen. Zum Vergleich in einem echten Raum über den
 „Original“-Button umschalten (Esc / Mods-Button bringt die neue Oberfläche zurück).
 
@@ -37,10 +37,10 @@ Legende: ✅ vorhanden · 🟡 teilweise · ❌ fehlt · 🚫 bewusst weggelasse
 | B1 | Kopfzeile „Mitglieder: x/15 (Legionäre x/y)“ | ✅ | `as_setTableHeaderS` |
 | B2 | Spalten Clan / Name / Wertung / Panzer, sortierbar | ✅ | eigene Erweiterung (v0.7.0) |
 | B3 | Platznummer, Spielername in WG-Farbe, eigener Name hervorgehoben | ✅ | |
-| B4 | Status-Icon pro Spieler (bereit / nicht bereit / im Gefecht) | 🟡 | eigene Punkte; seit v0.7.10 ganze Zeile grün bei „bereit“ (Nutzerwunsch, im Spiel bestätigt); WG-Icons fehlen |
+| B4 | Status-Icon pro Spieler (bereit / nicht bereit / im Gefecht) | 🟡 | v0.7.26 (im Spiel testen): WGs IndicationOfStatus_UI (guiControlsLobby.swf Sprite 571: normal / ready / inBattle / locked) am Zeilenende; ganze Zeile grün bei „bereit“ bleibt |
 | B5 | **Sprach-Indikator** (Spieler spricht gerade, `isPlayerSpeaking`) | ✅ | v0.7.18 (vom Nutzer so abgenommen, nicht live getestet): WGs VoiceWaves (`Voice.swf` Sprite 38, Endbild von „show“, rotes Mute-X entfernt) 100×20 hinter dem Namen, Team + Freiwillige; live über `g_messengerEvents.voip.onPlayerSpeaking`, Startwert `voipController.isPlayerSpeaking`. Nur WoT-Voice-Chat, nicht Discord |
 | B6 | Abzeichen (Badge) vor dem Namen (`badgeVisualVO`) | ❌ | |
-| B7 | Kommandanten-Icon | 🟡 | eigene Raute statt WG-Icon |
+| B7 | Kommandanten-Icon | 🟡 | v0.7.26 (im Spiel testen): WGs Offiziersmütze (IconLibrary.swf commanderMc, Sprite 126) vor dem Namen, Tooltip „Kommandant“ |
 | B8 | Rollen-Icons Artillerieschlag / Inspiration (`roleIcon`, `gunnerIcon0-14`) | ✅ | v0.7.19–0.7.20 (im Spiel bestätigt): Buttons nur, wo WGs Kontextmenü den Punkt anbieten würde (`roleRights`, WGs Prüfungen); WGs Icons (`fortClanBattleRoom.swf` Sprite 142) hinter dem Panzernamen; Kommandant: Bild-Buttons beim Überfahren der Zeile (eigene Zeile: links neben „Verlassen“) = `GiveEquipmentCommanderCtx` wie WGs Kontextmenü (Nutzerwunsch). Panzerbilder in der Teamliste entfernt (Nutzer) |
 | B9 | Legionär-Kennzeichnung | ✅ | |
 | B10 | Panzer: Icon, Stufe, Name; Nationsflagge im Hintergrund | 🟡 | Stufe + Name da; Panzerbild seit v0.7.19 bewusst weg (Nutzer, mehr Platz); Flagge fehlt |
