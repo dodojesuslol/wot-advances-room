@@ -489,7 +489,14 @@ const GRID_COLS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"];
 // commander markings (WG's MinimapGrid): data.grid.points in 0..1 of the map, still visible for
 // "left" seconds; shown as WG's orange MinimapClick dot, steady (no pulsing), gone after ~5 s
 function gridClickable() {
-    return !!(data.grid && data.grid.clickEnabled);
+    return !!(data.grid && data.grid.clickEnabled) && !randomMap();
+}
+
+// random map: WG shows its dark back + dice over the grid and blocks clicks (FortClanBattleRoom:
+// minimapGrid.back.visible = minimapGrid.dices.visible = !isMapEnabled)
+function randomMap() {
+    const room = data.room || {};
+    return room.isMapEnabled === false;
 }
 
 let gridTimer = null;
@@ -524,7 +531,7 @@ function renderMapGrid() {
             <div class="gtop"><div class="gcorner"></div>${cols}</div>
             <div class="gmid">
                 <div class="gleft">${rows}</div>
-                <div class="gmap ${gridClickable() ? "clickable" : ""}" id="gmap" ${data.mapIcon ? `style="background-image:url(${data.mapIcon})"` : ""} ${gridClickable() ? `data-tip="${esc(L("Klick: Stelle für alle markieren", "Click: mark a spot for everyone"))}"` : ""}>${cells}${renderGridPoints()}</div>
+                <div class="gmap ${gridClickable() ? "clickable" : ""} ${randomMap() ? "random" : ""}" id="gmap" ${data.mapIcon && !randomMap() ? `style="background-image:url(${data.mapIcon})"` : ""} ${gridClickable() ? `data-tip="${esc(L("Klick: Stelle für alle markieren", "Click: mark a spot for everyone"))}"` : ""}>${cells}${randomMap() ? `<div class="gdice"></div>` : ""}${renderGridPoints()}</div>
             </div>
         </div>`;
 }

@@ -229,6 +229,9 @@ body {
 /* commander markings: WG's MinimapClick dot (MinimapLobby.swf, steady frame), 40 px glow centred */
 .gmap { position: relative; }
 .gmap.clickable { cursor: pointer; }
+/* random map: WG's dice (MinimapLobby.swf sprite 9, 111 x 77 in WG's 207 px grid) on WG's dark back */
+.gmap.random { background-color: #0f0e0b; }
+.gdice { position: absolute; left: 46rem; top: 63rem; width: 107rem; height: 74rem; background-image: url(img://gui/maps/icons/ez_room/dice.png); background-size: 107rem 74rem; pointer-events: none; }
 .gpoint { position: absolute; width: 40rem; height: 40rem; background-image: url(img://gui/maps/icons/ez_room/gridclick.png); background-size: 40rem 40rem; pointer-events: none; }
 .grow-c { display: flex; flex-shrink: 0; width: 200rem; height: 20rem; }
 .gcell { flex-shrink: 0; width: 20rem; height: 20rem; box-sizing: border-box; border-right: 1rem solid rgba(0, 0, 0, 0.35); border-bottom: 1rem solid rgba(0, 0, 0, 0.35); }
