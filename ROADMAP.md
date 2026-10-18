@@ -113,7 +113,7 @@ Legende: ✅ vorhanden · 🟡 teilweise · ❌ fehlt · 🚫 bewusst weggelasse
 | G3 | Schritt 4: EZ ROOM und EZ TANK PICKER zu einer Mod zusammenlegen | 🚫 | bleibt eigene Mod (Nutzer, 2026-10-19)
 | G4 | README / Release auf GitHub (Konto dodojesuslol, kein Klarname!) | ❌ |
 | G5 | Dev-Modus vor Release aus (`mods/configs/ez_room/dev.json` löschen) | ❌ |
-| G6 | Zurück-Knopf ohne Mods-Liste | 🟡 | v0.7.34 (im Spiel testen): nach „Original“ / Esc / Mods-Liste-aus ein kleiner „EZ ROOM“-Knopf (eigenes Fenster, 96×22) mittig in WGs Titelleiste, folgt dem Fenster; Klick = Oberfläche zurück. Auch nach einem Absturz-Schutz (opening.guard) |
+| G6 | Zurück-Knopf ohne Mods-Liste | ✅ | v0.7.34 (im Spiel bestätigt): nach „Original“ / Esc / Mods-Liste-aus ein kleiner „EZ ROOM“-Knopf (eigenes Fenster, 96×22) mittig in WGs Titelleiste, folgt dem Fenster; Klick = Oberfläche zurück. Auch nach einem Absturz-Schutz (opening.guard) |
 
 ## Empfohlene Reihenfolge
 
