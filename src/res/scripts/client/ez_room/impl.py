@@ -22,7 +22,7 @@ from helpers.i18n import makeString
 from adisp import adisp_process
 from skeletons.gui.impl import IGuiLoader
 
-__version__ = '0.7.26'
+__version__ = '0.7.27'
 _logger = logging.getLogger('EZ_ROOM')
 _logger.setLevel(logging.INFO)
 _LAYOUT_PATH = ('ez_room', 'views', 'EzRoomView')
@@ -253,6 +253,39 @@ def _setEquipmentCommander(dbID, kind):
     from gui.prb_control.items.stronghold_items import ARTILLERY_COMMANDER, INSPIRE_COMMANDER
     role = ARTILLERY_COMMANDER if kind == 'artillery' else INSPIRE_COMMANDER
     yield g_prbLoader.getDispatcher().sendPrbRequest(GiveEquipmentCommanderCtx(dbID, role, 'prebattle/giveEquipmentCommander'))
+
+
+def _divisionTip():
+    # WG's divisionInfo tooltip (FortClanBattleRoom ⓘ -> TOOLTIPS_CONSTANTS.SORTIE_DIVISION): same data
+    # as SortieDivisionTooltipData, labels from #tooltips:fortification/sortieDivisionToolTip/*
+    try:
+        from gui.shared.tooltips import common, contexts
+        result = common.SortieDivisionTooltipData(contexts.FortificationContext()).getDisplayableData()
+        if not result or not result.get('divisions'):
+            return u''
+        d = result['divisions'][0]
+        T = lambda key: _u(makeString('#tooltips:fortification/sortieDivisionToolTip/' + key))
+        lines = [u'%s: %s' % (T('vehLevel'), _u(d.get('divisLevels', u''))),
+                 u'%s: %s' % (T('playersLimit'), _u(d.get('divisPlayers', u''))),
+                 u'%s: %s' % (T('legionnairesLimit'), _u(d.get('divisLegionnaires', u''))),
+                 u'%s: %s' % (T('timeLimitSortie' if d.get('isSortie') else 'timeLimit'), _u(d.get('divisTime', u'')))]
+        if d.get('dailyBonus'):
+            lines.append(u'%s %s' % (_u(d['dailyBonus']), T('doublebonus')))
+        return u'{HEADER}%s{/HEADER}{BODY}%s{/BODY}' % (_u(d.get('divisName', u'')), u'\n'.join(lines))
+    except Exception:
+        _logger.exception('division tooltip failed')
+        return u''
+
+
+def _configureTips():
+    # WG's tooltips of the configure (gear) button, enabled and disabled
+    try:
+        T = lambda key: _u(makeString('#tooltips:fortification/header/settingsBtn/' + key))
+        return {'on': u'{HEADER}%s{/HEADER}{BODY}%s{/BODY}' % (T('header'), T('body')),
+                'off': u'{HEADER}%s{/HEADER}{BODY}%s{/BODY}' % (T('disabled/header'), T('disabled/body'))}
+    except Exception:
+        _logger.exception('configure tooltips failed')
+        return {}
 
 
 def _mapIcon(mapID):
@@ -541,6 +574,8 @@ def _pack(bridge, frame=None, reserveSlot=-1, speakEvents=None):
         'dev': bool(DEV),
         'title': _title(bridge),
         'back': _backLink(),
+        'divisionTip': _divisionTip(),
+        'configureTips': _configureTips(),
         'me': _me(view) if view is not None else {},
         'room': room,
         'mapIcon': _mapIcon(room.get('mapID')),

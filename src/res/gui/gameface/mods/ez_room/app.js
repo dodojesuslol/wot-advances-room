@@ -108,7 +108,7 @@ function renderHeader() {
         <div class="header">
             <div class="titles">
                 <!-- no own title: WG's window frame above already shows it -->
-                <div class="sub">${esc(txt(room.headerDescr))}</div>
+                <div class="sub">${esc(txt(room.headerDescr))}${data.divisionTip ? `<div class="dinfo" data-tip="${esc(data.divisionTip)}"></div>` : ""}</div>
                 ${data.back && data.back.label ? `<div class="back" data-act="back" data-tip="${esc(data.back.tip)}">‹ ${esc(data.back.label)}</div>` : ""}
             </div>
             <div class="center">${center}</div>
@@ -266,7 +266,14 @@ function renderRoomActions() {
     const btns = [];
     if (rally().canInvite) btns.push(`<div class="btn wide" data-act="invite">${L("Einladen", "Invite")}</div>`);
     if (isCommander() && opened[0] && conf.isRoomStatusEnabled !== false) btns.push(`<div class="btn wide" data-act="toggleOpen" title="${esc(txt(opened[2]))}">${esc(txt(opened[0]))}</div>`);
-    if (isCommander() && conf.isEnabled) btns.push(`<div class="btn wide" data-act="configure">${L("Konfigurieren", "Configure")}</div>`);
+    // like WG: the commander always sees it, greyed out while WG locks it (with WG's tooltips)
+    const ctips = data.configureTips || {};
+    if (isCommander())
+        btns.push(
+            conf.isEnabled
+                ? `<div class="btn wide" data-act="configure" data-tip="${esc(ctips.on || "")}">${L("Konfigurieren", "Configure")}</div>`
+                : `<div class="btn wide disabled" data-tip="${esc(ctips.off || "")}">${L("Konfigurieren", "Configure")}</div>`
+        );
     const status = txt(opened[1]);
     if (!btns.length && !status) return "";
     return `<div class="pfoot">${btns.join("")}${status ? `<div class="pnote">${esc(status)}</div>` : ""}</div>`;

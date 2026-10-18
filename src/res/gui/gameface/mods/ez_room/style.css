@@ -50,6 +50,10 @@ body {
 .sub { font-size: 11rem; color: rgba(233, 231, 220, 0.55); margin-top: 2rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .back { display: inline-block; font-size: 11rem; color: #ffe4c0; margin-top: 3rem; white-space: nowrap; cursor: pointer; }
 .back:hover { color: #f28a3a; }
+/* WG's divisionInfo ⓘ after the description (library/infoIcon.png) */
+.sub { display: flex; align-items: center; }
+.dinfo { width: 14rem; height: 14rem; margin-left: 4rem; flex-shrink: 0; background-image: url(img://gui/maps/icons/library/infoIcon.png); background-size: 14rem 14rem; cursor: default; }
+.btn.disabled { opacity: 0.4; cursor: default; }
 .center { flex-shrink: 0; display: flex; justify-content: center; margin: 0 10rem; }
 .tools { flex-shrink: 0; display: flex; justify-content: flex-end; margin-left: 4rem; }
 

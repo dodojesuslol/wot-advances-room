@@ -1,6 +1,6 @@
 # EZ ROOM – Roadmap: Funktionsgleichheit mit dem WG-Original
 
-Stand: v0.7.26 (2026-10-18). Ziel: Jede Funktion des Flash-Raums (`fortClanBattleRoom.swf` + `fortBattleRoomWindow.swf`)
+Stand: v0.7.27 (2026-10-18). Ziel: Jede Funktion des Flash-Raums (`fortClanBattleRoom.swf` + `fortBattleRoomWindow.swf`)
 einzeln mit dem Original vergleichen und alles, was fehlt, nachbauen. Zum Vergleich in einem echten Raum über den
 „Original“-Button umschalten (Esc / Mods-Button bringt die neue Oberfläche zurück).
 
@@ -19,7 +19,7 @@ Legende: ✅ vorhanden · 🟡 teilweise · ❌ fehlt · 🚫 bewusst weggelasse
 | # | Funktion im Original | Status | Hinweise / WG-API |
 |---|---|---|---|
 | A1 | Titel des Fensters („Vorstoß vom Brückenkopf Süd (x2)“) | ✅ | v0.7.17: eigener Titel entfernt (Nutzer), steht schon in WGs Fensterrahmen |
-| A2 | Beschreibung + ⓘ-Icon mit Tooltip (`headerDescr`) | 🟡 | Text da, ⓘ-Tooltip fehlt |
+| A2 | Beschreibung + ⓘ-Icon mit Tooltip (`headerDescr`) | 🟡 | v0.7.27 (im Spiel testen): WGs infoIcon hinter der Beschreibung, Tooltip = `SortieDivisionTooltipData` (Name, Stufe, Spieler, Legionäre, Dauer, Bonus) mit WGs Beschriftungen |
 | A3 | Zurück-Link „Zur Abteilungszusammenstellung gehen“ (`backBtn`) | ✅ | v0.7.14 (im Spiel bestätigt): Link unter der Beschreibung, Text + Tooltip aus WGs Sprachdateien, Klick = `StrongholdBattleRoomWindow.onBackClick()` → verlässt die Abteilung (wie Original, ohne Rückfrage) |
 | A4 | Richtungs-/Gebäudegrafik (grüne Burg → Flaggen → ⚔ → rote Burg) | ✅ | v0.7.15 (im Spiel bestätigt): eigene Zeile unter dem Kopf, Clans links/rechts, Timer genau mittig im Kopf; 13 Endbilder aus `fortCmp.swf` (`ConnectedDirectsUI`, jeweils ruhiges Bild vor dem nächsten Label) in `gui/maps/icons/ez_room/direction/<value>.png`; `as_updateReadyDirectionsS(false)` → Text „Richtungen werden ermittelt …“; keine Animation. Teamzeilen 27→22 px, damit alle 15 passen |
 | A5 | Eigener Clan / Gegner-Clan mit Bereit-Anzeige | ✅ | Namen + Glow da; WGs Bereit-Lämpchen dort nicht gewünscht (Nutzer, 2026-10-18) |
@@ -28,7 +28,7 @@ Legende: ✅ vorhanden · 🟡 teilweise · ❌ fehlt · 🚫 bewusst weggelasse
 | A8 | „Warten auf Gefecht“-Text (`waitForBattleDescr`) | ✅ | |
 | A9 | 4 Reserve-Plätze + Auswahl | ✅ | eigene Liste statt Popover |
 | A10 | Reserve-Liste: erweiterte Werte (Schaden, Radius, Crew-Bonus …) | ❌ | `FortReserveSelectPopover.__buildReserveParams` |
-| A11 | Konfigurieren-Button (Modus ändern) + `divisionInfo` | 🟡 | Button da, Divisions-Info fehlt |
+| A11 | Konfigurieren-Button (Modus ändern) + `divisionInfo` | 🟡 | v0.7.27 (im Spiel testen): Button für den Kommandanten immer da, ausgegraut wenn WG ihn sperrt, WGs Tooltips (settingsBtn / disabled); divisionInfo = A2 |
 
 ## B. Team (Abteilungsmitglieder)
 
