@@ -20,7 +20,7 @@ from helpers.i18n import makeString
 from adisp import adisp_process
 from skeletons.gui.impl import IGuiLoader
 
-__version__ = '0.7.34'
+__version__ = '0.7.35'
 _logger = logging.getLogger('EZ_ROOM')
 _logger.setLevel(logging.INFO)
 _LAYOUT_PATH = ('ez_room', 'views', 'EzRoomView')
@@ -125,9 +125,15 @@ def _frame(roomRect, config):
     return (int(round(x + dx)), int(round(y + dy)), int(w), int(h))
 
 
+_LANGS = ('de', 'en', 'pl', 'cs', 'fr', 'es', 'it', 'tr', 'ru')
+
+
 def _lang():
     try:
-        return 'de' if (getClientLanguage() or '').lower().startswith('de') else 'en'
+        # client language code for the UI texts (app.js TR table); anything else -> English
+        code = (getClientLanguage() or '').lower()[:2]
+        code = {'cz': 'cs'}.get(code, code)
+        return code if code in _LANGS else 'en'
     except Exception:
         return 'en'
 

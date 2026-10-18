@@ -16,8 +16,111 @@ const ui = {
     foldTanks: {}, // sorted by tank: tank id -> true = only its first row is shown
 };
 
+// own texts: German / English in the code, other client languages from TR (key = the English
+// text, "{0}" = a value filled in by F). Missing entries fall back to English.
+const TR = {
+    pl: {
+        "Take {0} away": "Odbierz: {0}", "Give {0}": "Przydziel: {0}", "{0} players with this tank": "{0} graczy z tym czołgiem",
+        "Show all": "Pokaż wszystkie", "Artillery strike": "Ostrzał artyleryjski", "Drop onto a green slot (Esc = cancel)": "Upuść na zielone miejsce (Esc = anuluj)",
+        "Kick from the room": "Wyrzuć z pokoju", "Ready!": "Gotowy!", "Chat channel": "Kanał czatu", "Clan": "Klan", "Invite": "Zaproś",
+        "Remove": "Usuń", "Free slot": "Wolne miejsce", "Volunteers": "Ochotnicy", "Closed": "Zamknięte", "Inspiration": "Inspiracja",
+        "Map": "Mapa", "No reserves": "Brak rezerw", "No tank": "Brak czołgu", "Click: copy link": "Kliknij: kopiuj link",
+        "Click: next free slot · Drag: onto a slot": "Kliknij: następne wolne miejsce · Przeciągnij: na miejsce",
+        "Click: mark a spot for everyone": "Kliknij: zaznacz miejsce dla wszystkich", "Commander": "Dowódca", "Configure": "Konfiguruj",
+        "Copied ✓": "Skopiowano ✓", "Legionnaire": "Legionista", "Name": "Nazwa", "Not connected": "Nie połączono", "Nobody waiting": "Nikt nie czeka",
+        "Original": "Oryginał", "Tank": "Czołg", "Choose tank": "Wybierz czołg", "Take slot": "Zajmij miejsce", "Room": "Pokój", "Out": "Wyjdź",
+        "Determining directions …": "Ustalanie kierunków …", "Raw data": "Surowe dane", "Player": "Gracz", "Team": "Drużyna", "Leave": "Opuść",
+        "Rating": "Ocena", "Fold": "Zwiń", "Back to the volunteers": "Z powrotem do ochotników", "Back to the EZ ROOM view": "Powrót do widoku EZ ROOM",
+    },
+    cs: {
+        "Take {0} away": "Odebrat: {0}", "Give {0}": "Přidělit: {0}", "{0} players with this tank": "{0} hráčů s tímto tankem",
+        "Show all": "Zobrazit vše", "Artillery strike": "Dělostřelecký úder", "Drop onto a green slot (Esc = cancel)": "Přetáhněte na zelené místo (Esc = zrušit)",
+        "Kick from the room": "Vyhodit z místnosti", "Ready!": "Připraven!", "Chat channel": "Kanál chatu", "Clan": "Klan", "Invite": "Pozvat",
+        "Remove": "Odebrat", "Free slot": "Volné místo", "Volunteers": "Dobrovolníci", "Closed": "Zavřeno", "Inspiration": "Inspirace",
+        "Map": "Mapa", "No reserves": "Žádné zálohy", "No tank": "Žádný tank", "Click: copy link": "Klik: zkopírovat odkaz",
+        "Click: next free slot · Drag: onto a slot": "Klik: další volné místo · Tažení: na místo",
+        "Click: mark a spot for everyone": "Klik: označit místo pro všechny", "Commander": "Velitel", "Configure": "Nastavit",
+        "Copied ✓": "Zkopírováno ✓", "Legionnaire": "Legionář", "Name": "Jméno", "Not connected": "Nepřipojeno", "Nobody waiting": "Nikdo nečeká",
+        "Original": "Originál", "Tank": "Tank", "Choose tank": "Vybrat tank", "Take slot": "Obsadit místo", "Room": "Místnost", "Out": "Ven",
+        "Determining directions …": "Určování směrů …", "Raw data": "Surová data", "Player": "Hráč", "Team": "Tým", "Leave": "Opustit",
+        "Rating": "Hodnocení", "Fold": "Sbalit", "Back to the volunteers": "Zpět k dobrovolníkům", "Back to the EZ ROOM view": "Zpět do zobrazení EZ ROOM",
+    },
+    fr: {
+        "Take {0} away": "Retirer : {0}", "Give {0}": "Attribuer : {0}", "{0} players with this tank": "{0} joueurs avec ce char",
+        "Show all": "Tout afficher", "Artillery strike": "Frappe d'artillerie", "Drop onto a green slot (Esc = cancel)": "Déposer sur une place verte (Échap = annuler)",
+        "Kick from the room": "Exclure du salon", "Ready!": "Prêt !", "Chat channel": "Canal de discussion", "Clan": "Clan", "Invite": "Inviter",
+        "Remove": "Retirer", "Free slot": "Place libre", "Volunteers": "Volontaires", "Closed": "Fermé", "Inspiration": "Inspiration",
+        "Map": "Carte", "No reserves": "Aucune réserve", "No tank": "Aucun char", "Click: copy link": "Clic : copier le lien",
+        "Click: next free slot · Drag: onto a slot": "Clic : prochaine place libre · Glisser : sur une place",
+        "Click: mark a spot for everyone": "Clic : marquer un point pour tous", "Commander": "Commandant", "Configure": "Configurer",
+        "Copied ✓": "Copié ✓", "Legionnaire": "Légionnaire", "Name": "Nom", "Not connected": "Non connecté", "Nobody waiting": "Personne n'attend",
+        "Original": "Original", "Tank": "Char", "Choose tank": "Choisir un char", "Take slot": "Prendre la place", "Room": "Salon", "Out": "Sortir",
+        "Determining directions …": "Détermination des directions …", "Raw data": "Données brutes", "Player": "Joueur", "Team": "Équipe", "Leave": "Quitter",
+        "Rating": "Cote", "Fold": "Replier", "Back to the volunteers": "Retour aux volontaires", "Back to the EZ ROOM view": "Retour à la vue EZ ROOM",
+    },
+    es: {
+        "Take {0} away": "Quitar: {0}", "Give {0}": "Asignar: {0}", "{0} players with this tank": "{0} jugadores con este tanque",
+        "Show all": "Mostrar todo", "Artillery strike": "Ataque de artillería", "Drop onto a green slot (Esc = cancel)": "Soltar en un puesto verde (Esc = cancelar)",
+        "Kick from the room": "Expulsar de la sala", "Ready!": "¡Listo!", "Chat channel": "Canal de chat", "Clan": "Clan", "Invite": "Invitar",
+        "Remove": "Quitar", "Free slot": "Puesto libre", "Volunteers": "Voluntarios", "Closed": "Cerrado", "Inspiration": "Inspiración",
+        "Map": "Mapa", "No reserves": "Sin reservas", "No tank": "Sin tanque", "Click: copy link": "Clic: copiar enlace",
+        "Click: next free slot · Drag: onto a slot": "Clic: siguiente puesto libre · Arrastrar: a un puesto",
+        "Click: mark a spot for everyone": "Clic: marcar un punto para todos", "Commander": "Comandante", "Configure": "Configurar",
+        "Copied ✓": "Copiado ✓", "Legionnaire": "Legionario", "Name": "Nombre", "Not connected": "No conectado", "Nobody waiting": "Nadie espera",
+        "Original": "Original", "Tank": "Tanque", "Choose tank": "Elegir tanque", "Take slot": "Ocupar puesto", "Room": "Sala", "Out": "Fuera",
+        "Determining directions …": "Determinando direcciones …", "Raw data": "Datos sin procesar", "Player": "Jugador", "Team": "Equipo", "Leave": "Salir",
+        "Rating": "Índice", "Fold": "Contraer", "Back to the volunteers": "Volver a los voluntarios", "Back to the EZ ROOM view": "Volver a la vista EZ ROOM",
+    },
+    it: {
+        "Take {0} away": "Revoca: {0}", "Give {0}": "Assegna: {0}", "{0} players with this tank": "{0} giocatori con questo carro",
+        "Show all": "Mostra tutti", "Artillery strike": "Attacco d'artiglieria", "Drop onto a green slot (Esc = cancel)": "Rilascia su un posto verde (Esc = annulla)",
+        "Kick from the room": "Espelli dalla stanza", "Ready!": "Pronto!", "Chat channel": "Canale chat", "Clan": "Clan", "Invite": "Invita",
+        "Remove": "Rimuovi", "Free slot": "Posto libero", "Volunteers": "Volontari", "Closed": "Chiuso", "Inspiration": "Ispirazione",
+        "Map": "Mappa", "No reserves": "Nessuna riserva", "No tank": "Nessun carro", "Click: copy link": "Clic: copia link",
+        "Click: next free slot · Drag: onto a slot": "Clic: prossimo posto libero · Trascina: su un posto",
+        "Click: mark a spot for everyone": "Clic: segna un punto per tutti", "Commander": "Comandante", "Configure": "Configura",
+        "Copied ✓": "Copiato ✓", "Legionnaire": "Legionario", "Name": "Nome", "Not connected": "Non connesso", "Nobody waiting": "Nessuno in attesa",
+        "Original": "Originale", "Tank": "Carro", "Choose tank": "Scegli carro", "Take slot": "Prendi posto", "Room": "Stanza", "Out": "Fuori",
+        "Determining directions …": "Determinazione delle direzioni …", "Raw data": "Dati grezzi", "Player": "Giocatore", "Team": "Squadra", "Leave": "Lascia",
+        "Rating": "Valutazione", "Fold": "Comprimi", "Back to the volunteers": "Torna ai volontari", "Back to the EZ ROOM view": "Torna alla vista EZ ROOM",
+    },
+    tr: {
+        "Take {0} away": "Geri al: {0}", "Give {0}": "Ver: {0}", "{0} players with this tank": "Bu tankla {0} oyuncu",
+        "Show all": "Tümünü göster", "Artillery strike": "Topçu saldırısı", "Drop onto a green slot (Esc = cancel)": "Yeşil bir yere bırak (Esc = iptal)",
+        "Kick from the room": "Odadan at", "Ready!": "Hazır!", "Chat channel": "Sohbet kanalı", "Clan": "Klan", "Invite": "Davet et",
+        "Remove": "Kaldır", "Free slot": "Boş yer", "Volunteers": "Gönüllüler", "Closed": "Kapalı", "Inspiration": "İlham",
+        "Map": "Harita", "No reserves": "Yedek yok", "No tank": "Tank yok", "Click: copy link": "Tıkla: bağlantıyı kopyala",
+        "Click: next free slot · Drag: onto a slot": "Tıkla: sonraki boş yer · Sürükle: bir yere",
+        "Click: mark a spot for everyone": "Tıkla: herkes için bir nokta işaretle", "Commander": "Komutan", "Configure": "Yapılandır",
+        "Copied ✓": "Kopyalandı ✓", "Legionnaire": "Lejyoner", "Name": "İsim", "Not connected": "Bağlı değil", "Nobody waiting": "Bekleyen yok",
+        "Original": "Orijinal", "Tank": "Tank", "Choose tank": "Tank seç", "Take slot": "Yeri al", "Room": "Oda", "Out": "Çıkar",
+        "Determining directions …": "Yönler belirleniyor …", "Raw data": "Ham veri", "Player": "Oyuncu", "Team": "Takım", "Leave": "Ayrıl",
+        "Rating": "Derece", "Fold": "Daralt", "Back to the volunteers": "Gönüllülere geri", "Back to the EZ ROOM view": "EZ ROOM görünümüne dön",
+    },
+    ru: {
+        "Take {0} away": "Забрать: {0}", "Give {0}": "Назначить: {0}", "{0} players with this tank": "Игроков с этим танком: {0}",
+        "Show all": "Показать все", "Artillery strike": "Артиллерийский удар", "Drop onto a green slot (Esc = cancel)": "Перетащите на зелёный слот (Esc = отмена)",
+        "Kick from the room": "Исключить из комнаты", "Ready!": "Готов!", "Chat channel": "Канал чата", "Clan": "Клан", "Invite": "Пригласить",
+        "Remove": "Убрать", "Free slot": "Свободный слот", "Volunteers": "Добровольцы", "Closed": "Закрыто", "Inspiration": "Вдохновение",
+        "Map": "Карта", "No reserves": "Нет резервов", "No tank": "Нет танка", "Click: copy link": "Клик: копировать ссылку",
+        "Click: next free slot · Drag: onto a slot": "Клик: следующий свободный слот · Перетащить: в слот",
+        "Click: mark a spot for everyone": "Клик: отметить точку для всех", "Commander": "Командир", "Configure": "Настроить",
+        "Copied ✓": "Скопировано ✓", "Legionnaire": "Легионер", "Name": "Имя", "Not connected": "Нет подключения", "Nobody waiting": "Никто не ждёт",
+        "Original": "Оригинал", "Tank": "Танк", "Choose tank": "Выбрать танк", "Take slot": "Занять слот", "Room": "Комната", "Out": "Убрать",
+        "Determining directions …": "Определение направлений …", "Raw data": "Сырые данные", "Player": "Игрок", "Team": "Команда", "Leave": "Покинуть",
+        "Rating": "Рейтинг", "Fold": "Свернуть", "Back to the volunteers": "Вернуть к добровольцам", "Back to the EZ ROOM view": "Назад к виду EZ ROOM",
+    },
+};
+
 function L(de, en) {
-    return data.lang === "de" ? de : en;
+    if (data.lang === "de") return de;
+    const t = TR[data.lang];
+    return (t && t[en]) || en;
+}
+
+// L with a value: "{0}" in the texts is replaced by v
+function F(de, en, v) {
+    return L(de, en).replace("{0}", v);
 }
 
 function send(args) {
@@ -352,7 +455,7 @@ function renderSlot(slot, idx, tankCount, tankId) {
                 <div class="tier">${ROMAN[v.level] || ""}</div>
                 ${tankCount ? `<div class="vfold" data-act="foldTank" data-tank="${esc(tankId)}" data-tip="${esc(ui.foldTanks[tankId] ? L("Alle zeigen", "Show all") : L("Zuklappen", "Fold"))}">${ui.foldTanks[tankId] ? "▶" : "▼"}</div>` : tankId ? `<div class="vfold"></div>` : ""}
                 <div class="vname">${esc(v.shortUserName || v.userName)}</div>
-                ${tankCount ? `<div class="vcount" data-tip="${esc(L(`${tankCount} Spieler mit diesem Panzer`, `${tankCount} players with this tank`))}">×${tankCount}</div>` : ""}
+                ${tankCount ? `<div class="vcount" data-tip="${esc(F("{0} Spieler mit diesem Panzer", "{0} players with this tank", tankCount))}">×${tankCount}</div>` : ""}
                 ${roleIcons}
                 ${v.state ? `<div class="vstate">${esc(txt(v.state))}</div>` : ""}
             </div>`
@@ -386,7 +489,7 @@ function roleIcon(kind) {
 }
 
 function roleButton(dbID, kind, has) {
-    const tip = has ? L(`${ROLE[kind].name()} entziehen`, `Take ${ROLE[kind].name()} away`) : L(`${ROLE[kind].name()} geben`, `Give ${ROLE[kind].name()}`);
+    const tip = has ? F("{0} entziehen", "Take {0} away", ROLE[kind].name()) : F("{0} geben", "Give {0}", ROLE[kind].name());
     return `<div class="ibtn rolebtn ${has ? "on" : ""}" data-act="role" data-id="${dbID}" data-kind="${kind}" data-give="${has ? 0 : 1}" data-tip="${esc(tip)}"><div class="ricon2" style="background-image:url(img://gui/maps/icons/ez_room/role/${ROLE[kind].img}.png)"></div></div>`;
 }
 

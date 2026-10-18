@@ -1,6 +1,6 @@
 # EZ ROOM – Roadmap: Funktionsgleichheit mit dem WG-Original
 
-Stand: v0.7.34 (2026-10-18). Ziel: Jede Funktion des Flash-Raums (`fortClanBattleRoom.swf` + `fortBattleRoomWindow.swf`)
+Stand: v0.7.35 (2026-10-18). Ziel: Jede Funktion des Flash-Raums (`fortClanBattleRoom.swf` + `fortBattleRoomWindow.swf`)
 einzeln mit dem Original vergleichen und alles, was fehlt, nachbauen. Zum Vergleich in einem echten Raum über den
 „Original“-Button umschalten (Esc / Mods-Button bringt die neue Oberfläche zurück).
 
@@ -108,7 +108,7 @@ Legende: ✅ vorhanden · 🟡 teilweise · ❌ fehlt · 🚫 bewusst weggelasse
 
 | # | Punkt | Status |
 |---|---|---|
-| G1 | Englische Oberfläche (Texte über `L(de, en)`) | 🟡 alles prüfen |
+| G1 | Oberfläche in mehreren Sprachen (Texte über `L(de, en)` + Tabelle `TR`) | 🟡 | v0.7.35 (im Spiel testen): de, en, pl, cs, fr, es, it, tr, ru nach Spielsprache (`getClientLanguage`), fehlende Einträge → Englisch; WG-Texte kommen ohnehin aus WGs Sprachdateien |
 | G2 | WG-eigene Tooltips (Backport) statt eigener Tooltip-Box | ❌ |
 | G3 | Schritt 4: EZ ROOM und EZ TANK PICKER zu einer Mod zusammenlegen | 🚫 | bleibt eigene Mod (Nutzer, 2026-10-19)
 | G4 | README / Release auf GitHub (Konto dodojesuslol, kein Klarname!) | ❌ |
