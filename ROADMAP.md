@@ -49,7 +49,7 @@ Legende: ✅ vorhanden · 🟡 teilweise · ❌ fehlt · 🚫 bewusst weggelasse
 | B13 | Prestige-Stufe (`prestigeLevel`) | ❌ | |
 | B14 | Freien Platz nehmen | ✅ | `assignSlotRequest(slot, -1)` |
 | B15 | Platz verlassen / Kommandant: Spieler raus, kicken | ✅ | v0.7.6: „Raus“ + „✕“ (Kick, ein Klick, keine Rückfrage) erscheinen sofort beim Überfahren über dem Zeilenende, ohne Flackern; Freiwillige: „✕“. `leaveSlotRequest`, `requestToKickUser` |
-| B16 | Drag & Drop Freiwillige → Platz | ✅ | v0.7.5: Kommandant klickt Freiwilligen → nächster freier erlaubter Platz (`getAvailableSlots`, kleinste Nummer); ziehen → grüne Plätze, loslassen = genau dieser Platz. Zwei-Klick-Verfahren entfernt (Nutzerwunsch); v0.7.13 (im Spiel testen): Mitglied aus dem Team auf die Freiwilligen-Liste ziehen = `leaveSlotRequest` (wie „Raus“) |
+| B16 | Drag & Drop Freiwillige → Platz | ✅ | v0.7.5: Kommandant klickt Freiwilligen → nächster freier erlaubter Platz (`getAvailableSlots`, kleinste Nummer); ziehen → grüne Plätze, loslassen = genau dieser Platz. Zwei-Klick-Verfahren entfernt (Nutzerwunsch); v0.7.13 (im Spiel bestätigt): Mitglied aus dem Team auf die Freiwilligen-Liste ziehen = `leaveSlotRequest` (wie „Raus“) |
 | B17 | Gesperrte / geschlossene Plätze, Legionärs-Suchplätze („Spieler wird gesucht“) | 🟡 | Label kommt mit, Optik prüfen |
 | B18 | Rechtsklick-Menü | ✅ | `BackportContextMenuWindow` mit `UNIT_USER` |
 | B19 | Spieler-Tooltip (WG-Nutzerinfo) und Panzer-Tooltip | ❌ | WG-Backport-Tooltips statt eigener |
