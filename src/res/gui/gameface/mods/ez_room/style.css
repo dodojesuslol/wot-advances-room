@@ -518,3 +518,6 @@ body {
 
 /* chat author: right click = WG's player menu */
 .cname { cursor: pointer; }
+
+/* WG's player badge before the name (badgeVisualVO, 24x24 shown at 18) */
+.badge { width: 18rem; height: 18rem; margin-right: 4rem; flex-shrink: 0; background-size: 18rem 18rem; }

@@ -1,6 +1,6 @@
 # EZ ROOM – Roadmap: Funktionsgleichheit mit dem WG-Original
 
-Stand: v0.7.28 (2026-10-18). Ziel: Jede Funktion des Flash-Raums (`fortClanBattleRoom.swf` + `fortBattleRoomWindow.swf`)
+Stand: v0.7.29 (2026-10-18). Ziel: Jede Funktion des Flash-Raums (`fortClanBattleRoom.swf` + `fortBattleRoomWindow.swf`)
 einzeln mit dem Original vergleichen und alles, was fehlt, nachbauen. Zum Vergleich in einem echten Raum über den
 „Original“-Button umschalten (Esc / Mods-Button bringt die neue Oberfläche zurück).
 
@@ -39,7 +39,7 @@ Legende: ✅ vorhanden · 🟡 teilweise · ❌ fehlt · 🚫 bewusst weggelasse
 | B3 | Platznummer, Spielername in WG-Farbe, eigener Name hervorgehoben | ✅ | |
 | B4 | Status-Icon pro Spieler (bereit / nicht bereit / im Gefecht) | 🟡 | v0.7.26 (im Spiel testen): WGs IndicationOfStatus_UI (guiControlsLobby.swf Sprite 571: normal / ready / inBattle / locked) am Zeilenende; ganze Zeile grün bei „bereit“ bleibt |
 | B5 | **Sprach-Indikator** (Spieler spricht gerade, `isPlayerSpeaking`) | ✅ | v0.7.18 (vom Nutzer so abgenommen, nicht live getestet): WGs VoiceWaves (`Voice.swf` Sprite 38, Endbild von „show“, rotes Mute-X entfernt) 100×20 hinter dem Namen, Team + Freiwillige; live über `g_messengerEvents.voip.onPlayerSpeaking`, Startwert `voipController.isPlayerSpeaking`. Nur WoT-Voice-Chat, nicht Discord |
-| B6 | Abzeichen (Badge) vor dem Namen (`badgeVisualVO`) | ❌ | |
+| B6 | Abzeichen (Badge) vor dem Namen (`badgeVisualVO`) | 🟡 | v0.7.29 (im Spiel testen): WGs Badge-Bild (badgeVisualVO.icon, 24x24 als 18 px) vor dem Namen, nach der Kommandanten-Mütze |
 | B7 | Kommandanten-Icon | 🟡 | v0.7.26 (im Spiel testen): WGs Offiziersmütze (IconLibrary.swf commanderMc, Sprite 126) vor dem Namen, Tooltip „Kommandant“ |
 | B8 | Rollen-Icons Artillerieschlag / Inspiration (`roleIcon`, `gunnerIcon0-14`) | ✅ | v0.7.19–0.7.20 (im Spiel bestätigt): Buttons nur, wo WGs Kontextmenü den Punkt anbieten würde (`roleRights`, WGs Prüfungen); WGs Icons (`fortClanBattleRoom.swf` Sprite 142) hinter dem Panzernamen; Kommandant: Bild-Buttons beim Überfahren der Zeile (eigene Zeile: links neben „Verlassen“) = `GiveEquipmentCommanderCtx` wie WGs Kontextmenü (Nutzerwunsch). Panzerbilder in der Teamliste entfernt (Nutzer) |
 | B9 | Legionär-Kennzeichnung | ✅ | |
@@ -65,7 +65,7 @@ Legende: ✅ vorhanden · 🟡 teilweise · ❌ fehlt · 🚫 bewusst weggelasse
 | C9 | Lange Freiwilligen-Liste scrollt (Fenster wächst nicht mehr) + eigene Scrollleiste, auch im Chat | ✅ | v0.7.16 (im Spiel bestätigt): `.pwrap` mit height 0 (Gameface ignoriert min-height 0), Leiste ziehen / auf die Leiste klicken / Mausrad |
 | C3 | Online-/Beschäftigt-Status-Icon (`statusIcon`) | ✅ | v0.7.21 (im Spiel bestätigt): WGs `library/userStatus/small/online|busy|offline.png` (16 px) vor dem Namen, Wert kommt fertig von WG (`makeCandidateIconPath`: grün nur Clan/Freunde, rot = Nicht stören, sonst grau) |
 | C4 | Eingeladen-Markierung | ✅ | blauer Punkt |
-| C5 | Abzeichen | ❌ | |
+| C5 | Abzeichen | 🟡 | v0.7.29 (im Spiel testen): wie B6, zwischen Status-Lämpchen und Name |
 | C6 | Rechtsklick-Menü | ✅ | |
 | C7 | „Freunde einladen“ | ✅ | |
 | C8 | Raum vor Legionären verbergen/anzeigen + Statustext | ✅ | |

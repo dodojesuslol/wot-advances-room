@@ -76,6 +76,12 @@ function kickButton(dbID) {
 
 // --- parts -----------------------------------------------------------------------
 
+// WG's badge before the name (player VO badgeVisualVO: library/badges/24x24/badge_<id>.png)
+function badge(p) {
+    const b = p && p.badgeVisualVO;
+    return b && b.icon ? `<div class="badge" style="background-image:url(${img(b.icon)})"></div>` : "";
+}
+
 // WG's voice chat: player is speaking right now (data.speaking = dbIDs, live from Python)
 function speaking(dbID) {
     return (data.speaking || []).indexOf(dbID) >= 0;
@@ -241,6 +247,7 @@ function renderCandidates() {
                     <div data-user="${p.dbID}" class="cand ${p.isOffline ? "offline" : ""} ${own ? "own" : ""} ${pick ? "pickable" : ""} ${ui.selCand === p.dbID ? "sel" : ""}" ${pick ? `data-cand="${p.dbID}" data-tip="${esc(L("Klick: nächster freier Platz · Ziehen: auf einen Platz", "Click: next free slot · Drag: onto a slot"))}"` : ""}>
                         ${p.isInvite ? `<div class="inv" title="invited"></div>` : ""}
                         ${p.statusIcon ? `<div class="ustatus" style="background-image:url(${img(p.statusIcon)})"></div>` : ""}
+                        ${badge(p)}
                         <div class="name ${speaking(p.dbID) ? "speak" : ""}" ${c ? `style="color:${c}"` : ""}>${esc(p.userName || p.fullName)}</div>
                         <div class="rating">${esc(p.rating || "")}</div>
                         ${isCommander() && !own ? `<div class="acts">${kickButton(p.dbID)}</div>` : ""}
@@ -327,6 +334,7 @@ function renderSlot(slot, idx) {
             <div class="clan">${esc(p.clanAbbrev ? "[" + p.clanAbbrev + "]" : "")}</div>
             <div class="who">
                 ${p.isCommander ? `<div class="crown" data-tip="${esc(L("Kommandant", "Commander"))}"></div>` : ""}
+                ${badge(p)}
                 <div class="name ${own ? "own" : ""} ${p.isOffline ? "offline" : ""} ${speaking(p.dbID) ? "speak" : ""}" ${c ? `style="color:${c}"` : ""}>${esc(p.userName || p.fullName)}</div>
                 ${slot.isLegionaries ? `<div class="tag leg">${L("Legionär", "Legionnaire")}</div>` : ""}
             </div>`;
