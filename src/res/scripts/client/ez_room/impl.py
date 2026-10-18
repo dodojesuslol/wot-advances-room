@@ -19,9 +19,10 @@ from gui.Scaleform.locale.TOOLTIPS import TOOLTIPS
 from gui.shared.utils.functions import getArenaGeometryName
 from helpers import dependency, getClientLanguage
 from helpers.i18n import makeString
+from adisp import adisp_process
 from skeletons.gui.impl import IGuiLoader
 
-__version__ = '0.7.18'
+__version__ = '0.7.19'
 _logger = logging.getLogger('EZ_ROOM')
 _logger.setLevel(logging.INFO)
 _LAYOUT_PATH = ('ez_room', 'views', 'EzRoomView')
@@ -216,6 +217,17 @@ def _speaking(slots, candidates, events):
     return result
 
 
+@adisp_process
+def _setEquipmentCommander(dbID, kind):
+    # same request as WG's context menu (UnitUserCMHandler.giveEquipmentCommander): dbID None = take
+    # the role away; giving moves it from whoever had it (one player per role)
+    from gui.prb_control.dispatcher import g_prbLoader
+    from gui.prb_control.entities.stronghold.unit.ctx import GiveEquipmentCommanderCtx
+    from gui.prb_control.items.stronghold_items import ARTILLERY_COMMANDER, INSPIRE_COMMANDER
+    role = ARTILLERY_COMMANDER if kind == 'artillery' else INSPIRE_COMMANDER
+    yield g_prbLoader.getDispatcher().sendPrbRequest(GiveEquipmentCommanderCtx(dbID, role, 'prebattle/giveEquipmentCommander'))
+
+
 def _mapIcon(mapID):
     # square top-down minimap (gui/maps/icons/map/<geometry>.png, 300x300); '' for a random map or
     # when the client has none for this map (map/stats/ are 500x235 landscape shots, not minimaps)
@@ -238,8 +250,13 @@ def _mapIcon(mapID):
 def _me(view):
     try:
         info = view.prbEntity.getPlayerInfo()
+        try:
+            canChangeRoles = bool(view.prbEntity.getPermissions().canChangeExtraEquipmentRole())
+        except Exception:
+            canChangeRoles = False
         return {'dbID': info.dbID, 'isCommander': info.isCommander(), 'isInSlot': info.isInSlot,
-                'isReady': info.isReady, 'slotIdx': getattr(info, 'slotIdx', -1) if info.isInSlot else -1}
+                'isReady': info.isReady, 'slotIdx': getattr(info, 'slotIdx', -1) if info.isInSlot else -1,
+                'canChangeRoles': canChangeRoles}
     except Exception:
         _logger.exception('player info failed')
         return {}
@@ -699,6 +716,10 @@ class EzRoomView(ViewImpl):
                 self._contextMenu(int(args.get('dbID')))
             elif action == 'chooseVehicle':
                 self._chooseVehicle(int(args.get('cd') or 0))
+            elif action == 'role':
+                # commander's role buttons in the team rows (Artillerieschlag / Inspiration)
+                give = bool(args.get('give'))
+                _setEquipmentCommander(int(args.get('dbID')) if give else None, args.get('kind'))
             elif action == 'back':
                 # same as WG's back link: StrongholdBattleRoomWindow.onBackClick -> leaves the unit
                 windowView = bridge.roomWindowView()

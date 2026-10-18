@@ -1,6 +1,6 @@
 # EZ ROOM – Roadmap: Funktionsgleichheit mit dem WG-Original
 
-Stand: v0.7.18 (2026-10-18). Ziel: Jede Funktion des Flash-Raums (`fortClanBattleRoom.swf` + `fortBattleRoomWindow.swf`)
+Stand: v0.7.19 (2026-10-18). Ziel: Jede Funktion des Flash-Raums (`fortClanBattleRoom.swf` + `fortBattleRoomWindow.swf`)
 einzeln mit dem Original vergleichen und alles, was fehlt, nachbauen. Zum Vergleich in einem echten Raum über den
 „Original“-Button umschalten (Esc / Mods-Button bringt die neue Oberfläche zurück).
 
@@ -41,7 +41,7 @@ Legende: ✅ vorhanden · 🟡 teilweise · ❌ fehlt · 🚫 bewusst weggelasse
 | B5 | **Sprach-Indikator** (Spieler spricht gerade, `isPlayerSpeaking`) | ✅ | v0.7.18 (vom Nutzer so abgenommen, nicht live getestet): WGs VoiceWaves (`Voice.swf` Sprite 38, Endbild von „show“, rotes Mute-X entfernt) 100×20 hinter dem Namen, Team + Freiwillige; live über `g_messengerEvents.voip.onPlayerSpeaking`, Startwert `voipController.isPlayerSpeaking`. Nur WoT-Voice-Chat, nicht Discord |
 | B6 | Abzeichen (Badge) vor dem Namen (`badgeVisualVO`) | ❌ | |
 | B7 | Kommandanten-Icon | 🟡 | eigene Raute statt WG-Icon |
-| B8 | Rollen-Icons Richtschütze / Inspiration (`roleIcon`, `gunnerIcon0-14`) | ❌ | |
+| B8 | Rollen-Icons Artillerieschlag / Inspiration (`roleIcon`, `gunnerIcon0-14`) | 🟡 | v0.7.19 (im Spiel testen): WGs Icons (`fortClanBattleRoom.swf` Sprite 142) hinter dem Panzernamen; Kommandant: Bild-Buttons beim Überfahren der Zeile (eigene Zeile: links neben „Verlassen“) = `GiveEquipmentCommanderCtx` wie WGs Kontextmenü (Nutzerwunsch). Panzerbilder in der Teamliste entfernt (Nutzer) |
 | B9 | Legionär-Kennzeichnung | ✅ | |
 | B10 | Panzer: Icon, Stufe, Name; Nationsflagge im Hintergrund | 🟡 | Flagge fehlt |
 | B11 | Panzer-Zustand (nicht bereit, „Zu reparieren“ …) | ✅ | |

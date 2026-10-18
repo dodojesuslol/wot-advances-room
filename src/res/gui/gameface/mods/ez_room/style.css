@@ -263,6 +263,9 @@ body {
 .acts { position: absolute; right: 0; top: 0; bottom: 0; display: flex; align-items: center; padding: 0 6rem 0 14rem; background-color: rgba(30, 30, 31, 0.97); visibility: hidden; }
 .acts.always, .slot.hov .acts, .cand.hov .acts { visibility: visible; }
 .acts.always { position: static; padding: 0 0 0 6rem; background-color: transparent; }
+.acts.always { position: relative; }
+.roleover { position: absolute; right: 100%; top: 0; bottom: 0; display: flex; align-items: center; padding: 0 2rem 0 10rem; background-color: rgba(30, 30, 31, 0.97); visibility: hidden; }
+.slot.hov .roleover { visibility: visible; }
 .ibtn {
     margin-left: 4rem;
     padding: 2rem 7rem;
@@ -273,6 +276,13 @@ body {
     cursor: pointer;
     white-space: nowrap;
 }
+/* equipment roles: WG's gunnerIcon frames (fortClanBattleRoom.swf) after the tank name; commander buttons */
+.ricon2 { width: 18rem; height: 18rem; margin-left: 3rem; flex-shrink: 0; background-size: 18rem 18rem; background-repeat: no-repeat; }
+.rolebtn { display: flex; align-items: center; padding: 1rem; }
+.rolebtn .ricon2 { width: 16rem; height: 16rem; background-size: 16rem 16rem; margin: 0; opacity: 0.4; }
+.rolebtn:hover .ricon2 { opacity: 0.8; }
+.rolebtn.on { border-color: rgba(242, 138, 58, 0.8); color: #ffe4c0; background-color: rgba(242, 138, 58, 0.15); }
+.rolebtn.on .ricon2 { opacity: 1; }
 .ibtn:hover { border-color: rgba(255, 255, 255, 0.5); color: #ffffff; }
 .ibtn.kick:hover { border-color: #ff7a52; color: #ff9a72; }
 

@@ -243,6 +243,14 @@ function renderSlot(slot, idx) {
         acts.push(`<div class="ibtn" data-act="leaveSlot" data-id="${p.dbID}" data-tip="${esc(L("Zurück zu den Freiwilligen", "Back to the volunteers"))}">${L("Raus", "Out")}</div>`);
         acts.push(kickButton(p.dbID));
     }
+    // equipment roles (slot.roleIcon from WG: gunner / inspire / gunnerAndInspire): icons after the
+    // tank name for everyone; the commander gets a give/take button per role in the row
+    const role = String(slot.roleIcon || "");
+    const hasArt = role.indexOf("gunner") === 0;
+    const hasIns = role.indexOf("nspire") !== -1;
+    // shown on hover like Raus / kick; in the own row on hover left of "Verlassen" (.roleover)
+    const roleActs = p && canChangeRoles() ? roleButton(p.dbID, "artillery", hasArt) + roleButton(p.dbID, "inspire", hasIns) : "";
+    const roleIcons = p ? `${hasArt ? roleIcon("artillery") : ""}${hasIns ? roleIcon("inspire") : ""}` : "";
     let who;
     if (p) {
         const own = p.dbID === me;
@@ -262,9 +270,10 @@ function renderSlot(slot, idx) {
     const veh = v
         ? `
             <div class="veh ${mine ? "pick" : ""} ${v.isReadyToFight === false || v.enabled === false ? "bad" : ""}" ${vehAct} data-tip="${esc(v.userName || "")}">
-                ${v.smallIconPath ? `<div class="vicon" style="background-image:url(${img(v.smallIconPath)})"></div>` : ""}
+                <!-- no tank image (user, 0.7.19): more room for the name and the role icons -->
                 <div class="tier">${ROMAN[v.level] || ""}</div>
                 <div class="vname">${esc(v.shortUserName || v.userName)}</div>
+                ${roleIcons}
                 ${v.state ? `<div class="vstate">${esc(txt(v.state))}</div>` : ""}
             </div>`
         : mine
@@ -277,8 +286,28 @@ function renderSlot(slot, idx) {
             <div class="rating">${p ? esc(slot.rating || "") : ""}</div>
             ${veh}
             <div class="status">${slotStatus(slot)}</div>
-            <div class="acts ${mine ? "always" : ""}">${acts.join("")}</div>
+            ${mine
+                ? `<div class="acts always">${roleActs ? `<div class="roleover">${roleActs}</div>` : ""}${acts.join("")}</div>`
+                : `<div class="acts">${roleActs}${acts.join("")}</div>`}
         </div>`;
+}
+
+const ROLE = {
+    artillery: { img: "gunner", name: () => L("Artillerieschlag", "Artillery strike") },
+    inspire: { img: "inspire", name: () => L("Inspiration", "Inspiration") },
+};
+
+function canChangeRoles() {
+    return !!(data.me || {}).canChangeRoles;
+}
+
+function roleIcon(kind) {
+    return `<div class="ricon2" style="background-image:url(img://gui/maps/icons/ez_room/role/${ROLE[kind].img}.png)" data-tip="${esc(ROLE[kind].name())}"></div>`;
+}
+
+function roleButton(dbID, kind, has) {
+    const tip = has ? L(`${ROLE[kind].name()} entziehen`, `Take ${ROLE[kind].name()} away`) : L(`${ROLE[kind].name()} geben`, `Give ${ROLE[kind].name()}`);
+    return `<div class="ibtn rolebtn ${has ? "on" : ""}" data-act="role" data-id="${dbID}" data-kind="${kind}" data-give="${has ? 0 : 1}" data-tip="${esc(tip)}"><div class="ricon2" style="background-image:url(img://gui/maps/icons/ez_room/role/${ROLE[kind].img}.png)"></div></div>`;
 }
 
 function renderTeam() {
@@ -754,6 +783,7 @@ document.addEventListener("click", (e) => {
     } else if (act === "takeSlot") send({ action: "takeSlot", slot: slot });
     else if (act === "leaveSlot") send({ action: "leaveSlot", dbID: id });
     else if (act === "kick") send({ action: "kick", dbID: id });
+    else if (act === "role") send({ action: "role", dbID: id, kind: el.getAttribute("data-kind"), give: el.getAttribute("data-give") === "1" });
     else if (act === "reserveOpen") {
         const open = data.reserveOptions && data.reserveOptions.slot === slot;
         send({ action: "reserveOpen", slot: open ? -1 : slot });
