@@ -21,7 +21,7 @@ Legende: ✅ vorhanden · 🟡 teilweise · ❌ fehlt · 🚫 bewusst weggelasse
 | A1 | Titel des Fensters („Vorstoß vom Brückenkopf Süd (x2)“) | ✅ | v0.7.17: eigener Titel entfernt (Nutzer), steht schon in WGs Fensterrahmen |
 | A2 | Beschreibung + ⓘ-Icon mit Tooltip (`headerDescr`) | 🟡 | Text da, ⓘ-Tooltip fehlt |
 | A3 | Zurück-Link „Zur Abteilungszusammenstellung gehen“ (`backBtn`) | ✅ | v0.7.14 (im Spiel bestätigt): Link unter der Beschreibung, Text + Tooltip aus WGs Sprachdateien, Klick = `StrongholdBattleRoomWindow.onBackClick()` → verlässt die Abteilung (wie Original, ohne Rückfrage) |
-| A4 | Richtungs-/Gebäudegrafik (grüne Burg → Flaggen → ⚔ → rote Burg) | 🟡 | v0.7.15 (im Spiel testen): eigene Zeile unter dem Kopf, Clans links/rechts, Timer genau mittig im Kopf; 13 Endbilder aus `fortCmp.swf` (`ConnectedDirectsUI`, jeweils ruhiges Bild vor dem nächsten Label) in `gui/maps/icons/ez_room/direction/<value>.png`; `as_updateReadyDirectionsS(false)` → Text „Richtungen werden ermittelt …“; keine Animation. Teamzeilen 27→22 px, damit alle 15 passen |
+| A4 | Richtungs-/Gebäudegrafik (grüne Burg → Flaggen → ⚔ → rote Burg) | ✅ | v0.7.15 (im Spiel bestätigt): eigene Zeile unter dem Kopf, Clans links/rechts, Timer genau mittig im Kopf; 13 Endbilder aus `fortCmp.swf` (`ConnectedDirectsUI`, jeweils ruhiges Bild vor dem nächsten Label) in `gui/maps/icons/ez_room/direction/<value>.png`; `as_updateReadyDirectionsS(false)` → Text „Richtungen werden ermittelt …“; keine Animation. Teamzeilen 27→22 px, damit alle 15 passen |
 | A5 | Eigener Clan / Gegner-Clan mit Bereit-Anzeige | 🟡 | Namen + Glow da; WGs Bereit-Lämpchen-Optik fehlt |
 | A6 | Gefechts-Timer, normale und Alarm-Farbe (#ffdd99 / #ff7f00) | ✅ | v0.7.7: letzte 10 s sofort orange + oranger Rand (Farben aus dem Timer-VO), ohne Animation |
 | A7 | Timer-Alarm-Ton (Flash ruft `onTimerAlert()` → `playBattleRoomTimerAlert`) | 🚫 | nicht nachbauen (Nutzer): der Flash-Timer läuft unter der Oberfläche weiter und spielt den Original-Ton selbst |
@@ -62,7 +62,7 @@ Legende: ✅ vorhanden · 🟡 teilweise · ❌ fehlt · 🚫 bewusst weggelasse
 |---|---|---|---|
 | C1 | Liste mit Gruppen „Clanmitglieder“ / „Legionäre“ | ✅ | |
 | C2 | Spalten Spieler / Wertung | 🟡 | ohne Spaltenköpfe |
-| C9 | Lange Freiwilligen-Liste scrollt (Fenster wächst nicht mehr) + eigene Scrollleiste, auch im Chat | 🟡 | v0.7.16 (im Spiel testen): `.pwrap` mit height 0 (Gameface ignoriert min-height 0), Leiste ziehen / auf die Leiste klicken / Mausrad |
+| C9 | Lange Freiwilligen-Liste scrollt (Fenster wächst nicht mehr) + eigene Scrollleiste, auch im Chat | ✅ | v0.7.16 (im Spiel bestätigt): `.pwrap` mit height 0 (Gameface ignoriert min-height 0), Leiste ziehen / auf die Leiste klicken / Mausrad |
 | C3 | Online-/Beschäftigt-Status-Icon (`statusIcon`) | ❌ | |
 | C4 | Eingeladen-Markierung | ✅ | blauer Punkt |
 | C5 | Abzeichen | ❌ | |
