@@ -20,7 +20,7 @@ from helpers.i18n import makeString
 from adisp import adisp_process
 from skeletons.gui.impl import IGuiLoader
 
-__version__ = '0.7.32'
+__version__ = '0.7.33'
 _logger = logging.getLogger('EZ_ROOM')
 _logger.setLevel(logging.INFO)
 _LAYOUT_PATH = ('ez_room', 'views', 'EzRoomView')
@@ -240,6 +240,13 @@ def _divisionTip():
     # WG's divisionInfo tooltip (FortClanBattleRoom ⓘ -> TOOLTIPS_CONSTANTS.SORTIE_DIVISION): same data
     # as SortieDivisionTooltipData, labels from #tooltips:fortification/sortieDivisionToolTip/*
     try:
+        # only while WG's current entity is the stronghold unit (leaving the room switches it to the
+        # stronghold browser / random entity before our overlay is gone)
+        from gui.prb_control.dispatcher import g_prbLoader
+        dispatcher = g_prbLoader.getDispatcher()
+        entity = dispatcher.getEntity() if dispatcher is not None else None
+        if entity is None or not hasattr(entity, 'isStrongholdSettingsValid'):
+            return u''
         from gui.shared.tooltips import common, contexts
         result = common.SortieDivisionTooltipData(contexts.FortificationContext()).getDisplayableData()
         if not result or not result.get('divisions'):
