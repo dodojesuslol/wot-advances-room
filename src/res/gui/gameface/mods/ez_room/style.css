@@ -226,6 +226,10 @@ body {
     background-size: 100% 100%;
     border: 1rem solid rgba(255, 255, 255, 0.12);
 }
+/* commander markings: WG's MinimapClick dot (MinimapLobby.swf, steady frame), 40 px glow centred */
+.gmap { position: relative; }
+.gmap.clickable { cursor: pointer; }
+.gpoint { position: absolute; width: 40rem; height: 40rem; background-image: url(img://gui/maps/icons/ez_room/gridclick.png); background-size: 40rem 40rem; pointer-events: none; }
 .grow-c { display: flex; flex-shrink: 0; width: 200rem; height: 20rem; }
 .gcell { flex-shrink: 0; width: 20rem; height: 20rem; box-sizing: border-box; border-right: 1rem solid rgba(0, 0, 0, 0.35); border-bottom: 1rem solid rgba(0, 0, 0, 0.35); }
 .chat { flex-grow: 1; }

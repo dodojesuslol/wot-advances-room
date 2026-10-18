@@ -486,6 +486,29 @@ function sendChat() {
 // 10 x 10 grid with A-K / 1-0 labels like WG's lobby minimap, map image below it
 const GRID_ROWS = ["A", "B", "C", "D", "E", "F", "G", "H", "J", "K"];
 const GRID_COLS = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0"];
+// commander markings (WG's MinimapGrid): data.grid.points in 0..1 of the map, still visible for
+// "left" seconds; shown as WG's orange MinimapClick dot, steady (no pulsing), gone after ~5 s
+function gridClickable() {
+    return !!(data.grid && data.grid.clickEnabled);
+}
+
+let gridTimer = null;
+function renderGridPoints() {
+    const points = ((data.grid || {}).points || []).filter((p) => p.left > 0);
+    if (gridTimer) clearTimeout(gridTimer);
+    gridTimer = null;
+    if (points.length) {
+        const next = Math.min.apply(null, points.map((p) => p.left));
+        const at = Date.now();
+        gridTimer = setTimeout(() => {
+            const gone = (Date.now() - at) / 1000;
+            (data.grid.points || []).forEach((p) => (p.left -= gone));
+            render();
+        }, next * 1000 + 30);
+    }
+    return points.map((p) => `<div class="gpoint" style="left:${Math.round(p.x * 200) - 20}rem;top:${Math.round(p.y * 200) - 20}rem"></div>`).join("");
+}
+
 function renderMapGrid() {
     const cols = GRID_COLS.map((c) => `<div class="gcol">${c}</div>`).join("");
     const rows = GRID_ROWS.map((r) => `<div class="grow-l">${r}</div>`).join("");
@@ -501,7 +524,7 @@ function renderMapGrid() {
             <div class="gtop"><div class="gcorner"></div>${cols}</div>
             <div class="gmid">
                 <div class="gleft">${rows}</div>
-                <div class="gmap" ${data.mapIcon ? `style="background-image:url(${data.mapIcon})"` : ""}>${cells}</div>
+                <div class="gmap ${gridClickable() ? "clickable" : ""}" id="gmap" ${data.mapIcon ? `style="background-image:url(${data.mapIcon})"` : ""} ${gridClickable() ? `data-tip="${esc(L("Klick: Stelle für alle markieren", "Click: mark a spot for everyone"))}"` : ""}>${cells}${renderGridPoints()}</div>
             </div>
         </div>`;
 }
@@ -907,6 +930,18 @@ document.addEventListener("mousemove", (e) => {
         tip.style.left = Math.min(e.clientX + 14, w - tw - 4) + "px";
         tip.style.top = (e.clientY + 18 + th > h ? e.clientY - th - 8 : e.clientY + 18) + "px";
     }
+});
+
+// commander: left click on the minimap = mark that spot for everyone (WG's MinimapGrid.setClick)
+document.addEventListener("mousedown", (e) => {
+    if (e.button !== 0 || !gridClickable()) return;
+    const map = document.getElementById("gmap");
+    if (!map || !closest(e.target, "id") || closest(e.target, "id") !== map) return;
+    const r = map.getBoundingClientRect();
+    const x = Math.max(0, Math.min(200, e.clientX - r.left - 1)) / 200;
+    const y = Math.max(0, Math.min(200, e.clientY - r.top - 1)) / 200;
+    e.preventDefault();
+    send({ action: "gridClick", x: x, y: y });
 });
 
 // right click on a player: WG's player context menu (opened by Python)

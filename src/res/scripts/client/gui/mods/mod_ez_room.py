@@ -80,6 +80,7 @@ class RoomBridge(object):
         self.times = {}      # as_*S name -> time.time() of the last call (seconds)
         self.title = None    # (isSortie, direction, resourceMultiplier) from _updateTitle
         self.minimap = {'texture': u'', 'points': []}  # what WG's lobby minimap got (as_*S of MinimapLobby)
+        self.grid = {'points': [], 'clickEnabled': False}  # commander markings (as_*S of MinimapGrid)
         self.window = None
         self.hidden = False
         self._pushPending = False
@@ -258,6 +259,31 @@ def _wrapMinimap(name, orig):
     return wrapper
 
 
+# WG's MinimapGrid in the room (commander clicks a spot, everyone gets an ATTENTIONTOCELL unit chat
+# command): record its points (WG grid px, 207 x 207) and whether clicking is allowed
+def _wrapGrid(name, orig):
+    def wrapper(self, *args):
+        result = orig(self, *args)
+        try:
+            bridge = _bridge
+            view = bridge.view if bridge is not None else None
+            if view is not None and getattr(view, '_StrongholdBattleRoom__minimapGrid', None) is self:
+                grid = bridge.grid
+                if name == 'as_addPointS':
+                    grid['points'] = [p for p in grid['points'] if time.time() - p['time'] < 10.0]
+                    grid['points'].append({'x': args[0], 'y': args[1], 'time': time.time()})
+                elif name == 'as_clearPointsS':
+                    grid['points'] = []
+                elif name == 'as_clickEnabledS':
+                    grid['clickEnabled'] = bool(args[0]) if args else False
+                bridge.changed()
+        except Exception:
+            _logger.exception('recording grid %s failed', name)
+        return result
+    wrapper.__name__ = name
+    return wrapper
+
+
 def _populate(self):
     global _bridge
     old = _bridge
@@ -341,6 +367,12 @@ try:
         setattr(MinimapLobby, _name, _wrapMinimap(_name, getattr(MinimapLobby, _name)))
 except Exception:
     _logger.exception('minimap hooks failed')
+try:
+    from gui.Scaleform.daapi.view.lobby.MinimapGrid import MinimapGrid
+    for _name in ('as_addPointS', 'as_clearPointsS', 'as_clickEnabledS'):
+        setattr(MinimapGrid, _name, _wrapGrid(_name, getattr(MinimapGrid, _name)))
+except Exception:
+    _logger.exception('grid hooks failed')
 StrongholdBattleRoom._populate = _populate
 StrongholdBattleRoomWindow._populate = _windowPopulate
 StrongholdBattleRoomWindow._dispose = _windowDispose

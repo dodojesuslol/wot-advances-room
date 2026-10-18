@@ -22,7 +22,7 @@ from helpers.i18n import makeString
 from adisp import adisp_process
 from skeletons.gui.impl import IGuiLoader
 
-__version__ = '0.7.22'
+__version__ = '0.7.23'
 _logger = logging.getLogger('EZ_ROOM')
 _logger.setLevel(logging.INFO)
 _LAYOUT_PATH = ('ez_room', 'views', 'EzRoomView')
@@ -496,6 +496,17 @@ def _actionButton(vo):
     return vo
 
 
+_GRID_SIZE = 207.0      # WG's MinimapGrid hit area (MinimapLobby.swf LobbyMinimapGrid.hitMc)
+_GRID_POINT_LIFE = 5.0  # WG's MinimapClick animation: 140 frames, about 5 s, then it removes itself
+
+
+def _packGrid(bridge, now):
+    grid = getattr(bridge, 'grid', None) or {}
+    points = [{'x': p['x'] / _GRID_SIZE, 'y': p['y'] / _GRID_SIZE, 'left': _GRID_POINT_LIFE - (now - p['time'])}
+              for p in grid.get('points') or [] if now - p['time'] < _GRID_POINT_LIFE]
+    return {'points': points, 'clickEnabled': bool(grid.get('clickEnabled'))}
+
+
 def _pack(bridge, frame=None, reserveSlot=-1, speakEvents=None):
     view = bridge.view
     calls = bridge.calls
@@ -535,6 +546,7 @@ def _pack(bridge, frame=None, reserveSlot=-1, speakEvents=None):
         'mapIcon': _mapIcon(room.get('mapID')),
         # WG minimap units: centre 0,0, 300 x 300 (MinimapLobby.build _normalizePoint)
         'minimapPoints': list(getattr(bridge, 'minimap', {}).get('points') or []),
+        'grid': _packGrid(bridge, now),
         'rally': first('as_updateRallyS', {}),
         'slots': slots,
         'candidates': candidates,
@@ -750,6 +762,12 @@ class EzRoomView(ViewImpl):
                 # commander's role buttons in the team rows (Artillerieschlag / Inspiration)
                 give = bool(args.get('give'))
                 _setEquipmentCommander(int(args.get('dbID')) if give else None, args.get('kind'))
+            elif action == 'gridClick':
+                # same as a click on WG's minimap grid: MinimapGrid.setClick(x, y) in its 207 px space
+                view = bridge.view
+                grid = getattr(view, '_StrongholdBattleRoom__minimapGrid', None) if view is not None else None
+                if grid is not None and bridge.grid.get('clickEnabled'):
+                    grid.setClick(float(args.get('x')) * _GRID_SIZE, float(args.get('y')) * _GRID_SIZE)
             elif action == 'back':
                 # same as WG's back link: StrongholdBattleRoomWindow.onBackClick -> leaves the unit
                 windowView = bridge.roomWindowView()
