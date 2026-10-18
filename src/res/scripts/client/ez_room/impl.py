@@ -22,7 +22,7 @@ from helpers.i18n import makeString
 from adisp import adisp_process
 from skeletons.gui.impl import IGuiLoader
 
-__version__ = '0.7.19'
+__version__ = '0.7.20'
 _logger = logging.getLogger('EZ_ROOM')
 _logger.setLevel(logging.INFO)
 _LAYOUT_PATH = ('ez_room', 'views', 'EzRoomView')
@@ -215,6 +215,33 @@ def _speaking(slots, candidates, events):
         if on:
             result.append(dbID)
     return result
+
+
+def _roleRights(view, slots):
+    # per player: may I give / take each role? Same checks as WG's context menu
+    # (UnitUserCMHandler._canGiveEquipmentCommander / _canTakeEquipmentCommander)
+    rights = {}
+    try:
+        from gui.prb_control.items.stronghold_items import BOOST_TYPE, SUPPORT_TYPE
+        entity = view.prbEntity
+        if not entity.getPermissions().canChangeExtraEquipmentRole():
+            return rights
+        for slot in slots:
+            player = slot.get('player') if isinstance(slot, dict) else None
+            dbID = player.get('dbID') if isinstance(player, dict) else None
+            if not dbID:
+                continue
+            pInfo = entity.getPlayerInfo(dbID=dbID)
+            if not pInfo.isInSlot:
+                continue
+            perms = entity.getPermissions(dbID=dbID)
+            r = {}
+            for kind, equipmentType in (('artillery', SUPPORT_TYPE), ('inspire', BOOST_TYPE)):
+                r[kind] = 'take' if perms.isEquipmentCommander(equipmentType) else 'give'
+            rights[str(dbID)] = r
+    except Exception:
+        _logger.exception('role rights failed')
+    return rights
 
 
 @adisp_process
@@ -510,6 +537,7 @@ def _pack(bridge, frame=None, reserveSlot=-1, speakEvents=None):
         'slots': slots,
         'candidates': candidates,
         'speaking': _speaking(slots, candidates, speakEvents or {}),
+        'roleRights': _roleRights(view, slots) if view is not None else {},
         'tableHeader': first('as_setTableHeaderS', []),
         'timer': timer,
         'timerAge': now - bridge.times.get('as_setTimerDeltaS', now),

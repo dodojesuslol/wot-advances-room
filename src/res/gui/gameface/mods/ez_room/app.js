@@ -249,7 +249,9 @@ function renderSlot(slot, idx) {
     const hasArt = role.indexOf("gunner") === 0;
     const hasIns = role.indexOf("nspire") !== -1;
     // shown on hover like Raus / kick; in the own row on hover left of "Verlassen" (.roleover)
-    const roleActs = p && canChangeRoles() ? roleButton(p.dbID, "artillery", hasArt) + roleButton(p.dbID, "inspire", hasIns) : "";
+    // only where WG's context menu would offer the item (data.roleRights from Python, WG's checks)
+    const rights = p ? (data.roleRights || {})[String(p.dbID)] : null;
+    const roleActs = rights ? `${rights.artillery ? roleButton(p.dbID, "artillery", rights.artillery === "take") : ""}${rights.inspire ? roleButton(p.dbID, "inspire", rights.inspire === "take") : ""}` : "";
     const roleIcons = p ? `${hasArt ? roleIcon("artillery") : ""}${hasIns ? roleIcon("inspire") : ""}` : "";
     let who;
     if (p) {
@@ -288,7 +290,7 @@ function renderSlot(slot, idx) {
             <div class="status">${slotStatus(slot)}</div>
             ${mine
                 ? `<div class="acts always">${roleActs ? `<div class="roleover">${roleActs}</div>` : ""}${acts.join("")}</div>`
-                : `<div class="acts">${roleActs}${acts.join("")}</div>`}
+                : roleActs || acts.length ? `<div class="acts">${roleActs}${acts.join("")}</div>` : ""}
         </div>`;
 }
 
