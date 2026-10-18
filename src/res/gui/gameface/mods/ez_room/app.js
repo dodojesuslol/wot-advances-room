@@ -82,8 +82,14 @@ function renderHeader() {
     const mine = txt(room.mineClanName);
     const enemy = txt(room.enemyClanName);
     const wait = txt(room.waitForBattleDescr);
+    // WG's direction graphic (as_setDirectionS: definition / attack0-5 / defense0-5), own row under
+    // the header with the clan names left and right; exported from fortCmp.swf (ConnectedDirectsUI)
+    const dir = data.direction && data.direction[0];
+    const showDir = !!dir && (mine || enemy);
     let center = "";
-    if (mine || enemy) {
+    if (showDir) {
+        center = "";
+    } else if (mine || enemy) {
         center = `
             <div class="vs">
                 <div class="clan mine ${ready[0] ? "ready" : ""}">${esc(mine)}</div>
@@ -101,12 +107,21 @@ function renderHeader() {
                 ${data.back && data.back.label ? `<div class="back" data-act="back" data-tip="${esc(data.back.tip)}">‹ ${esc(data.back.label)}</div>` : ""}
             </div>
             <div class="center">${center}</div>
+            ${showDir ? `<div class="hcenter"><div class="timer" id="timer">${esc(timerText())}</div></div>` : ""}
             ${renderReserves()}
             <div class="tools">
                 ${data.dev ? `<div class="btn ghost" data-act="raw">${ui.raw ? L("Raum", "Room") : L("Rohdaten", "Raw data")}</div>` : ""}
                 <div class="btn" data-act="hide">${L("Original", "Original")}</div>
             </div>
-        </div>`;
+        </div>
+        ${showDir ? `
+        <div class="dirrow">
+            <div class="clan mine ${ready[0] ? "ready" : ""}">${esc(mine)}</div>
+            ${data.readyDirections === false
+                ? `<div class="dirimg dirwait">${L("Richtungen werden ermittelt …", "Determining directions …")}</div>`
+                : `<div class="dirimg" style="background-image:url(img://gui/maps/icons/ez_room/direction/${esc(dir)}.png)"></div>`}
+            <div class="clan enemy ${ready[1] ? "ready" : ""}">${esc(enemy)}</div>
+        </div>` : ""}`;
 }
 
 // reserve slots (top right like in WG's room); click opens the list (data.reserveOptions)

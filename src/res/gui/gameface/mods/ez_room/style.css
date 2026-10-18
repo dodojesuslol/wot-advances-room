@@ -40,7 +40,11 @@ body {
     padding: 0 12rem;
     border-bottom: 1rem solid rgba(242, 138, 58, 0.45);
     background-image: linear-gradient(to bottom, rgba(40, 34, 28, 0.9), rgba(21, 21, 21, 0.6));
+    position: relative;
 }
+/* timer exactly in the middle of the header while the direction row shows the clans */
+.hcenter { position: absolute; left: 50%; top: 0; bottom: 0; width: 140rem; margin-left: -70rem; display: flex; align-items: center; justify-content: center; }
+.hcenter .timer { margin: 0; }
 .titles { flex-grow: 1; width: 0; min-width: 0; overflow: hidden; }
 .title { font-size: 18rem; font-weight: bold; color: #eeede9; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sub { font-size: 11rem; color: rgba(233, 231, 220, 0.55); margin-top: 2rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -66,6 +70,19 @@ body {
 }
 .timer.alert { border-color: #ff7f00; background-color: rgba(60, 18, 0, 0.85); }
 .wait { color: rgba(233, 231, 220, 0.7); font-size: 13rem; }
+
+/* direction row (WG's ConnectedDirectsUI frames, 820x128 exported at 2x) */
+.dirrow {
+    height: 72rem;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-bottom: 1rem solid rgba(242, 138, 58, 0.25);
+    background-color: rgba(21, 21, 21, 0.6);
+}
+.dirimg { width: 410rem; height: 64rem; margin: 0 14rem; background-size: 410rem 64rem; background-repeat: no-repeat; }
+.dirwait { display: flex; align-items: center; justify-content: center; color: rgba(233, 231, 220, 0.7); font-size: 13rem; }
 
 .btn {
     margin-left: 6rem;
@@ -135,7 +152,7 @@ body {
 .slot {
     display: flex;
     align-items: center;
-    height: 27rem;
+    height: 22rem;
     margin-bottom: 2rem;
     padding-right: 8rem;
     background-color: rgba(255, 255, 255, 0.035);
