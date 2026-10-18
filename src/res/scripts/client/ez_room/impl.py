@@ -22,7 +22,7 @@ from helpers.i18n import makeString
 from adisp import adisp_process
 from skeletons.gui.impl import IGuiLoader
 
-__version__ = '0.7.27'
+__version__ = '0.7.28'
 _logger = logging.getLogger('EZ_ROOM')
 _logger.setLevel(logging.INFO)
 _LAYOUT_PATH = ('ez_room', 'views', 'EzRoomView')
@@ -790,6 +790,8 @@ class EzRoomView(ViewImpl):
                 component = _chatComponent(bridge)
                 if text and component is not None:
                     component.sendMessage(text.encode('utf-8') if isinstance(text, unicode) else text)
+            elif action == 'contextMenuName':
+                self._contextMenuByName(args.get('name') or u'')
             elif action == 'contextMenu':
                 self._contextMenu(int(args.get('dbID')))
             elif action == 'chooseVehicle':
@@ -840,6 +842,41 @@ class EzRoomView(ViewImpl):
                 bridge.call('assignSlotRequest', slotIdx, dbID)
                 return
         _logger.info('no free slot for %s', dbID)
+
+    def _contextMenuByName(self, name):
+        # chat author: a player in the room gets the room menu (UNIT_USER), anyone else WG's normal
+        # player menu (BASE_USER) with the dbID from the messenger's user storage
+        if not name:
+            return
+        bridge = self._bridge
+        view = bridge.view
+        if view is None:
+            return
+        members = bridge.calls.get('as_setMembersS')
+        players = [slot.get('player') for slot in (members[1] if members and len(members) > 1 else ()) if isinstance(slot, dict)]
+        dp = getattr(view, '_candidatesDP', None)
+        players += [item for item in (dp.collection if dp is not None else ()) if isinstance(item, dict)]
+        for player in players:
+            if player and _u(player.get('userName') or u'') == name and player.get('dbID'):
+                self._contextMenu(player['dbID'])
+                return
+        try:
+            from messenger.storage import MessengerStorageDescriptor, UsersStorage
+            users = MessengerStorageDescriptor(UsersStorage).get()
+            user = next((u for u in users.all() if _u(u.getName() or u'') == name), None)
+            if user is None:
+                _logger.info('chat menu: %s not found', name)
+                return
+            if user.isCurrentPlayer():
+                return
+            from gui.impl.backport import BackportContextMenuWindow
+            from gui.impl.backport.backport_context_menu import createContextMenuData
+            from gui.Scaleform.genConsts.CONTEXT_MENU_HANDLER_TYPE import CONTEXT_MENU_HANDLER_TYPE
+            vo = {'dbID': user.getID(), 'userName': user.getName()}
+            window = BackportContextMenuWindow(createContextMenuData(CONTEXT_MENU_HANDLER_TYPE.BASE_USER, vo), self.getParentWindow())
+            window.load()
+        except Exception:
+            _logger.exception('chat menu failed')
 
     def _contextMenu(self, dbID):
         # WG's player menu (UNIT_USER), opened the way WG's Gameface platoon view does it, with

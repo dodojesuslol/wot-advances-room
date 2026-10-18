@@ -495,6 +495,7 @@ function smileys(text) {
 function chatHtml(line) {
     let out = "";
     let open = 0;
+    let first = true; // WG's first <font> is the author: right click opens WG's player menu (E5)
     String(line || "")
         .replace(/<br\s*\/?>/gi, " ")
         .split(/(<[^>]*>)/)
@@ -505,7 +506,12 @@ function chatHtml(line) {
                 return;
             }
             const m = /^<font\b[^>]*color\s*=\s*['"]?(#[0-9a-fA-F]{6})/i.exec(part);
-            if (m) {
+            if (m && first) {
+                first = false;
+                const name = (/^<font\b[^>]*>([^<]*)<\/font>/i.exec(String(line).slice(String(line).indexOf(part))) || [])[1] || "";
+                out += `<span class="cname" data-chatname="${esc(name.replace(/&nbsp;/g, " ").trim())}" style="color:${m[1]}">`;
+                open++;
+            } else if (m) {
                 out += `<span style="color:${m[1]}">`;
                 open++;
             } else if (/^<font\b/i.test(part)) {
@@ -1022,6 +1028,17 @@ document.addEventListener("mousedown", (e) => {
     const y = Math.max(0, Math.min(200, e.clientY - r.top - 1)) / 200;
     e.preventDefault();
     send({ action: "gridClick", x: x, y: y });
+});
+
+// right click on an author name in the chat: WG's player menu for that name (Python finds the player)
+document.addEventListener("mousedown", (e) => {
+    if (e.button !== 2) return;
+    const el = closest(e.target, "data-chatname");
+    if (!el) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const name = el.getAttribute("data-chatname");
+    if (name) send({ action: "contextMenuName", name: name });
 });
 
 // right click on a player: WG's player context menu (opened by Python)

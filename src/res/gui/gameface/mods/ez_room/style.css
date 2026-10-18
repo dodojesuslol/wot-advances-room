@@ -515,3 +515,6 @@ body {
     font-size: 12rem;
     pointer-events: none;
 }
+
+/* chat author: right click = WG's player menu */
+.cname { cursor: pointer; }
