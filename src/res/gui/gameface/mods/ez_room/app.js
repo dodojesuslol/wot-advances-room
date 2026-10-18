@@ -186,6 +186,7 @@ function renderCandidates() {
                   return `
                     <div data-user="${p.dbID}" class="cand ${p.isOffline ? "offline" : ""} ${own ? "own" : ""} ${pick ? "pickable" : ""} ${ui.selCand === p.dbID ? "sel" : ""}" ${pick ? `data-cand="${p.dbID}" data-tip="${esc(L("Klick: nächster freier Platz · Ziehen: auf einen Platz", "Click: next free slot · Drag: onto a slot"))}"` : ""}>
                         ${p.isInvite ? `<div class="inv" title="invited"></div>` : ""}
+                        ${p.statusIcon ? `<div class="ustatus" style="background-image:url(${img(p.statusIcon)})"></div>` : ""}
                         <div class="name ${speaking(p.dbID) ? "speak" : ""}" ${c ? `style="color:${c}"` : ""}>${esc(p.userName || p.fullName)}</div>
                         <div class="rating">${esc(p.rating || "")}</div>
                         ${isCommander() && !own ? `<div class="acts">${kickButton(p.dbID)}</div>` : ""}

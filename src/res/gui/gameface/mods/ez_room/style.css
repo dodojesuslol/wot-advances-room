@@ -148,6 +148,8 @@ body {
 .sthumb:hover { background-color: rgba(242, 138, 58, 0.8); }
 .cand { display: flex; align-items: center; height: 24rem; padding: 0 10rem; }
 .cgroup { padding: 8rem 10rem 3rem; color: rgba(233, 231, 220, 0.45); font-size: 11rem; text-transform: uppercase; }
+/* WG's user status (statusIcon: library/userStatus/small online / busy / offline, 24x24) */
+.ustatus { width: 16rem; height: 16rem; margin-right: 4rem; margin-left: -4rem; flex-shrink: 0; background-size: 16rem 16rem; background-repeat: no-repeat; }
 .inv { width: 6rem; height: 6rem; margin-right: 6rem; border-radius: 3rem; background-color: #4f9fe0; flex-shrink: 0; }
 .cand:hover { background-color: rgba(255, 255, 255, 0.05); }
 /* speaking in WG's voice chat: WG's VoiceWaves (Voice.swf, "show" end frame, 100x20 behind the name) */
