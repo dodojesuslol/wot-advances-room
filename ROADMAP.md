@@ -1,6 +1,6 @@
 # EZ ROOM – Roadmap: Funktionsgleichheit mit dem WG-Original
 
-Stand: v0.7.21 (2026-10-18). Ziel: Jede Funktion des Flash-Raums (`fortClanBattleRoom.swf` + `fortBattleRoomWindow.swf`)
+Stand: v0.7.22 (2026-10-18). Ziel: Jede Funktion des Flash-Raums (`fortClanBattleRoom.swf` + `fortBattleRoomWindow.swf`)
 einzeln mit dem Original vergleichen und alles, was fehlt, nachbauen. Zum Vergleich in einem echten Raum über den
 „Original“-Button umschalten (Esc / Mods-Button bringt die neue Oberfläche zurück).
 
@@ -76,7 +76,7 @@ Legende: ✅ vorhanden · 🟡 teilweise · ❌ fehlt · 🚫 bewusst weggelasse
 |---|---|---|---|
 | D1 | Kartenname / „Zufallskarte“ (mit Würfel-Grafik) | 🟡 | Name da, Würfel-Grafik fehlt |
 | D2 | Minimap-Bild mit Raster A–K / 1–0 | ✅ | v0.7.12 (Raster 10 feste Zeilen, border-box; 0.7.11 brach in Gameface nach 9 Feldern um), im Spiel bestätigt: echte quadratische Minikarte `gui/maps/icons/map/<geometry>.png` (300×300; vorher fälschlich map/stats = 500×235 Landschaftsbild), Raster in festen px (200×200, Felder 20×20), mittig. WGs eigener Pfad (`MinimapLobby._resilientMapIconPathGetter`: map/<gameplay>/c_<geometry>) existiert im Client nicht |
-| D3 | Basen / Startpunkte auf der Minimap (`MinimapLobby.setArena`, `setPlayerTeam`) | ❌ | |
+| D3 | Basen / Startpunkte auf der Minimap (`MinimapLobby.setArena`, `setPlayerTeam`) | 🟡 | v0.7.22: Daten da (Hooks auf `MinimapLobby.as_clearS/as_changeMapS/as_addPointS/as_addPoiS` der Raum-Minimap → `data.minimapPoints`, WG-Einheiten: Mitte 0,0, 300×300). Anzeige fehlt: wartet auf Screenshot der Original-Minimap (Markergröße, y-Richtung) |
 | D4 | **Minimap-Markierungen des Kommandanten** (`MinimapGrid`, eigener Chat-Kanal) | ❌ | Kommandant klickt Planquadrate, alle sehen sie |
 
 ## E. Chat

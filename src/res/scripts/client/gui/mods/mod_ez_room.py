@@ -79,6 +79,7 @@ class RoomBridge(object):
         self.slotCalls = {}  # as_*S name -> {slotIdx: args}
         self.times = {}      # as_*S name -> time.time() of the last call (seconds)
         self.title = None    # (isSortie, direction, resourceMultiplier) from _updateTitle
+        self.minimap = {'texture': u'', 'points': []}  # what WG's lobby minimap got (as_*S of MinimapLobby)
         self.window = None
         self.hidden = False
         self._pushPending = False
@@ -222,6 +223,41 @@ _origDispose = StrongholdBattleRoom._dispose
 _origUpdateTitle = StrongholdBattleRoom._updateTitle
 
 
+# WG's lobby minimap in the room (MinimapLobby.build): record exactly what Flash gets for the
+# room's own minimap instance (bases, spawns, control points, points of interest)
+def _roomMinimapBridge(minimap):
+    bridge = _bridge
+    view = bridge.view if bridge is not None else None
+    if view is not None and getattr(view, '_StrongholdBattleRoom__minimap', None) is minimap:
+        return bridge
+    return None
+
+
+def _wrapMinimap(name, orig):
+    def wrapper(self, *args):
+        result = orig(self, *args)
+        try:
+            bridge = _roomMinimapBridge(self)
+            if bridge is not None:
+                mm = bridge.minimap
+                if name == 'as_clearS':
+                    mm['points'] = []
+                elif name == 'as_changeMapS':
+                    mm['texture'] = args[0] if args else u''
+                elif name == 'as_addPointS':
+                    x, y, kind, color, number = args
+                    mm['points'].append({'x': x, 'y': y, 'type': kind, 'color': color, 'id': number})
+                elif name == 'as_addPoiS':
+                    x, y, kind, number = args
+                    mm['points'].append({'x': x, 'y': y, 'type': 'poi', 'poi': kind, 'id': number})
+                bridge.changed()
+        except Exception:
+            _logger.exception('recording minimap %s failed', name)
+        return result
+    wrapper.__name__ = name
+    return wrapper
+
+
 def _populate(self):
     global _bridge
     old = _bridge
@@ -299,6 +335,12 @@ def _registerModsList():
 for _name in dir(StrongholdBattleRoom):
     if _name.startswith('as_') and _name.endswith('S') and _name not in _SKIP:
         setattr(StrongholdBattleRoom, _name, _wrapCall(_name, getattr(StrongholdBattleRoom, _name)))
+try:
+    from gui.Scaleform.daapi.view.lobby.MinimapLobby import MinimapLobby
+    for _name in ('as_clearS', 'as_changeMapS', 'as_addPointS', 'as_addPoiS'):
+        setattr(MinimapLobby, _name, _wrapMinimap(_name, getattr(MinimapLobby, _name)))
+except Exception:
+    _logger.exception('minimap hooks failed')
 StrongholdBattleRoom._populate = _populate
 StrongholdBattleRoomWindow._populate = _windowPopulate
 StrongholdBattleRoomWindow._dispose = _windowDispose

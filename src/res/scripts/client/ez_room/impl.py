@@ -22,7 +22,7 @@ from helpers.i18n import makeString
 from adisp import adisp_process
 from skeletons.gui.impl import IGuiLoader
 
-__version__ = '0.7.21'
+__version__ = '0.7.22'
 _logger = logging.getLogger('EZ_ROOM')
 _logger.setLevel(logging.INFO)
 _LAYOUT_PATH = ('ez_room', 'views', 'EzRoomView')
@@ -533,6 +533,8 @@ def _pack(bridge, frame=None, reserveSlot=-1, speakEvents=None):
         'me': _me(view) if view is not None else {},
         'room': room,
         'mapIcon': _mapIcon(room.get('mapID')),
+        # WG minimap units: centre 0,0, 300 x 300 (MinimapLobby.build _normalizePoint)
+        'minimapPoints': list(getattr(bridge, 'minimap', {}).get('points') or []),
         'rally': first('as_updateRallyS', {}),
         'slots': slots,
         'candidates': candidates,
