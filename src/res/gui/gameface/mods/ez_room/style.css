@@ -150,6 +150,8 @@ body {
 .cgroup { padding: 8rem 10rem 3rem; color: rgba(233, 231, 220, 0.45); font-size: 11rem; text-transform: uppercase; }
 .inv { width: 6rem; height: 6rem; margin-right: 6rem; border-radius: 3rem; background-color: #4f9fe0; flex-shrink: 0; }
 .cand:hover { background-color: rgba(255, 255, 255, 0.05); }
+/* speaking in WG's voice chat: WG's VoiceWaves (Voice.swf, "show" end frame, 100x20 behind the name) */
+.name.speak { background-image: url(img://gui/maps/icons/ez_room/speaking.png); background-size: 100rem 20rem; background-repeat: no-repeat; background-position: left center; }
 .cand .name { flex-grow: 1; width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .cand .rating { color: rgba(233, 231, 220, 0.5); font-size: 11rem; margin-left: 6rem; }
 .offline { opacity: 0.45; }

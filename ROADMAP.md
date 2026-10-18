@@ -1,6 +1,6 @@
 # EZ ROOM – Roadmap: Funktionsgleichheit mit dem WG-Original
 
-Stand: v0.7.17 (2026-10-18). Ziel: Jede Funktion des Flash-Raums (`fortClanBattleRoom.swf` + `fortBattleRoomWindow.swf`)
+Stand: v0.7.18 (2026-10-18). Ziel: Jede Funktion des Flash-Raums (`fortClanBattleRoom.swf` + `fortBattleRoomWindow.swf`)
 einzeln mit dem Original vergleichen und alles, was fehlt, nachbauen. Zum Vergleich in einem echten Raum über den
 „Original“-Button umschalten (Esc / Mods-Button bringt die neue Oberfläche zurück).
 
@@ -38,7 +38,7 @@ Legende: ✅ vorhanden · 🟡 teilweise · ❌ fehlt · 🚫 bewusst weggelasse
 | B2 | Spalten Clan / Name / Wertung / Panzer, sortierbar | ✅ | eigene Erweiterung (v0.7.0) |
 | B3 | Platznummer, Spielername in WG-Farbe, eigener Name hervorgehoben | ✅ | |
 | B4 | Status-Icon pro Spieler (bereit / nicht bereit / im Gefecht) | 🟡 | eigene Punkte; seit v0.7.10 ganze Zeile grün bei „bereit“ (Nutzerwunsch, im Spiel bestätigt); WG-Icons fehlen |
-| B5 | **Sprach-Indikator** (Spieler spricht gerade, `isPlayerSpeaking`) | ❌ | |
+| B5 | **Sprach-Indikator** (Spieler spricht gerade, `isPlayerSpeaking`) | 🟡 | v0.7.18 (im Spiel testen): WGs VoiceWaves (`Voice.swf` Sprite 38, Endbild von „show“, rotes Mute-X entfernt) 100×20 hinter dem Namen, Team + Freiwillige; live über `g_messengerEvents.voip.onPlayerSpeaking`, Startwert `voipController.isPlayerSpeaking`. Nur WoT-Voice-Chat, nicht Discord |
 | B6 | Abzeichen (Badge) vor dem Namen (`badgeVisualVO`) | ❌ | |
 | B7 | Kommandanten-Icon | 🟡 | eigene Raute statt WG-Icon |
 | B8 | Rollen-Icons Richtschütze / Inspiration (`roleIcon`, `gunnerIcon0-14`) | ❌ | |

@@ -21,7 +21,7 @@ from helpers import dependency, getClientLanguage
 from helpers.i18n import makeString
 from skeletons.gui.impl import IGuiLoader
 
-__version__ = '0.7.17'
+__version__ = '0.7.18'
 _logger = logging.getLogger('EZ_ROOM')
 _logger.setLevel(logging.INFO)
 _LAYOUT_PATH = ('ez_room', 'views', 'EzRoomView')
@@ -185,6 +185,35 @@ def _backLink():
     except Exception:
         _logger.exception('back link text failed')
         return {'label': u'', 'tip': u''}
+
+
+def _speaking(slots, candidates, events):
+    # dbIDs speaking in WG's voice chat: WG's own check (VOIPChatController.isPlayerSpeaking, False
+    # while voice chat is off) overridden by the live onPlayerSpeaking events seen since opening
+    ids = set()
+    for slot in slots:
+        player = slot.get('player') if isinstance(slot, dict) else None
+        if isinstance(player, dict) and player.get('dbID'):
+            ids.add(player['dbID'])
+    for cand in candidates:
+        if isinstance(cand, dict) and cand.get('dbID'):
+            ids.add(cand['dbID'])
+    isSpeaking = None
+    try:
+        from messenger.m_constants import PROTO_TYPE
+        from messenger.proto import proto_getter
+        isSpeaking = proto_getter(PROTO_TYPE.BW_CHAT2)(None).voipController.isPlayerSpeaking
+    except Exception:
+        _logger.exception('voip controller lookup failed')
+    result = []
+    for dbID in ids:
+        try:
+            on = events[dbID] if dbID in events else bool(isSpeaking and isSpeaking(dbID))
+        except Exception:
+            on = False
+        if on:
+            result.append(dbID)
+    return result
 
 
 def _mapIcon(mapID):
@@ -423,7 +452,7 @@ def _actionButton(vo):
     return vo
 
 
-def _pack(bridge, frame=None, reserveSlot=-1):
+def _pack(bridge, frame=None, reserveSlot=-1, speakEvents=None):
     view = bridge.view
     calls = bridge.calls
     first = lambda name, default=None: calls[name][0] if name in calls and calls[name] else default
@@ -463,6 +492,7 @@ def _pack(bridge, frame=None, reserveSlot=-1):
         'rally': first('as_updateRallyS', {}),
         'slots': slots,
         'candidates': candidates,
+        'speaking': _speaking(slots, candidates, speakEvents or {}),
         'tableHeader': first('as_setTableHeaderS', []),
         'timer': timer,
         'timerAge': now - bridge.times.get('as_setTimerDeltaS', now),
@@ -526,6 +556,7 @@ class EzRoomView(ViewImpl):
         self._tracking = False
         self._loggedRect = False
         self._reserveSlot = -1  # reserve slot whose list is open
+        self._speakEvents = {}  # dbID -> bool from g_messengerEvents.voip.onPlayerSpeaking
 
     @property
     def viewModel(self):
@@ -535,6 +566,11 @@ class EzRoomView(ViewImpl):
         super(EzRoomView, self)._onLoading(*args, **kwargs)
         if DEV:
             self.viewModel.setDev(_devUI())
+        try:
+            from messenger.proto.events import g_messengerEvents
+            g_messengerEvents.voip.onPlayerSpeaking += self.__onPlayerSpeaking
+        except Exception:
+            _logger.exception('voip subscribe failed')
         self.onRoomChanged()
         # move only after the window is loaded (like WG's OfferBannerWindow: load(), then move)
         self._tracking = True
@@ -573,6 +609,11 @@ class EzRoomView(ViewImpl):
     def _finalize(self):
         self._tracking = False
         try:
+            from messenger.proto.events import g_messengerEvents
+            g_messengerEvents.voip.onPlayerSpeaking -= self.__onPlayerSpeaking
+        except Exception:
+            _logger.exception('voip unsubscribe failed')
+        try:
             bridge = self._bridge
             window = bridge.window
             if window is not None and window.content in (None, self):
@@ -584,9 +625,14 @@ class EzRoomView(ViewImpl):
             _logger.exception('finalize failed')
         super(EzRoomView, self)._finalize()
 
+    def __onPlayerSpeaking(self, accountDBID, isSpeak):
+        # same live event WG's voice chat manager forwards to Flash (as_onPlayerSpeakS)
+        self._speakEvents[accountDBID] = bool(isSpeak)
+        self.onRoomChanged()
+
     def onRoomChanged(self):
         try:
-            data = _pack(self._bridge, self._frame, self._reserveSlot)
+            data = _pack(self._bridge, self._frame, self._reserveSlot, self._speakEvents)
             self.viewModel.setData(json.dumps(data))
         except Exception:
             _logger.exception('packing room data failed')

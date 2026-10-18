@@ -76,6 +76,11 @@ function kickButton(dbID) {
 
 // --- parts -----------------------------------------------------------------------
 
+// WG's voice chat: player is speaking right now (data.speaking = dbIDs, live from Python)
+function speaking(dbID) {
+    return (data.speaking || []).indexOf(dbID) >= 0;
+}
+
 function renderHeader() {
     const room = data.room || {};
     const ready = data.readyStatus || [];
@@ -181,7 +186,7 @@ function renderCandidates() {
                   return `
                     <div data-user="${p.dbID}" class="cand ${p.isOffline ? "offline" : ""} ${own ? "own" : ""} ${pick ? "pickable" : ""} ${ui.selCand === p.dbID ? "sel" : ""}" ${pick ? `data-cand="${p.dbID}" data-tip="${esc(L("Klick: nächster freier Platz · Ziehen: auf einen Platz", "Click: next free slot · Drag: onto a slot"))}"` : ""}>
                         ${p.isInvite ? `<div class="inv" title="invited"></div>` : ""}
-                        <div class="name" ${c ? `style="color:${c}"` : ""}>${esc(p.userName || p.fullName)}</div>
+                        <div class="name ${speaking(p.dbID) ? "speak" : ""}" ${c ? `style="color:${c}"` : ""}>${esc(p.userName || p.fullName)}</div>
                         <div class="rating">${esc(p.rating || "")}</div>
                         ${isCommander() && !own ? `<div class="acts">${kickButton(p.dbID)}</div>` : ""}
                     </div>`;
@@ -246,7 +251,7 @@ function renderSlot(slot, idx) {
             <div class="clan">${esc(p.clanAbbrev ? "[" + p.clanAbbrev + "]" : "")}</div>
             <div class="who">
                 ${p.isCommander ? `<div class="crown" title="commander"></div>` : ""}
-                <div class="name ${own ? "own" : ""} ${p.isOffline ? "offline" : ""}" ${c ? `style="color:${c}"` : ""}>${esc(p.userName || p.fullName)}</div>
+                <div class="name ${own ? "own" : ""} ${p.isOffline ? "offline" : ""} ${speaking(p.dbID) ? "speak" : ""}" ${c ? `style="color:${c}"` : ""}>${esc(p.userName || p.fullName)}</div>
                 ${slot.isLegionaries ? `<div class="tag leg">${L("Legionär", "Legionnaire")}</div>` : ""}
             </div>`;
     } else {
