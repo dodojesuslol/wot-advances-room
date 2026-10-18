@@ -98,6 +98,7 @@ function renderHeader() {
             <div class="titles">
                 <div class="title">${esc(data.title || L("Vorstoß", "Advance"))}</div>
                 <div class="sub">${esc(txt(room.headerDescr))}</div>
+                ${data.back && data.back.label ? `<div class="back" data-act="back" data-tip="${esc(data.back.tip)}">‹ ${esc(data.back.label)}</div>` : ""}
             </div>
             <div class="center">${center}</div>
             ${renderReserves()}
@@ -685,7 +686,7 @@ document.addEventListener("click", (e) => {
         render();
     } else if (act === "chatSend") sendChat();
     else if (act === "chooseVehicle") send({ action: "chooseVehicle", cd: Number(el.getAttribute("data-cd")) || 0 });
-    else if (act === "ready" || act === "invite" || act === "toggleOpen" || act === "configure") send({ action: act });
+    else if (act === "ready" || act === "invite" || act === "toggleOpen" || act === "configure" || act === "back") send({ action: act });
 });
 
 // commander: click a volunteer = WG puts him into the next free allowed slot (Python picks it),

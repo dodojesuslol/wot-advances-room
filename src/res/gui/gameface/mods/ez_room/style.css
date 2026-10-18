@@ -44,6 +44,8 @@ body {
 .titles { flex-grow: 1; width: 0; min-width: 0; overflow: hidden; }
 .title { font-size: 18rem; font-weight: bold; color: #eeede9; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .sub { font-size: 11rem; color: rgba(233, 231, 220, 0.55); margin-top: 2rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.back { display: inline-block; font-size: 11rem; color: #ffe4c0; margin-top: 3rem; white-space: nowrap; cursor: pointer; }
+.back:hover { color: #f28a3a; }
 .center { flex-shrink: 0; display: flex; justify-content: center; margin: 0 10rem; }
 .tools { flex-shrink: 0; display: flex; justify-content: flex-end; margin-left: 4rem; }
 

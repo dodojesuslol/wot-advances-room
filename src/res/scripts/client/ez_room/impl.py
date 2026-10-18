@@ -15,12 +15,13 @@ from gui.impl.pub import ViewImpl
 from gui.impl.pub.window_impl import WindowImpl
 from gui.Scaleform.daapi.view.lobby.rally import vo_converters
 from gui.Scaleform.locale.FORTIFICATIONS import FORTIFICATIONS
+from gui.Scaleform.locale.TOOLTIPS import TOOLTIPS
 from gui.shared.utils.functions import getArenaGeometryName
 from helpers import dependency, getClientLanguage
 from helpers.i18n import makeString
 from skeletons.gui.impl import IGuiLoader
 
-__version__ = '0.7.13'
+__version__ = '0.7.14'
 _logger = logging.getLogger('EZ_ROOM')
 _logger.setLevel(logging.INFO)
 _LAYOUT_PATH = ('ez_room', 'views', 'EzRoomView')
@@ -173,6 +174,17 @@ def _title(bridge):
     except Exception:
         _logger.exception('title failed')
         return u''
+
+
+def _backLink():
+    # WG's back link (FortClanBattleRoom.backBtn): label in normal case from the tooltip header
+    # (#fortifications:sortie/room/leaveBtn is all caps), tooltip body explains that it leaves the unit
+    try:
+        return {'label': _u(makeString(TOOLTIPS.FORTIFICATION_SORTIE_BATTLEROOM_LEAVEBTN_HEADER)),
+                'tip': _u(makeString(TOOLTIPS.FORTIFICATION_SORTIE_BATTLEROOM_LEAVEBTN_BODY))}
+    except Exception:
+        _logger.exception('back link text failed')
+        return {'label': u'', 'tip': u''}
 
 
 def _mapIcon(mapID):
@@ -444,6 +456,7 @@ def _pack(bridge, frame=None, reserveSlot=-1):
         'lang': _lang(),
         'dev': bool(DEV),
         'title': _title(bridge),
+        'back': _backLink(),
         'me': _me(view) if view is not None else {},
         'room': room,
         'mapIcon': _mapIcon(room.get('mapID')),
@@ -640,6 +653,11 @@ class EzRoomView(ViewImpl):
                 self._contextMenu(int(args.get('dbID')))
             elif action == 'chooseVehicle':
                 self._chooseVehicle(int(args.get('cd') or 0))
+            elif action == 'back':
+                # same as WG's back link: StrongholdBattleRoomWindow.onBackClick -> leaves the unit
+                windowView = bridge.roomWindowView()
+                if windowView is not None:
+                    windowView.onBackClick()
             elif action == 'invite':
                 _whileWgWindow(bridge, lambda: bridge.call('inviteFriendRequest'))
             elif action == 'configure':
