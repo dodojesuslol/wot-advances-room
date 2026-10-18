@@ -801,8 +801,18 @@ let chatDraft = "";
 let chatFocus = false;
 let chatStick = true; // keep the chat scrolled to the newest line
 
+// small EZ ROOM button over WG's title bar while the original room is shown (data.mini)
+function renderMini() {
+    return `<div class="mini" data-act="restore" data-tip="${esc(L("Zurück zur EZ-ROOM-Oberfläche", "Back to the EZ ROOM view"))}">EZ ROOM</div>`;
+}
+
 function render() {
     applyFrame();
+    document.body.className = data.mini ? "minibody" : "";
+    if (data.mini) {
+        document.getElementById("root").innerHTML = renderMini();
+        return;
+    }
     lastKey = changeKey(data);
     const root = document.getElementById("root");
     const input = document.getElementById("chatinput");
@@ -980,7 +990,7 @@ document.addEventListener("click", (e) => {
         render();
     } else if (act === "chatSend") sendChat();
     else if (act === "chooseVehicle") send({ action: "chooseVehicle", cd: Number(el.getAttribute("data-cd")) || 0 });
-    else if (act === "ready" || act === "invite" || act === "toggleOpen" || act === "configure" || act === "back") send({ action: act });
+    else if (act === "ready" || act === "invite" || act === "toggleOpen" || act === "configure" || act === "back" || act === "restore") send({ action: act });
 });
 
 // commander: click a volunteer = WG puts him into the next free allowed slot (Python picks it),

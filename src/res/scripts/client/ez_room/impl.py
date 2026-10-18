@@ -20,7 +20,7 @@ from helpers.i18n import makeString
 from adisp import adisp_process
 from skeletons.gui.impl import IGuiLoader
 
-__version__ = '0.7.33'
+__version__ = '0.7.34'
 _logger = logging.getLogger('EZ_ROOM')
 _logger.setLevel(logging.INFO)
 _LAYOUT_PATH = ('ez_room', 'views', 'EzRoomView')
@@ -107,7 +107,16 @@ def _roomRect(bridge):
     return None
 
 
+_MINI_W, _MINI_H = 96, 22
+
+
 def _frame(roomRect, config):
+    if (config or {}).get('mini'):
+        # small button in the middle of WG's title bar (the title text is on the left, the window
+        # buttons on the right)
+        x, y = roomRect[0], roomRect[1]
+        dx, dy = _CONTENT_OFFSET[0], 7
+        return (int(round(x + dx + (_ROOM_W - _MINI_W) / 2.0)), int(round(y + dy)), _MINI_W, _MINI_H)
     # overlay rect = room content of WG's window. as_getGeometryS gives the window's top-left
     # (incl. its shadow) and -1 as size; the content starts 12 px right / 35 px down (measured
     # in game, title bar above stays WG's) and is 1013 x 653 (fortClanBattleRoom.swf).
@@ -692,6 +701,12 @@ class EzRoomView(ViewImpl):
             g_messengerEvents.voip.onPlayerSpeaking -= self.__onPlayerSpeaking
         except Exception:
             _logger.exception('voip unsubscribe failed')
+        if self._config.get('mini'):
+            bridge = self._bridge
+            if getattr(bridge, 'miniWindow', None) is not None and bridge.miniWindow.content in (None, self):
+                bridge.miniWindow = None
+            super(EzRoomView, self)._finalize()
+            return
         try:
             bridge = self._bridge
             window = bridge.window
@@ -710,6 +725,14 @@ class EzRoomView(ViewImpl):
         self.onRoomChanged()
 
     def onRoomChanged(self):
+        if self._config.get('mini'):
+            # the button only needs its size and the language
+            try:
+                self.viewModel.setData(json.dumps({'mini': True, 'frame': list(self._frame) if self._frame else None,
+                                                   'lang': _lang(), 'version': __version__}))
+            except Exception:
+                _logger.exception('packing button data failed')
+            return
         try:
             data = _pack(self._bridge, self._frame, self._reserveSlot, self._speakEvents)
             self.viewModel.setData(json.dumps(data))
@@ -738,7 +761,14 @@ class EzRoomView(ViewImpl):
         try:
             bridge = self._bridge
             if action == 'hide':
-                bridge.close(hide=True)
+                # "Original" / Esc: WG's room, with the small EZ ROOM button to come back
+                if hasattr(bridge, 'showOriginal'):
+                    bridge.showOriginal()
+                else:
+                    bridge.close(hide=True)
+            elif action == 'restore':
+                # the small EZ ROOM button: overlay back (next tick: opening closes this button's own window)
+                BigWorld.callback(0.0, lambda: bridge.open(manual=True))
             elif action == 'takeSlot':
                 bridge.call('assignSlotRequest', int(args.get('slot')), -1)
             elif action == 'assign':
@@ -1016,6 +1046,19 @@ def _layoutID():
         _logger.error('layout %s not registered', '.'.join(_LAYOUT_PATH))
         return None
     return resID
+
+
+def openMini(bridge, devConfig=None):
+    # small EZ ROOM button over WG's title bar while the original room is shown
+    layoutID = _layoutID()
+    if layoutID is None or _roomWindowView(bridge) is None:
+        return None
+    config = dict(devConfig or {}, mini=True)
+    config.pop('offset', None)
+    window = EzRoomWindow(layoutID, bridge, WindowLayer.FULLSCREEN_WINDOW, config)
+    window.load()
+    _logger.info('EZ ROOM button shown')
+    return window
 
 
 def openOverlay(bridge, devConfig=None):

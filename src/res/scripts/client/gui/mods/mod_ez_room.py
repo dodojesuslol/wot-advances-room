@@ -81,6 +81,7 @@ class RoomBridge(object):
         self.minimap = {'texture': u'', 'points': []}  # what WG's lobby minimap got (as_*S of MinimapLobby)
         self.grid = {'points': [], 'clickEnabled': False}  # commander markings (as_*S of MinimapGrid)
         self.window = None
+        self.miniWindow = None  # small "EZ ROOM" button in WG's title bar while the original is shown
         self.hidden = False
         self._pushPending = False
 
@@ -131,8 +132,10 @@ class RoomBridge(object):
         if self.window is not None or self.view is None:
             return
         if _guardTripped and not manual:
-            _logger.warning('overlay stays off this session (last start crashed while opening it); open it from the mods list')
+            _logger.warning('overlay stays off this session (last start crashed while opening it); open it with the EZ ROOM button')
+            self.showMini()
             return
+        self.closeMini()
         self.hidden = False
         _setGuard(True)
         try:
@@ -150,6 +153,30 @@ class RoomBridge(object):
                 window.destroy()
             except Exception:
                 _logger.exception('closing room overlay failed')
+        if not hide:
+            self.closeMini()
+
+    def showOriginal(self):
+        # the user wants WG's room: overlay off, the small button brings it back
+        self.close(hide=True)
+        self.showMini()
+
+    def showMini(self):
+        if self.miniWindow is not None or self.view is None:
+            return
+        try:
+            self.miniWindow = _impl().openMini(self, _devConfig())
+        except Exception:
+            _logger.exception('opening the EZ ROOM button failed')
+            self.miniWindow = None
+
+    def closeMini(self):
+        window, self.miniWindow = self.miniWindow, None
+        if window is not None:
+            try:
+                window.destroy()
+            except Exception:
+                _logger.exception('closing the EZ ROOM button failed')
 
     def reopen(self):
         self.close()
@@ -311,7 +338,7 @@ def _toggleOverlay():
     if bridge.window is None:
         bridge.open(manual=True)
     else:
-        bridge.close(hide=True)
+        bridge.showOriginal()
 
 
 def _registerModsList():
