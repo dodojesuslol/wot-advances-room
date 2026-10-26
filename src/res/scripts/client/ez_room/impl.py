@@ -22,7 +22,7 @@ from helpers.i18n import makeString
 from adisp import adisp_process
 from skeletons.gui.impl import IGuiLoader
 
-__version__ = '0.7.45'
+__version__ = '0.7.46'
 _logger = logging.getLogger('EZ_ROOM')
 _logger.setLevel(logging.INFO)
 _LAYOUT_PATH = ('ez_room', 'views', 'EzRoomView')
@@ -343,6 +343,44 @@ def _readyCoolDown(bridge):
     return max(0.0, start + seconds - time.time())
 
 
+def _directTips():
+    # WG's direction tooltips are shown by WG itself (_showWgTip), here only: is the stronghold data there
+    try:
+        from gui.prb_control.dispatcher import g_prbLoader
+        dispatcher = g_prbLoader.getDispatcher()
+        entity = dispatcher.getEntity() if dispatcher is not None else None
+        return bool(entity is not None and hasattr(entity, 'isStrongholdSettingsValid') and entity.isStrongholdSettingsValid())
+    except Exception:
+        _logger.exception('direction tooltips failed')
+        return False
+
+
+def _battleMapPoints():
+    # bases / control points of the current battle exactly as WG's direction tooltip has them
+    # (ToolTipRefSysDirects.getDisplayableData -> mapPoints: x, y in 300 x 300 minimap units around
+    # the centre, pointType 'base' (current battle) or 'control', color blue / red / empty, id)
+    try:
+        from gui.prb_control.dispatcher import g_prbLoader
+        dispatcher = g_prbLoader.getDispatcher()
+        entity = dispatcher.getEntity() if dispatcher is not None else None
+        if entity is None or not hasattr(entity, 'isStrongholdSettingsValid') or not entity.isStrongholdSettingsValid():
+            return None
+        series = entity.getStrongholdSettings().getData().getHeader().getBattleSeriesStatus() or []
+        current = [idx for idx, battle in enumerate(series) if battle.getCurrentBattle()]
+        if not current:
+            return None
+        from gui.shared.tooltips import contexts, fortifications
+        d = fortifications.ToolTipRefSysDirects(contexts.FortificationContext()).getDisplayableData(current[0]) or {}
+        if not d.get('isMapEnabled'):
+            return None
+        return {'index': current[0], 'texture': _u(d.get('mapTexture', u'')),
+                'points': [{'x': p['x'], 'y': p['y'], 'type': p['pointType'], 'color': p['color'], 'id': p['id']}
+                           for p in d.get('mapPoints') or []]}
+    except Exception:
+        _logger.exception('battle map points failed')
+        return None
+
+
 def _frozenTips():
     # WG's tooltips of the frozen vehicle marker and the unfreeze button (SortieSlot.as)
     try:
@@ -645,6 +683,8 @@ def _pack(bridge, frame=None, reserveSlot=-1, speakEvents=None):
         'divisionTip': _divisionTip(),
         'configureTips': _configureTips(),
         'frozenTips': _frozenTips(),
+        'directTips': _directTips(),
+        'battleMap': _battleMapPoints(),
         'me': _me(view) if view is not None else {},
         'room': room,
         'mapIcon': _mapIcon(room.get('mapID')),
@@ -840,6 +880,7 @@ class EzRoomView(ViewImpl):
     def _finalize(self):
         self._tracking = False
         self._finalized = True
+        self._hideWgTip()
         try:
             from messenger.proto.events import g_messengerEvents
             g_messengerEvents.voip.onPlayerSpeaking -= self.__onPlayerSpeaking
@@ -899,6 +940,28 @@ class EzRoomView(ViewImpl):
         except Exception:
             _logger.exception('writing snapshot failed')
 
+    # WG's own Flash tooltips (same way WG's Gameface views do it: BackportTooltipWindow), used for the
+    # direction graphic (ConnectedDirects.as): buildings -> DIRECT_MODULE (index 0-5), swords -> complex
+    def _showWgTip(self, kind, index):
+        self._hideWgTip()
+        from gui.impl.backport.backport_tooltip import BackportTooltipWindow, createTooltipData
+        from gui.Scaleform.genConsts.TOOLTIPS_CONSTANTS import TOOLTIPS_CONSTANTS
+        if kind == 'swords':
+            data = createTooltipData(tooltip=makeString('#fortifications:strongholdtooltips/crossSwords'))
+        else:
+            data = createTooltipData(isSpecial=True, specialAlias=TOOLTIPS_CONSTANTS.DIRECT_MODULE, specialArgs=[index, 0])
+        window = BackportTooltipWindow(data, self.getParentWindow())
+        window.load()
+        self._wgTip = window
+
+    def _hideWgTip(self):
+        window, self._wgTip = getattr(self, '_wgTip', None), None
+        if window is not None:
+            try:
+                window.destroy()
+            except Exception:
+                _logger.exception('hiding WG tooltip failed')
+
     def __onAction(self, args=None):
         args = args or {}
         action = args.get('action')
@@ -920,6 +983,10 @@ class EzRoomView(ViewImpl):
                 windowView = bridge.roomWindowView()
                 if windowView is not None and windowView.onTryClosing():
                     windowView.onWindowClose()
+            elif action == 'wgTip':
+                self._showWgTip(args.get('kind'), int(args.get('index') or 0))
+            elif action == 'wgTipHide':
+                self._hideWgTip()
             elif action == 'dragStart':
                 self._dragStart()
             elif action == 'dragEnd':

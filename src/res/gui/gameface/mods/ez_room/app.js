@@ -200,11 +200,12 @@ function renderHeader() {
     // WG's direction graphic (as_setDirectionS: definition / attack0-5 / defense0-5), own row under
     // the header with the clan names left and right; exported from fortCmp.swf (ConnectedDirectsUI)
     const dir = data.direction && data.direction[0];
-    const showDir = !!dir && (mine || enemy);
+    // shown like WG also before the clans are known (e.g. "unit in battle", user 0.7.46)
+    const showDir = !!dir;
     // with the direction row the clans sit there and the timer is centred in the header (.hcenter)
     let center = "";
     if (showDir) {
-        // nothing in the middle column
+        if (!mine && !enemy && wait) center = `<div class="wait">${esc(wait)}</div>`;
     } else if (mine || enemy) {
         center = `
             <div class="vs">
@@ -235,9 +236,23 @@ function renderHeader() {
             <div class="clan mine ${ready[0] ? "ready" : ""}">${esc(mine)}</div>
             ${data.readyDirections === false
                 ? `<div class="dirimg dirwait">${L("Richtungen werden ermittelt …", "Determining directions …")}</div>`
-                : `<div class="dirimg" style="background-image:url(img://gui/maps/icons/ez_room/direction/${esc(dir)}.png)"></div>`}
+                : `<div class="dirimg" style="background-image:url(img://gui/maps/icons/ez_room/direction/${esc(dir)}.png)">${renderDirectTips(dir)}</div>`}
             <div class="clan enemy ${ready[1] ? "ready" : ""}">${esc(enemy)}</div>
         </div>` : ""}`;
+}
+
+// WG's tooltips on the direction graphic (ConnectedDirects.as): hover zones over the 6 buildings
+// (left to right = WG's index 0-5) and the swords; x ranges in rem measured from the exported frames
+const DIRECT_ZONES = [[31, 77], [98, 129], [152, 183], [227, 258], [281, 312], [333, 379]];
+const DIRECT_ZONES_DEFINITION = [[12, 58], [78, 109], [132, 163], [246, 277], [300, 331], [352, 398]];
+const DIRECT_SWORDS_DEFINITION = [189, 220];
+
+function renderDirectTips(dir) {
+    if (!data.directTips) return "";
+    const zone = (x, tip) => `<div class="dirzone" style="left:${x[0] - 2}rem;width:${x[1] - x[0] + 4}rem" data-wgtip="${tip}"></div>`;
+    const definition = dir === "definition";
+    const zones = definition ? DIRECT_ZONES_DEFINITION : DIRECT_ZONES;
+    return zones.map((x, i) => zone(x, i)).join("") + (definition ? zone(DIRECT_SWORDS_DEFINITION, "swords") : "");
 }
 
 // reserve slots (top right like in WG's room); click opens the list (data.reserveOptions)
@@ -772,6 +787,26 @@ function randomMap() {
     return room.isMapEnabled === false;
 }
 
+// bases / spawns / control points of the current battle like WG's direction tooltip shows them
+// (ToolTipRefSysDirects mapPoints, else what WG's room minimap got): x, y in 300 x 300 units around
+// the centre, y up (MinimapPresentation: px = 150 + x, py = 150 - y); WG's MinimapEntry art
+// (MinimapLobby.swf, teamPoint frames), 48 px on the 300 px map = 32 rem on our 200 rem map
+function renderMapPoints() {
+    if (randomMap()) return "";
+    const points = (data.battleMap && data.battleMap.points) || data.minimapPoints || [];
+    return points.map((p) => {
+        const id = Math.max(1, parseInt(p.id, 10) || 1);
+        let img = "";
+        if (p.type === "base" && (p.color === "blue" || p.color === "red")) img = `base_${p.color}_${Math.min(id, 4)}`;
+        else if (p.type === "spawn" && (p.color === "blue" || p.color === "red")) img = `spawn_${p.color}_${Math.min(id, 5)}`;
+        else if (p.type === "control") img = p.color === "blue" || p.color === "red" ? `control_${p.color}` : `control_empty_${Math.min(id, 4)}`;
+        if (!img) return "";
+        const x = ((150 + Number(p.x)) * 200) / 300;
+        const y = ((150 - Number(p.y)) * 200) / 300;
+        return `<div class="mpoint" style="left:${Math.round(x - 16)}rem;top:${Math.round(y - 16)}rem;background-image:url(img://gui/maps/icons/ez_room/minimap/${img}.png)"></div>`;
+    }).join("");
+}
+
 let gridTimer = null;
 function renderGridPoints() {
     const now = Date.now();
@@ -797,7 +832,7 @@ function renderMapGrid() {
             <div class="gtop"><div class="gcorner"></div>${cols}</div>
             <div class="gmid">
                 <div class="gleft">${rows}</div>
-                <div class="gmap ${gridClickable() ? "clickable" : ""} ${randomMap() ? "random" : ""}" id="gmap" ${data.mapIcon && !randomMap() ? `style="background-image:url(${data.mapIcon})"` : ""} ${gridClickable() ? `data-tip="${esc(L("Klick: Stelle für alle markieren", "Click: mark a spot for everyone"))}"` : ""}>${cells}${randomMap() ? `<div class="gdice"></div>` : ""}${renderGridPoints()}</div>
+                <div class="gmap ${gridClickable() ? "clickable" : ""} ${randomMap() ? "random" : ""}" id="gmap" ${data.mapIcon && !randomMap() ? `style="background-image:url(${data.mapIcon})"` : ""} ${gridClickable() ? `data-tip="${esc(L("Klick: Stelle für alle markieren", "Click: mark a spot for everyone"))}"` : ""}>${cells}${randomMap() ? `<div class="gdice"></div>` : ""}${renderMapPoints()}${renderGridPoints()}</div>
             </div>
         </div>`;
 }
@@ -991,7 +1026,14 @@ function render() {
     root.querySelectorAll("[data-scroll]").forEach((el, i) => (keep[i] = el.scrollTop));
     const body = ui.raw ? renderRaw() : `${renderCandidates()}${renderTeam()}${renderSide()}`;
     root.innerHTML = `${renderTitlebar()}${renderHeader()}<div class="body">${body}${ui.raw ? "" : renderWaiting()}</div>${renderFooter()}${renderReservePopup()}<div id="tip" class="tip"></div>`;
-    tipTarget = null;
+    // the room re-renders every second (timer, room data): keep an open tooltip where it was (user 0.7.46)
+    const tip = document.getElementById("tip");
+    if (tip && tipRaw) {
+        tip.innerHTML = tipHtml(tipRaw);
+        tip.style.display = "block";
+        tip.style.left = tipPos[0];
+        tip.style.top = tipPos[1];
+    }
     markHover();
     root.querySelectorAll("[data-scroll]").forEach((el, i) => {
         if (keep[i]) el.scrollTop = keep[i];
@@ -1005,6 +1047,17 @@ function render() {
     const newLog = document.getElementById("chatlog");
     if (newLog && chatStick) newLog.scrollTop = newLog.scrollHeight;
     updateScrollbars();
+    // Gameface may lay the new lists out only in the next frame (scrollHeight still too small, the
+    // chat jumped up on room updates, user 0.7.46): set the scroll positions again then
+    const stick = chatStick;
+    requestAnimationFrame(() => {
+        root.querySelectorAll("[data-scroll]").forEach((el, i) => {
+            if (keep[i] && el.scrollTop !== keep[i]) el.scrollTop = keep[i];
+        });
+        const lateLog = document.getElementById("chatlog");
+        if (lateLog && stick) lateLog.scrollTop = lateLog.scrollHeight;
+        updateScrollbars();
+    });
 }
 
 // own scrollbars for the volunteers list and the chat (Gameface draws none): thumb size/position
@@ -1243,24 +1296,39 @@ function tipHtml(raw) {
     if (!h && !b) return t.trim() ? `<div class="tbody">${esc(txt(t))}</div>` : "";
     return `${h ? `<div class="thead">${esc(txt(h[1]))}</div>` : ""}${b ? `<div class="tbody">${esc(txt(b[1])).replace(/\n/g, "<br/>")}</div>` : ""}`;
 }
-let tipTarget = null;
+let tipRaw = ""; // text of the open tooltip (compared by text: a re-render replaces the elements)
+let tipPos = ["0px", "0px"];
+// data-wgtip: WG shows its own tooltip (Python, BackportTooltipWindow); "swords" or building index 0-5
+let wgTipTarget = "";
 document.addEventListener("mousemove", (e) => {
+    const wg = closest(e.target, "data-wgtip");
+    const v = wg ? wg.getAttribute("data-wgtip") : "";
+    if (v !== wgTipTarget) {
+        if (wgTipTarget) send({ action: "wgTipHide" });
+        wgTipTarget = v;
+        if (v) {
+            send(v === "swords" ? { action: "wgTip", kind: "swords" } : { action: "wgTip", kind: "building", index: parseInt(v, 10) });
+        }
+    }
     const tip = document.getElementById("tip");
     if (!tip) return;
     const el = closest(e.target, "data-tip");
-    if (el !== tipTarget) {
-        tipTarget = el;
-        const html = el ? tipHtml(el.getAttribute("data-tip")) : "";
+    const raw = el ? el.getAttribute("data-tip") || "" : "";
+    if (raw !== tipRaw || (raw && tip.style.display !== "block")) {
+        tipRaw = raw;
+        const html = raw ? tipHtml(raw) : "";
         tip.innerHTML = html;
         tip.style.display = html ? "block" : "none";
+        if (!html) tipRaw = "";
     }
-    if (tipTarget) {
+    if (tipRaw) {
         const w = document.body.offsetWidth || 1013;
         const h = document.body.offsetHeight || 653;
         const tw = tip.offsetWidth || 260;
         const th = tip.offsetHeight || 60;
         tip.style.left = Math.min(e.clientX + 14, w - tw - 4) + "px";
         tip.style.top = (e.clientY + 18 + th > h ? e.clientY - th - 8 : e.clientY + 18) + "px";
+        tipPos = [tip.style.left, tip.style.top];
     }
 });
 

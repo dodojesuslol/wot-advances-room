@@ -85,7 +85,8 @@ body {
     border-bottom: 1rem solid rgba(242, 138, 58, 0.25);
     background-color: rgba(21, 21, 21, 0.6);
 }
-.dirimg { width: 410rem; height: 64rem; margin: 0 14rem; background-size: 410rem 64rem; background-repeat: no-repeat; }
+.dirimg { width: 410rem; height: 64rem; margin: 0 14rem; background-size: 410rem 64rem; background-repeat: no-repeat; position: relative; }
+.dirzone { position: absolute; top: 8rem; height: 48rem; }
 .dirwait { display: flex; align-items: center; justify-content: center; color: rgba(233, 231, 220, 0.7); font-size: 13rem; }
 
 .btn {
@@ -164,11 +165,14 @@ body {
 .own { color: #ffe23b; text-shadow: 0 0 6rem rgba(255, 226, 59, 0.6); }
 
 .team { flex-grow: 1; width: 0; margin: 0 8rem; }
-.slots { flex-grow: 1; overflow-y: hidden; padding: 4rem; }
+.slots { flex-grow: 1; overflow-y: hidden; padding: 4rem; display: flex; flex-direction: column; }
+/* rows share the free height of the panel (22 - 28 px each, user 0.7.46) */
 .slot {
     display: flex;
     align-items: center;
-    height: 22rem;
+    flex: 1 0 22rem;
+    min-height: 22rem;
+    max-height: 28rem;
     margin-bottom: 2rem;
     padding-right: 8rem;
     background-color: rgba(255, 255, 255, 0.035);
@@ -239,6 +243,7 @@ body {
 /* random map: WG's dice (MinimapLobby.swf sprite 9, 111 x 77 in WG's 207 px grid) on WG's dark back */
 .gmap.random { background-color: #0f0e0b; }
 .gdice { position: absolute; left: 46rem; top: 63rem; width: 107rem; height: 74rem; background-image: url(img://gui/maps/icons/ez_room/dice.png); background-size: 107rem 74rem; pointer-events: none; }
+.mpoint { position: absolute; width: 32rem; height: 32rem; background-size: 32rem 32rem; pointer-events: none; }
 .gpoint { position: absolute; width: 40rem; height: 40rem; background-image: url(img://gui/maps/icons/ez_room/gridclick.png); background-size: 40rem 40rem; pointer-events: none; }
 .grow-c { display: flex; flex-shrink: 0; width: 200rem; height: 20rem; }
 .gcell { flex-shrink: 0; width: 20rem; height: 20rem; box-sizing: border-box; border-right: 1rem solid rgba(0, 0, 0, 0.35); border-bottom: 1rem solid rgba(0, 0, 0, 0.35); }
