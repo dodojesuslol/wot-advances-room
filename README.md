@@ -17,23 +17,29 @@ Languages: English, Deutsch, Polski, Čeština, Français, Español, Italiano, T
 3. Delete any older `ez.advances_room_*.wotmod` there (two versions make the client hang on start).
 4. Start the game. The zip contains the same guide as `README.txt` (EN) and `LIESMICH.txt` (DE).
 
+`EZ_ROOM_<version>_DEV.zip` is the same mod plus dev mode: also copy its `mods\configs\ez_room\`
+folder into the WoT folder (raw data view, F5 reload of the UI from `mods\configs\ez_room\src`).
+
 ## Features
 
+- Own title bar like WG's window (same size, 1038 x 707): drag to move, minimize, X = leave
+  the room (with WG's confirmation)
 - Team table: sortable columns (clan, name, rating, tank), WG's status lamps, commander cap,
   badges, voice indicator, roles (artillery strike / inspiration) with commander buttons,
-  tank count and fold arrow when sorted by tank
+  WG's class icon before the tank name; sorted by tank = by class (heavy, medium, TD, light,
+  SPG), A-Z inside, with tank count and fold arrow; frozen vehicles with WG's unfreeze button
 - Volunteers: WG's online status, sortable (offline players at the bottom), click = next free
   slot, drag = that slot, drag a member back out
-- Header: WG's direction graphic, timer with alert colour, reserves, division info tooltip,
-  back link
-- Map: square minimap with grid, commander markings for everyone (WG's MinimapGrid), dice for
-  a random map
-- Chat: live, colours, smileys, right click on a name = WG's player menu, click a link = copy it
+- Header: WG's direction graphic (also while the unit is in battle) with WG's own tooltips,
+  timer with alert colour, reserves, division info tooltip, back link
+- Ready button with WG's cooldown after a click
+- Map: square minimap with grid, bases of the current battle (WG's markers), commander markings
+  for everyone (WG's MinimapGrid), dice for a random map; skirmishes have no map (more room for
+  the chat)
+- Chat: live, colours, smileys, right click on a name = WG's player menu, click a link = copy it;
+  keeps its scroll position on room changes
 - "Original" / Esc shows WG's room; a small "EZ ROOM" button in its title bar brings the view back
 - Enemy search and WG's popups stay WG's own
-
-Optional: with [EZ TANK PICKER for ADV](https://github.com/dodojesuslol/wot-advances-picker),
-"Choose tank" opens the big tank selection.
 
 ## Development
 
