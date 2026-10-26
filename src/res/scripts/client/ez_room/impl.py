@@ -22,7 +22,7 @@ from helpers.i18n import makeString
 from adisp import adisp_process
 from skeletons.gui.impl import IGuiLoader
 
-__version__ = '0.7.38'
+__version__ = '0.7.39'
 _logger = logging.getLogger('EZ_ROOM')
 _logger.setLevel(logging.INFO)
 _LAYOUT_PATH = ('ez_room', 'views', 'EzRoomView')
@@ -67,10 +67,10 @@ DEV = None
 _ROOM_W, _ROOM_H = 1013, 653
 _CONTENT_OFFSET = (12, 35, _ROOM_W, _ROOM_H)
 _TRACK_INTERVAL = 0.0  # every frame: the overlay follows WG's window / the cursor while dragged
-# WG's whole room window (Window.as content padding 35/13/19/12 around the content) and the bigger
-# overlay laid centred over it, own title bar included
+# WG's whole room window (Window.as content padding 35/13/19/12 around the content); the overlay
+# covers exactly that, own title bar included (1200 x 800 in 0.7.36-0.7.38 was too big)
 _WIN_W, _WIN_H = 12 + _ROOM_W + 13, 35 + _ROOM_H + 19
-_EZ_W, _EZ_H = 1200, 800
+_EZ_W, _EZ_H = _WIN_W, _WIN_H
 _EZ_DX, _EZ_DY = (_WIN_W - _EZ_W) // 2, (_WIN_H - _EZ_H) // 2
 
 

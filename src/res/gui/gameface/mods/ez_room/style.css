@@ -1,6 +1,6 @@
 /* 1rem = 1 design px (Gameface sets the root font size to the UI scale)
    Look: same as EZ TANK PICKER (WoT 2.0 inspired: dark glass, cream text, orange accent).
-   The view lies centred over WG's whole room window (1200 x 800, own title bar); app.js sets the
+   The view lies exactly over WG's whole room window (1038 x 707, own title bar); app.js sets the
    body size from data.frame. */
 html, body {
     width: 100%;
