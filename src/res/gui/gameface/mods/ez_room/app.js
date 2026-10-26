@@ -585,11 +585,13 @@ function sortValue(slot, key) {
     if (key === "clan") return (p.clanAbbrev || "").toLowerCase();
     if (key === "name") return (p.userName || p.fullName || "").toLowerCase();
     if (key === "rating") return ratingValue(slot);
-    if (key === "tank") return v ? tankClass(v) + (v.shortUserName || v.userName || "").toLowerCase() : null;
+    if (key === "tank") return v ? tankClass(v) + String(1000 + (tankCounts[tankKey(slot)] || 0)) + (v.shortUserName || v.userName || "").toLowerCase() : null;
     return 0;
 }
 
-// sorted by tank: heavy, medium, tank destroyer, light, SPG, then A-Z inside each class (user)
+// sorted by tank: heavy, medium, tank destroyer, light, SPG; inside each class the tanks taken
+// least often first (single tanks on top), then A-Z (user)
+let tankCounts = {};
 const TANK_CLASS_ORDER = ["heavyTank", "mediumTank", "AT-SPG", "lightTank", "SPG"];
 
 function tankClass(v) {
@@ -603,6 +605,11 @@ function sortedSlots() {
     if (!sort || !sort.key || !sort.dir) return rows;
     const taken = rows.filter(([s]) => s && s.player);
     const rest = rows.filter(([s]) => !(s && s.player));
+    tankCounts = {};
+    taken.forEach(([s]) => {
+        const k = tankKey(s);
+        if (k) tankCounts[k] = (tankCounts[k] || 0) + 1;
+    });
     taken.sort((a, b) => {
         const va = sortValue(a[0], sort.key);
         const vb = sortValue(b[0], sort.key);
