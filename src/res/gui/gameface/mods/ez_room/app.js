@@ -457,7 +457,8 @@ function renderSlot(slot, idx, tankCount, tankId) {
                 <div class="vname">${esc(v.shortUserName || v.userName)}</div>
                 ${tankCount ? `<div class="vcount" data-tip="${esc(F("{0} Spieler mit diesem Panzer", "{0} players with this tank", tankCount))}">×${tankCount}</div>` : ""}
                 ${roleIcons}
-                ${v.state ? `<div class="vstate">${esc(txt(v.state))}</div>` : ""}
+                ${v.state && v.state !== "frozenVehicle" ? `<div class="vstate">${esc(txt(v.state))}</div>` : ""}
+                ${renderFrozen(slot, idx)}
             </div>`
         : mine
           ? `<div class="veh none pick" ${vehAct}>${L("Panzer wählen", "Choose tank")}</div>`
@@ -473,6 +474,18 @@ function renderSlot(slot, idx, tankCount, tankId) {
                 ? `<div class="acts always">${roleActs ? `<div class="roleover">${roleActs}</div>` : ""}${acts.join("")}</div>`
                 : roleActs || acts.length ? `<div class="acts">${roleActs}${acts.join("")}</div>` : ""}
         </div>`;
+}
+
+// frozen vehicle (stronghold event, vo_converters.makeStrongholdsSlotsVOs): WG's red gear for
+// everyone, the gear button "back in service" for clan roles that may unfreeze (SortieSlot.as)
+function renderFrozen(slot, idx) {
+    const tips = data.frozenTips || {};
+    if (slot.canUnfrozeVehicles) {
+        const on = slot.unfrozeVehiclesBtnEnabled !== false;
+        return `<div class="frzbtn ${on ? "" : "disabled"}" ${on ? `data-act="unfreeze" data-slot="${idx}"` : ""} data-tip="${esc(on ? tips.btn || "" : tips.btnOff || "")}"></div>`;
+    }
+    if (slot.hasFrozenVehicle) return `<div class="frzicon" data-tip="${esc(tips.icon || "")}"></div>`;
+    return "";
 }
 
 const ROLE = {
@@ -1073,6 +1086,7 @@ document.addEventListener("click", (e) => {
     const slot = Number(el.getAttribute("data-slot"));
     if (act === "hide") send({ action: "hide" });
     else if (act === "minimize" || act === "close") send({ action: act });
+    else if (act === "unfreeze") send({ action: "unfreeze", slot: slot });
     else if (act === "raw") {
         ui.raw = !ui.raw;
         render();

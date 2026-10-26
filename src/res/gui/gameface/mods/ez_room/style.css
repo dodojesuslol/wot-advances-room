@@ -548,3 +548,17 @@ body.minibody { background-color: transparent; background-image: none; }
 /* WG's MinimizeButton / CloseButton (windows.swf sprites 29 / 39) */
 .wmin:active { background-image: url(img://gui/maps/icons/ez_room/window/min_down.png); }
 .wclose:active { background-image: url(img://gui/maps/icons/ez_room/window/close_down.png); }
+
+/* frozen vehicle: WG's VehBrokenIcon (fortClanBattleRoom.swf sprite 120) and the unfreeze button
+   (ButtonIconTextTransparent with the "gear" icon, guiControlsLobbyBattle.swf), at the right end
+   of the tank column like in WG's slot */
+.frzicon { width: 16rem; height: 16rem; margin-left: auto; padding-left: 6rem; flex-shrink: 0; background-image: url(img://gui/maps/icons/ez_room/frozen/broken.png); background-size: 16rem 16rem; background-repeat: no-repeat; background-position: right center; }
+.frzbtn {
+    width: 22rem; height: 20rem; margin-left: auto; flex-shrink: 0;
+    border: 1rem solid rgba(255, 255, 255, 0.25); border-radius: 2rem;
+    background-image: url(img://gui/maps/icons/ez_room/frozen/gear.png); background-size: 17rem 17rem; background-repeat: no-repeat; background-position: center;
+    cursor: pointer;
+}
+.frzbtn:hover { border-color: rgba(255, 255, 255, 0.6); background-color: rgba(255, 255, 255, 0.08); }
+.frzbtn.disabled { opacity: 0.4; cursor: default; }
+.frzbtn.disabled:hover { border-color: rgba(255, 255, 255, 0.25); background-color: transparent; }

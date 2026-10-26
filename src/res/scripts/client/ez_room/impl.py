@@ -22,7 +22,7 @@ from helpers.i18n import makeString
 from adisp import adisp_process
 from skeletons.gui.impl import IGuiLoader
 
-__version__ = '0.7.41'
+__version__ = '0.7.42'
 _logger = logging.getLogger('EZ_ROOM')
 _logger.setLevel(logging.INFO)
 _LAYOUT_PATH = ('ez_room', 'views', 'EzRoomView')
@@ -326,6 +326,20 @@ def _configureTips():
         return {}
 
 
+def _frozenTips():
+    # WG's tooltips of the frozen vehicle marker and the unfreeze button (SortieSlot.as)
+    try:
+        T = lambda key: _u(makeString(key))
+        return {'icon': T(TOOLTIPS.FORTIFICATION_SORTIE_BATTLEROOM_VEHBROKENICON),
+                'btn': T(TOOLTIPS.FORTIFICATION_SORTIE_BATTLEROOM_UNFROZEVEHICLEBTN),
+                'btnOff': u'{HEADER}%s{/HEADER}{BODY}%s{/BODY}' % (
+                    T(TOOLTIPS.FORTIFICATION_SORTIE_BATTLEROOM_UNFROZEVEHICLEBTN_DISABLED_HEADER),
+                    T(TOOLTIPS.FORTIFICATION_SORTIE_BATTLEROOM_UNFROZEVEHICLEBTN_DISABLED_BODY))}
+    except Exception:
+        _logger.exception('frozen tooltips failed')
+        return {}
+
+
 def _mapIcon(mapID):
     # square top-down minimap (gui/maps/icons/map/<geometry>.png, 300x300); '' for a random map or
     # when the client has none for this map (map/stats/ are 500x235 landscape shots, not minimaps)
@@ -613,6 +627,7 @@ def _pack(bridge, frame=None, reserveSlot=-1, speakEvents=None):
         'back': _backLink(),
         'divisionTip': _divisionTip(),
         'configureTips': _configureTips(),
+        'frozenTips': _frozenTips(),
         'me': _me(view) if view is not None else {},
         'room': room,
         'mapIcon': _mapIcon(room.get('mapID')),
@@ -957,6 +972,11 @@ class EzRoomView(ViewImpl):
                 windowView = bridge.roomWindowView()
                 if windowView is not None:
                     windowView.onBackClick()
+            elif action == 'unfreeze':
+                # same as WG's gear button in the slot: StrongholdBattleRoom.onUnfrozenVehicleSlotClick
+                # -> WG's "In Dienst stellen?" dialog with the spare parts price
+                slot = int(args.get('slot'))
+                _whileWgWindow(bridge, lambda: bridge.call('onUnfrozenVehicleSlotClick', slot))
             elif action == 'invite':
                 _whileWgWindow(bridge, lambda: bridge.call('inviteFriendRequest'))
             elif action == 'configure':
