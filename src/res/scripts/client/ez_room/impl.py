@@ -22,7 +22,7 @@ from helpers.i18n import makeString
 from adisp import adisp_process
 from skeletons.gui.impl import IGuiLoader
 
-__version__ = '0.7.36'
+__version__ = '0.7.37'
 _logger = logging.getLogger('EZ_ROOM')
 _logger.setLevel(logging.INFO)
 _LAYOUT_PATH = ('ez_room', 'views', 'EzRoomView')
@@ -683,6 +683,8 @@ class EzRoomView(ViewImpl):
         self._frame = None      # (x, y, w, h) the overlay should cover
         self._roomRect = None   # last seen rect of WG's room window
         self._tracking = False
+        self._finalized = False
+        self._placed = False    # overlay window moved onto WG's window at least once
         self._drag = None       # (cursor x, y, overlay x, y) while the title bar is dragged
         self._loggedRect = False
         self._reserveSlot = -1  # reserve slot whose list is open
@@ -701,10 +703,25 @@ class EzRoomView(ViewImpl):
             g_messengerEvents.voip.onPlayerSpeaking += self.__onPlayerSpeaking
         except Exception:
             _logger.exception('voip subscribe failed')
+        # frame known right away: the first data already carries the size, so the UI resizes
+        # itself on its first render instead of after the first tracking step
+        self._roomRect = _roomRect(self._bridge)
+        if self._roomRect is not None:
+            self._frame = _frame(self._roomRect, self._config)
         self.onRoomChanged()
-        # move only after the window is loaded (like WG's OfferBannerWindow: load(), then move)
+        # move only after the window is loaded (like WG's OfferBannerWindow: load(), then move):
+        # _onLoaded starts the tracking, the callback is a fallback if it never comes
+        BigWorld.callback(0.2, self._startTracking)
+
+    def _onLoaded(self, *args, **kwargs):
+        super(EzRoomView, self)._onLoaded(*args, **kwargs)
+        self._startTracking()
+
+    def _startTracking(self):
+        if self._tracking or self._finalized:
+            return
         self._tracking = True
-        BigWorld.callback(0.2, self._trackNext)
+        self._track()
 
     # follow WG's room window (moved by dragging its title bar) ---------------------
 
@@ -715,7 +732,8 @@ class EzRoomView(ViewImpl):
             return
         try:
             roomRect = _roomRect(self._bridge)
-            if roomRect is not None and roomRect != self._roomRect:
+            if roomRect is not None and (roomRect != self._roomRect or not self._placed):
+                self._placed = True
                 self._roomRect = roomRect
                 frame = _frame(roomRect, self._config)
                 sizeChanged = self._frame is None or frame[2:] != self._frame[2:]
@@ -782,6 +800,7 @@ class EzRoomView(ViewImpl):
 
     def _finalize(self):
         self._tracking = False
+        self._finalized = True
         try:
             from messenger.proto.events import g_messengerEvents
             g_messengerEvents.voip.onPlayerSpeaking -= self.__onPlayerSpeaking

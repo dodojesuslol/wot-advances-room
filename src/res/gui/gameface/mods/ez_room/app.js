@@ -852,8 +852,8 @@ setInterval(() => updateTimer(document.getElementById("timer")), 500);
 // (viewEnv.resizeViewPx, same as WG's own OfferBannerWindow)
 // Right after the view opens, resizeViewPx can be ignored (game.log: viewSizePx 0x0, only the
 // top-left corner drawn): check the real size and set it again every 0.2 s until it sticks.
-const RESIZE_RETRY_MS = 200;
-const RESIZE_RETRY_MAX = 25; // 5 s
+const RESIZE_RETRY_MS = 50; // short: until the size is applied WG's room shows through
+const RESIZE_RETRY_MAX = 100; // 5 s
 let appliedSize = "";
 let resizeTimer = 0;
 
