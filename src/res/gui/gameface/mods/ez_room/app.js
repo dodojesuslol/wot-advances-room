@@ -611,8 +611,24 @@ function renderColumns() {
         </div>`;
 }
 
+// WG's ready button cooldown (as_setCoolDownS, SET_PLAYER_STATE): button greyed out for the
+// seconds WG sends, no countdown (BaseTeamSection.enableFightButton)
+let readyCdEnd = 0;
+let readyCdTimer = 0;
+
+function setReadyCoolDown(seconds) {
+    if (!(seconds > 0)) return;
+    readyCdEnd = Date.now() + seconds * 1000;
+    if (readyCdTimer) clearTimeout(readyCdTimer);
+    readyCdTimer = setTimeout(() => {
+        readyCdTimer = 0;
+        render();
+    }, seconds * 1000 + 20);
+}
+
 function renderReadyBar() {
-    const ab = data.actionButton || {};
+    const ab = Object.assign({}, data.actionButton || {});
+    if (Date.now() < readyCdEnd) ab.isEnabled = false;
     const state = txt(ab.stateString);
     const hint = ui.selCand ? L("Auf einen grünen Platz ziehen (Esc = abbrechen)", "Drop onto a green slot (Esc = cancel)") : state;
     const label = txt(ab.label) || L("Bereit!", "Ready!");
@@ -1335,6 +1351,7 @@ function readModel() {
         const key = changeKey(next);
         data = next;
         timerBase = { at: Date.now() };
+        setReadyCoolDown(data.readyCoolDown);
         if (key === lastKey) {
             updateTimer(document.getElementById("timer"));
             return;

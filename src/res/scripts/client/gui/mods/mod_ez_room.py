@@ -78,6 +78,7 @@ class RoomBridge(object):
         self.calls = {}      # as_*S name -> last args
         self.slotCalls = {}  # as_*S name -> {slotIdx: args}
         self.times = {}      # as_*S name -> time.time() of the last call (seconds)
+        self.coolDowns = {}  # as_setCoolDownS requestID -> (time.time(), seconds), like BaseRallyView.as
         self.minimap = {'texture': u'', 'points': []}  # what WG's lobby minimap got (as_*S of MinimapLobby)
         self.grid = {'points': [], 'clickEnabled': False}  # commander markings (as_*S of MinimapGrid)
         self.window = None
@@ -101,6 +102,12 @@ class RoomBridge(object):
             if name == 'as_setMembersS':
                 self.slotCalls = {}
         self.times[name] = time.time()
+        if name == 'as_setCoolDownS' and len(args) >= 2:
+            # BaseRallyView.as_setCoolDown ignores a new one while that request's cooldown runs
+            start, seconds = self.coolDowns.get(args[1], (0.0, 0.0))
+            now = time.time()
+            if now >= start + (seconds or 0):
+                self.coolDowns[args[1]] = (now, float(args[0] or 0))
         self.changed()
 
     def changed(self):

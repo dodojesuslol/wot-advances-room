@@ -97,7 +97,7 @@ Legende: ✅ vorhanden · 🟡 teilweise · ❌ fehlt · 🚫 bewusst weggelasse
 | F1 | **Automatische Gegnersuche / Warteschlange** (Panel im Fenster) | ✅ | bleibt WG-Original (Nutzerwunsch): Oberfläche blendet sich während der Suche aus und kommt danach zurück (v0.7.3, im Spiel bestätigt) |
 | F2 | **Warte-Overlay** („Daten werden geladen“, `showStrongholdWaiting`) | ✅ | v0.7.4: Hook auf `StrongholdBattleRoomWindow.as_setWaitingS` → eigener Schleier mit Kreisel + WG-Text über dem Raum (Variante 1, Nutzerwahl) |
 | F3 | Wartungsmodus (`onStrongholdMaintenance`) | ❌ | |
-| F4 | Cooldowns: Buttons kurz gesperrt (`as_setCoolDownS`) | ❌ | |
+| F4 | Cooldowns: Buttons kurz gesperrt (`as_setCoolDownS`) | 🟡 | v0.7.43 (im Spiel testen): nur Bereit/Nicht-bereit wie WG (SET_PLAYER_STATE = 6, WGs Sekunden, kein Countdown); Loader merkt sich die Sperre pro Anfrage (`bridge.coolDowns`). Raum schließen / Kommentar sperrt WG wegen falscher ID (24 statt 27) selbst nie → nicht nachgebaut |
 | F5 | UI-Klänge (`g_strongholdSoundController`, Klick-Sounds) | ❌ | |
 | F6 | FAQ-Fenster (`showFAQWindow`) | ❌ | falls im Original erreichbar |
 | F7 | Minimieren / Schließen | ✅ | v0.7.36–0.7.39 (im Spiel bestätigt): Overlay 1038×707 deckt WGs ganzes Fenster ab, eigene Titelleiste mit WGs Knöpfen (`windows.swf` Sprites 29/39) → `onWindowMinimize` / `onWindowClose`; Ziehen an der Titelleiste schiebt WGs Fenster mit (`as_setGeometryS`). Aus dem Bild schieben geht nicht (Engine begrenzt Gameface-Fenster, 0.7.40 zurückgenommen). Ab 0.7.38 kann kein anderes Fenster das Overlay schließen (`canBeClosed`) |

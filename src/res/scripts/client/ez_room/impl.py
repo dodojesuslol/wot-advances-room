@@ -22,7 +22,7 @@ from helpers.i18n import makeString
 from adisp import adisp_process
 from skeletons.gui.impl import IGuiLoader
 
-__version__ = '0.7.42'
+__version__ = '0.7.43'
 _logger = logging.getLogger('EZ_ROOM')
 _logger.setLevel(logging.INFO)
 _LAYOUT_PATH = ('ez_room', 'views', 'EzRoomView')
@@ -324,6 +324,23 @@ def _configureTips():
     except Exception:
         _logger.exception('configure tooltips failed')
         return {}
+
+
+_SET_PLAYER_STATE = 6  # REQUEST_TYPE.SET_PLAYER_STATE: the only cooldown WG's room shows (ready button)
+
+
+def _readyCoolDown(bridge):
+    # seconds left of the ready button cooldown (FortClanBattleRoom.coolDownControls -> enableFightButton)
+    coolDowns = getattr(bridge, 'coolDowns', None)
+    if coolDowns is None:
+        # loader < 0.7.43: only the last call is known
+        args = bridge.calls.get('as_setCoolDownS')
+        if not args or len(args) < 2 or args[1] != _SET_PLAYER_STATE:
+            return 0.0
+        start, seconds = bridge.times.get('as_setCoolDownS', 0.0), float(args[0] or 0)
+    else:
+        start, seconds = coolDowns.get(_SET_PLAYER_STATE, (0.0, 0.0))
+    return max(0.0, start + seconds - time.time())
 
 
 def _frozenTips():
@@ -650,6 +667,7 @@ def _pack(bridge, frame=None, reserveSlot=-1, speakEvents=None):
         'opened': calls.get('as_setOpenedS'),
         'configure': first('as_setConfigureButtonStateS'),
         'actionButton': _actionButton(first('as_setActionButtonStateS')),
+        'readyCoolDown': _readyCoolDown(bridge),
         'comment': first('as_setCommentS', u''),
         'vehiclesTitle': calls.get('as_setVehiclesTitleS'),
         'highlight': first('as_highlightSlotsS'),
