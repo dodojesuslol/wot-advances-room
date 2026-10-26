@@ -30,7 +30,7 @@ const TR = {
         "Copied ✓": "Skopiowano ✓", "Legionnaire": "Legionista", "Name": "Nazwa", "Not connected": "Nie połączono", "Nobody waiting": "Nikt nie czeka",
         "Original": "Oryginał", "Tank": "Czołg", "Choose tank": "Wybierz czołg", "Take slot": "Zajmij miejsce", "Room": "Pokój", "Out": "Wyjdź",
         "Determining directions …": "Ustalanie kierunków …", "Raw data": "Surowe dane", "Player": "Gracz", "Team": "Drużyna", "Leave": "Opuść",
-        "Rating": "Ocena", "Fold": "Zwiń", "Back to the volunteers": "Z powrotem do ochotników", "Back to the EZ ROOM view": "Powrót do widoku EZ ROOM",
+        "Rating": "Ocena", "Fold": "Zwiń", "Back to the volunteers": "Z powrotem do ochotników", "Back to the EZ ROOM view": "Powrót do widoku EZ ROOM", "Minimize": "Minimalizuj", "Close": "Zamknij",
     },
     cs: {
         "Take {0} away": "Odebrat: {0}", "Give {0}": "Přidělit: {0}", "{0} players with this tank": "{0} hráčů s tímto tankem",
@@ -43,7 +43,7 @@ const TR = {
         "Copied ✓": "Zkopírováno ✓", "Legionnaire": "Legionář", "Name": "Jméno", "Not connected": "Nepřipojeno", "Nobody waiting": "Nikdo nečeká",
         "Original": "Originál", "Tank": "Tank", "Choose tank": "Vybrat tank", "Take slot": "Obsadit místo", "Room": "Místnost", "Out": "Ven",
         "Determining directions …": "Určování směrů …", "Raw data": "Surová data", "Player": "Hráč", "Team": "Tým", "Leave": "Opustit",
-        "Rating": "Hodnocení", "Fold": "Sbalit", "Back to the volunteers": "Zpět k dobrovolníkům", "Back to the EZ ROOM view": "Zpět do zobrazení EZ ROOM",
+        "Rating": "Hodnocení", "Fold": "Sbalit", "Back to the volunteers": "Zpět k dobrovolníkům", "Back to the EZ ROOM view": "Zpět do zobrazení EZ ROOM", "Minimize": "Minimalizovat", "Close": "Zavřít",
     },
     fr: {
         "Take {0} away": "Retirer : {0}", "Give {0}": "Attribuer : {0}", "{0} players with this tank": "{0} joueurs avec ce char",
@@ -56,7 +56,7 @@ const TR = {
         "Copied ✓": "Copié ✓", "Legionnaire": "Légionnaire", "Name": "Nom", "Not connected": "Non connecté", "Nobody waiting": "Personne n'attend",
         "Original": "Original", "Tank": "Char", "Choose tank": "Choisir un char", "Take slot": "Prendre la place", "Room": "Salon", "Out": "Sortir",
         "Determining directions …": "Détermination des directions …", "Raw data": "Données brutes", "Player": "Joueur", "Team": "Équipe", "Leave": "Quitter",
-        "Rating": "Cote", "Fold": "Replier", "Back to the volunteers": "Retour aux volontaires", "Back to the EZ ROOM view": "Retour à la vue EZ ROOM",
+        "Rating": "Cote", "Fold": "Replier", "Back to the volunteers": "Retour aux volontaires", "Back to the EZ ROOM view": "Retour à la vue EZ ROOM", "Minimize": "Réduire", "Close": "Fermer",
     },
     es: {
         "Take {0} away": "Quitar: {0}", "Give {0}": "Asignar: {0}", "{0} players with this tank": "{0} jugadores con este tanque",
@@ -69,7 +69,7 @@ const TR = {
         "Copied ✓": "Copiado ✓", "Legionnaire": "Legionario", "Name": "Nombre", "Not connected": "No conectado", "Nobody waiting": "Nadie espera",
         "Original": "Original", "Tank": "Tanque", "Choose tank": "Elegir tanque", "Take slot": "Ocupar puesto", "Room": "Sala", "Out": "Fuera",
         "Determining directions …": "Determinando direcciones …", "Raw data": "Datos sin procesar", "Player": "Jugador", "Team": "Equipo", "Leave": "Salir",
-        "Rating": "Índice", "Fold": "Contraer", "Back to the volunteers": "Volver a los voluntarios", "Back to the EZ ROOM view": "Volver a la vista EZ ROOM",
+        "Rating": "Índice", "Fold": "Contraer", "Back to the volunteers": "Volver a los voluntarios", "Back to the EZ ROOM view": "Volver a la vista EZ ROOM", "Minimize": "Minimizar", "Close": "Cerrar",
     },
     it: {
         "Take {0} away": "Revoca: {0}", "Give {0}": "Assegna: {0}", "{0} players with this tank": "{0} giocatori con questo carro",
@@ -82,7 +82,7 @@ const TR = {
         "Copied ✓": "Copiato ✓", "Legionnaire": "Legionario", "Name": "Nome", "Not connected": "Non connesso", "Nobody waiting": "Nessuno in attesa",
         "Original": "Originale", "Tank": "Carro", "Choose tank": "Scegli carro", "Take slot": "Prendi posto", "Room": "Stanza", "Out": "Fuori",
         "Determining directions …": "Determinazione delle direzioni …", "Raw data": "Dati grezzi", "Player": "Giocatore", "Team": "Squadra", "Leave": "Lascia",
-        "Rating": "Valutazione", "Fold": "Comprimi", "Back to the volunteers": "Torna ai volontari", "Back to the EZ ROOM view": "Torna alla vista EZ ROOM",
+        "Rating": "Valutazione", "Fold": "Comprimi", "Back to the volunteers": "Torna ai volontari", "Back to the EZ ROOM view": "Torna alla vista EZ ROOM", "Minimize": "Riduci a icona", "Close": "Chiudi",
     },
     tr: {
         "Take {0} away": "Geri al: {0}", "Give {0}": "Ver: {0}", "{0} players with this tank": "Bu tankla {0} oyuncu",
@@ -95,7 +95,7 @@ const TR = {
         "Copied ✓": "Kopyalandı ✓", "Legionnaire": "Lejyoner", "Name": "İsim", "Not connected": "Bağlı değil", "Nobody waiting": "Bekleyen yok",
         "Original": "Orijinal", "Tank": "Tank", "Choose tank": "Tank seç", "Take slot": "Yeri al", "Room": "Oda", "Out": "Çıkar",
         "Determining directions …": "Yönler belirleniyor …", "Raw data": "Ham veri", "Player": "Oyuncu", "Team": "Takım", "Leave": "Ayrıl",
-        "Rating": "Derece", "Fold": "Daralt", "Back to the volunteers": "Gönüllülere geri", "Back to the EZ ROOM view": "EZ ROOM görünümüne dön",
+        "Rating": "Derece", "Fold": "Daralt", "Back to the volunteers": "Gönüllülere geri", "Back to the EZ ROOM view": "EZ ROOM görünümüne dön", "Minimize": "Simge durumuna küçült", "Close": "Kapat",
     },
     ru: {
         "Take {0} away": "Забрать: {0}", "Give {0}": "Назначить: {0}", "{0} players with this tank": "Игроков с этим танком: {0}",
@@ -108,7 +108,7 @@ const TR = {
         "Copied ✓": "Скопировано ✓", "Legionnaire": "Легионер", "Name": "Имя", "Not connected": "Нет подключения", "Nobody waiting": "Никто не ждёт",
         "Original": "Оригинал", "Tank": "Танк", "Choose tank": "Выбрать танк", "Take slot": "Занять слот", "Room": "Комната", "Out": "Убрать",
         "Determining directions …": "Определение направлений …", "Raw data": "Сырые данные", "Player": "Игрок", "Team": "Команда", "Leave": "Покинуть",
-        "Rating": "Рейтинг", "Fold": "Свернуть", "Back to the volunteers": "Вернуть к добровольцам", "Back to the EZ ROOM view": "Назад к виду EZ ROOM",
+        "Rating": "Рейтинг", "Fold": "Свернуть", "Back to the volunteers": "Вернуть к добровольцам", "Back to the EZ ROOM view": "Назад к виду EZ ROOM", "Minimize": "Свернуть окно", "Close": "Закрыть",
     },
 };
 
@@ -905,6 +905,26 @@ let chatFocus = false;
 let chatStick = true; // keep the chat scrolled to the newest line
 
 // small EZ ROOM button over WG's title bar while the original room is shown (data.mini)
+// title bar drag: Python moves the overlay with the cursor until the left button is released
+document.addEventListener("mousedown", (e) => {
+    if (e.button !== 0 || !closest(e.target, "data-drag") || closest(e.target, "data-act")) return;
+    send({ action: "dragStart" });
+});
+document.addEventListener("mouseup", (e) => {
+    if (e.button === 0 && closest(e.target, "data-drag")) send({ action: "dragEnd" });
+});
+
+// own title bar (the overlay covers WG's whole window incl. its title bar): drag = move the room,
+// minimize / X do the same as WG's buttons (Window.as minimizeBtn / closeBtnEx)
+function renderTitlebar() {
+    return `
+        <div class="titlebar" data-drag="1">
+            <div class="ttext">EZ ROOM</div>
+            <div class="wbtn wmin" data-act="minimize" data-tip="${esc(L("Minimieren", "Minimize"))}"></div>
+            <div class="wbtn wclose" data-act="close" data-tip="${esc(L("Schließen", "Close"))}"></div>
+        </div>`;
+}
+
 function renderMini() {
     return `<div class="mini" data-act="restore" data-tip="${esc(L("Zurück zur EZ-ROOM-Oberfläche", "Back to the EZ ROOM view"))}">EZ ROOM</div>`;
 }
@@ -928,7 +948,7 @@ function render() {
     const keep = {};
     root.querySelectorAll("[data-scroll]").forEach((el, i) => (keep[i] = el.scrollTop));
     const body = ui.raw ? renderRaw() : `${renderCandidates()}${renderTeam()}${renderSide()}`;
-    root.innerHTML = `${renderHeader()}<div class="body">${body}${ui.raw ? "" : renderWaiting()}</div>${renderFooter()}${renderReservePopup()}<div id="tip" class="tip"></div>`;
+    root.innerHTML = `${renderTitlebar()}${renderHeader()}<div class="body">${body}${ui.raw ? "" : renderWaiting()}</div>${renderFooter()}${renderReservePopup()}<div id="tip" class="tip"></div>`;
     tipTarget = null;
     markHover();
     root.querySelectorAll("[data-scroll]").forEach((el, i) => {
@@ -1048,6 +1068,7 @@ document.addEventListener("click", (e) => {
     const id = Number(el.getAttribute("data-id"));
     const slot = Number(el.getAttribute("data-slot"));
     if (act === "hide") send({ action: "hide" });
+    else if (act === "minimize" || act === "close") send({ action: act });
     else if (act === "raw") {
         ui.raw = !ui.raw;
         render();

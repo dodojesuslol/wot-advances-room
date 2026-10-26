@@ -9,6 +9,8 @@ import os
 import time
 
 import BigWorld
+import GUI
+import Keys
 from frameworks.wulf import ViewFlags, ViewModel, ViewSettings, WindowFlags, WindowLayer
 from gui.impl.gen import R
 from gui.impl.pub import ViewImpl
@@ -20,7 +22,7 @@ from helpers.i18n import makeString
 from adisp import adisp_process
 from skeletons.gui.impl import IGuiLoader
 
-__version__ = '0.7.35'
+__version__ = '0.7.36'
 _logger = logging.getLogger('EZ_ROOM')
 _logger.setLevel(logging.INFO)
 _LAYOUT_PATH = ('ez_room', 'views', 'EzRoomView')
@@ -64,7 +66,12 @@ DEV = None
 # size of the room content in WG's Flash window (FortClanBattleRoomUI, fortClanBattleRoom.swf)
 _ROOM_W, _ROOM_H = 1013, 653
 _CONTENT_OFFSET = (12, 35, _ROOM_W, _ROOM_H)
-_TRACK_INTERVAL = 0.0  # every frame: the overlay follows WG's window while it is dragged
+_TRACK_INTERVAL = 0.0  # every frame: the overlay follows WG's window / the cursor while dragged
+# WG's whole room window (Window.as content padding 35/13/19/12 around the content) and the bigger
+# overlay laid centred over it, own title bar included
+_WIN_W, _WIN_H = 12 + _ROOM_W + 13, 35 + _ROOM_H + 19
+_EZ_W, _EZ_H = 1200, 800
+_EZ_DX, _EZ_DY = (_WIN_W - _EZ_W) // 2, (_WIN_H - _EZ_H) // 2
 
 
 def _rect(window):
@@ -117,12 +124,40 @@ def _frame(roomRect, config):
         x, y = roomRect[0], roomRect[1]
         dx, dy = _CONTENT_OFFSET[0], 7
         return (int(round(x + dx + (_ROOM_W - _MINI_W) / 2.0)), int(round(y + dy)), _MINI_W, _MINI_H)
-    # overlay rect = room content of WG's window. as_getGeometryS gives the window's top-left
-    # (incl. its shadow) and -1 as size; the content starts 12 px right / 35 px down (measured
-    # in game, title bar above stays WG's) and is 1013 x 653 (fortClanBattleRoom.swf).
+    # as_getGeometryS gives the window's top-left and -1 as size; the content starts 12 px right /
+    # 35 px down and is 1013 x 653 (fortClanBattleRoom.swf). Dev 'offset' = old content-only overlay.
     x, y = roomRect[0], roomRect[1]
-    dx, dy, w, h = (config or {}).get('offset') or _CONTENT_OFFSET
-    return (int(round(x + dx)), int(round(y + dy)), int(w), int(h))
+    offset = (config or {}).get('offset')
+    if offset:
+        dx, dy, w, h = offset
+        return (int(round(x + dx)), int(round(y + dy)), int(w), int(h))
+    x, y = _clampToScreen(x + _EZ_DX, y + _EZ_DY)
+    return (x, y, _EZ_W, _EZ_H)
+
+
+def _screenSize():
+    # lobby size in UI px (window pixels / interface scale, like WG's armor inspector tooltip)
+    w, h = BigWorld.windowSize()
+    try:
+        from skeletons.account_helpers.settings_core import ISettingsCore
+        scale = float(dependency.instance(ISettingsCore).interfaceScale.get()) or 1.0
+    except Exception:
+        scale = 1.0
+    return (w / scale, h / scale, scale)
+
+
+def _clampToScreen(x, y):
+    sw, sh, _ = _screenSize()
+    x = max(0.0, min(float(x), sw - _EZ_W))
+    y = max(0.0, min(float(y), sh - _EZ_H))
+    return (int(round(x)), int(round(y)))
+
+
+def _cursor():
+    # cursor in UI px (GUI.mcursor().position is -1..1, y up)
+    sw, sh, _ = _screenSize()
+    nx, ny = GUI.mcursor().position
+    return ((nx + 1) / 2.0 * sw, (1 - ny) / 2.0 * sh)
 
 
 _LANGS = ('de', 'en', 'pl', 'cs', 'fr', 'es', 'it', 'tr', 'ru')
@@ -648,6 +683,7 @@ class EzRoomView(ViewImpl):
         self._frame = None      # (x, y, w, h) the overlay should cover
         self._roomRect = None   # last seen rect of WG's room window
         self._tracking = False
+        self._drag = None       # (cursor x, y, overlay x, y) while the title bar is dragged
         self._loggedRect = False
         self._reserveSlot = -1  # reserve slot whose list is open
         self._speakEvents = {}  # dbID -> bool from g_messengerEvents.voip.onPlayerSpeaking
@@ -673,6 +709,10 @@ class EzRoomView(ViewImpl):
     # follow WG's room window (moved by dragging its title bar) ---------------------
 
     def _track(self):
+        if self._drag is not None:
+            self._dragStep()
+            BigWorld.callback(_TRACK_INTERVAL, self._trackNext)
+            return
         try:
             roomRect = _roomRect(self._bridge)
             if roomRect is not None and roomRect != self._roomRect:
@@ -692,6 +732,46 @@ class EzRoomView(ViewImpl):
         except Exception:
             _logger.exception('tracking room window failed')
         BigWorld.callback(_TRACK_INTERVAL, self._trackNext)
+
+    # own title bar dragged: the overlay follows the cursor, WG's window is moved behind it
+    # (as_setGeometryS, the same call WG uses to restore a stored window position)
+
+    def _dragStart(self):
+        if self._frame is None or self._config.get('mini'):
+            return
+        try:
+            cx, cy = _cursor()
+        except Exception:
+            _logger.exception('reading cursor failed')
+            return
+        self._drag = (cx, cy, self._frame[0], self._frame[1])
+
+    def _dragStep(self):
+        try:
+            if not BigWorld.isKeyDown(Keys.KEY_LEFTMOUSE):
+                self._dragEnd()
+                return
+            cx, cy = _cursor()
+            sx, sy, fx, fy = self._drag
+            x, y = _clampToScreen(fx + cx - sx, fy + cy - sy)
+            if (x, y) == tuple(self._frame[:2]):
+                return
+            self._frame = (x, y) + tuple(self._frame[2:])
+            window = self.getParentWindow()
+            if window is not None:
+                window.move(x, y)
+            view = _roomWindowView(self._bridge)
+            if view is not None:
+                rect = self._roomRect or (0, 0, _WIN_W, _WIN_H)
+                view.as_setGeometryS(x - _EZ_DX, y - _EZ_DY, rect[2], rect[3])
+        except Exception:
+            _logger.exception('dragging failed')
+            self._drag = None
+
+    def _dragEnd(self):
+        self._drag = None
+        # take WG's (possibly clamped) position as seen, so the overlay does not jump afterwards
+        self._roomRect = _roomRect(self._bridge)
 
     def _trackNext(self):
         if self._tracking:
@@ -772,6 +852,21 @@ class EzRoomView(ViewImpl):
                     bridge.showOriginal()
                 else:
                     bridge.close(hide=True)
+            elif action == 'minimize':
+                # same as WG's minimize button: room into the channel carousel, unit is kept
+                windowView = bridge.roomWindowView()
+                if windowView is not None:
+                    windowView.onWindowMinimize()
+            elif action == 'close':
+                # same as WG's X: AbstractWindowView.handleWindowClose -> leave dialog, then leave
+                windowView = bridge.roomWindowView()
+                if windowView is not None and windowView.onTryClosing():
+                    windowView.onWindowClose()
+            elif action == 'dragStart':
+                self._dragStart()
+            elif action == 'dragEnd':
+                if self._drag is not None:
+                    self._dragEnd()
             elif action == 'restore':
                 # the small EZ ROOM button: overlay back (next tick: opening closes this button's own window)
                 BigWorld.callback(0.0, lambda: bridge.open(manual=True))
