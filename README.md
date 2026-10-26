@@ -26,9 +26,12 @@ folder into the WoT folder (raw data view, F5 reload of the UI from `mods\config
   the room (with WG's confirmation)
 - Team table: sortable columns (clan, name, rating, tank), WG's status lamps, commander cap,
   badges, voice indicator, roles (artillery strike / inspiration) with commander buttons,
-  WG's class icon before the tank name; sorted by tank = by class (heavy, medium, TD, light,
-  SPG), A-Z inside, with tank count and fold arrow; frozen vehicles with WG's unfreeze button
-- Volunteers: WG's online status, sortable (offline players at the bottom), click = next free
+  WG's class icon before the tank name, tanks per class and total next to the title; one click
+  sorts (clan/name A-Z, rating highest first), the second goes back to WG's order; by tank =
+  by class (heavy, medium, TD, light, SPG), single tanks first, then by count and A-Z, with
+  tank count and fold arrow; frozen vehicles with WG's unfreeze button
+- Volunteers: WG's online status, sortable (players in the room on top, then invited, then
+  offline), click = next free
   slot, drag = that slot, drag a member back out
 - Header: WG's direction graphic (also while the unit is in battle) with WG's own tooltips,
   timer with alert colour, reserves, division info tooltip, back link
