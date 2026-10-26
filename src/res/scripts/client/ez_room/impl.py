@@ -22,7 +22,7 @@ from helpers.i18n import makeString
 from adisp import adisp_process
 from skeletons.gui.impl import IGuiLoader
 
-__version__ = '0.7.37'
+__version__ = '0.7.38'
 _logger = logging.getLogger('EZ_ROOM')
 _logger.setLevel(logging.INFO)
 _LAYOUT_PATH = ('ez_room', 'views', 'EzRoomView')
@@ -797,6 +797,12 @@ class EzRoomView(ViewImpl):
 
     def _getEvents(self):
         return ((self.viewModel.onAction, self.__onAction),)
+
+    def canBeClosed(self):
+        # WG's fullscreen manager destroys every FULLSCREEN_WINDOW when any lobby window opens
+        # (e.g. another mod's window after a battle) unless it says no here; it is the only caller.
+        # Our own close / minimize / Original destroy the window directly.
+        return False
 
     def _finalize(self):
         self._tracking = False
