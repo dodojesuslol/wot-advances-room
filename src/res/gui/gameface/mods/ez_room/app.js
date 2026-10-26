@@ -569,8 +569,16 @@ function sortValue(slot, key) {
     if (key === "clan") return (p.clanAbbrev || "").toLowerCase();
     if (key === "name") return (p.userName || p.fullName || "").toLowerCase();
     if (key === "rating") return ratingValue(slot);
-    if (key === "tank") return v ? (v.shortUserName || v.userName || "").toLowerCase() : null;
+    if (key === "tank") return v ? tankClass(v) + (v.shortUserName || v.userName || "").toLowerCase() : null;
     return 0;
+}
+
+// sorted by tank: heavy, medium, tank destroyer, light, SPG, then A-Z inside each class (user)
+const TANK_CLASS_ORDER = ["heavyTank", "mediumTank", "AT-SPG", "lightTank", "SPG"];
+
+function tankClass(v) {
+    const i = TANK_CLASS_ORDER.indexOf(String(v.type || "").replace(/_elite$/, ""));
+    return String(i === -1 ? TANK_CLASS_ORDER.length : i);
 }
 
 function sortedSlots() {
@@ -1120,11 +1128,12 @@ document.addEventListener("click", (e) => {
     } else if (act === "reserveSelect") {
         send({ action: "reserveSelect", id: id, remove: el.getAttribute("data-remove") === "1" });
     } else if (act === "sort") {
-        // first click ascending, second descending, third back to slot order
+        // first click ascending, second descending, third back to slot order;
+        // tank only has two: by class, then back to slot order (user)
         const key = el.getAttribute("data-key");
         const cur = ui.sort || {};
         let dir = 1;
-        if (cur.key === key) dir = cur.dir === 1 ? -1 : cur.dir === -1 ? 0 : 1;
+        if (cur.key === key) dir = key === "tank" ? 0 : cur.dir === 1 ? -1 : cur.dir === -1 ? 0 : 1;
         ui.sort = dir ? { key: key, dir: dir } : null;
         send({ action: "sort", key: dir ? key : "", dir: dir });
         render();
@@ -1360,7 +1369,7 @@ function readModel() {
         if (!sortLoaded) {
             sortLoaded = true;
             const saved = (data.settings || {}).sort;
-            if (saved && saved.key && saved.dir) ui.sort = { key: saved.key, dir: saved.dir };
+            if (saved && saved.key && saved.dir) ui.sort = { key: saved.key, dir: saved.key === "tank" ? 1 : saved.dir };
             const savedCand = (data.settings || {}).candSort;
             if (savedCand && savedCand.key && savedCand.dir) ui.candSort = { key: savedCand.key, dir: savedCand.dir };
         }
