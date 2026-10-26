@@ -45,7 +45,7 @@ Legende: ✅ vorhanden · 🟡 teilweise · ❌ fehlt · 🚫 bewusst weggelasse
 | B9 | Legionär-Kennzeichnung | ✅ | |
 | B10 | Panzer: Icon, Stufe, Name; Nationsflagge im Hintergrund | 🟡 | Stufe + Name da; Panzerbild seit v0.7.19 bewusst weg (Nutzer, mehr Platz); Flagge fehlt |
 | B11 | Panzer-Zustand (nicht bereit, „Zu reparieren“ …) | ✅ | |
-| B12 | **Eingefrorene Panzer** + „Auftauen“-Button (`vehBrokenIcon`) | ❌ | `onUnfrozenVehicleSlotClick(slotIndex)`, Slot-VO `hasFrozenVehicle`, `canUnfrozeVehicles` |
+| B12 | **Eingefrorene Panzer** + „Auftauen“-Button (`vehBrokenIcon`) | 🟡 | v0.7.42 (Vorschau ok, im Spiel noch nicht gesehen – nur während eines Festungs-Events): WGs rotes Zahnrad (`fortClanBattleRoom.swf` Sprite 120) am Ende der Panzerspalte; Clan-Rollen mit `canUnfrozeVehicles` bekommen WGs Zahnrad-Knopf → `onUnfrozenVehicleSlotClick(slot)` (WGs Dialog mit Reparaturteile-Preis), grau bei `unfrozeVehiclesBtnEnabled == false`; WG-Tooltips |
 | B13 | Prestige-Stufe (`prestigeLevel`) | 🚫 | nicht gewünscht (Nutzer, 2026-10-18) |
 | B14 | Freien Platz nehmen | ✅ | `assignSlotRequest(slot, -1)` |
 | B15 | Platz verlassen / Kommandant: Spieler raus, kicken | ✅ | v0.7.6: „Raus“ + „✕“ (Kick, ein Klick, keine Rückfrage) erscheinen sofort beim Überfahren über dem Zeilenende, ohne Flackern; Freiwillige: „✕“. `leaveSlotRequest`, `requestToKickUser` |
@@ -100,7 +100,7 @@ Legende: ✅ vorhanden · 🟡 teilweise · ❌ fehlt · 🚫 bewusst weggelasse
 | F4 | Cooldowns: Buttons kurz gesperrt (`as_setCoolDownS`) | ❌ | |
 | F5 | UI-Klänge (`g_strongholdSoundController`, Klick-Sounds) | ❌ | |
 | F6 | FAQ-Fenster (`showFAQWindow`) | ❌ | falls im Original erreichbar |
-| F7 | Minimieren / Schließen über die WG-Titelleiste | ✅ | Titelleiste bleibt frei |
+| F7 | Minimieren / Schließen | ✅ | v0.7.36–0.7.39 (im Spiel bestätigt): Overlay 1038×707 deckt WGs ganzes Fenster ab, eigene Titelleiste mit WGs Knöpfen (`windows.swf` Sprites 29/39) → `onWindowMinimize` / `onWindowClose`; Ziehen an der Titelleiste schiebt WGs Fenster mit (`as_setGeometryS`). Aus dem Bild schieben geht nicht (Engine begrenzt Gameface-Fenster, 0.7.40 zurückgenommen). Ab 0.7.38 kann kein anderes Fenster das Overlay schließen (`canBeClosed`) |
 | F8 | Fenster verschieben | ✅ | Abfrage jedes Frame |
 | F9 | Kontextmenüs / Popups / WG-Fenster über der Oberfläche | ✅ | `_whileWgWindow`, `_reopenAfterExternalClose` |
 
