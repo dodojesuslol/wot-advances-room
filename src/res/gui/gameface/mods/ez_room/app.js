@@ -647,7 +647,8 @@ function renderColumns() {
     const sort = ui.sort || {};
     const head = (key, label, cls) => {
         const on = sort.key === key && sort.dir;
-        const arrow = on ? (sort.dir > 0 ? "▲" : "▼") : "";
+        // tank has only one sort order (by class): just marked, no arrow (user 0.7.50)
+        const arrow = on && key !== "tank" ? (sort.dir > 0 ? "▲" : "▼") : "";
         return `<div class="col ${cls} ${on ? "on" : ""}" data-act="sort" data-key="${key}">${esc(label())}<span class="arrow">${arrow}</span></div>`;
     };
     return `
