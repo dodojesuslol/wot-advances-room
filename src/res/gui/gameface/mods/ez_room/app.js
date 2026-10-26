@@ -767,12 +767,16 @@ function renderMapGrid() {
 function renderSide() {
     const room = data.room || {};
     const map = txt(room.mapName);
+    // skirmishes (isBattleType false = sortie, vo_converters) always get a random map: no minimap
+    // there, the chat takes the whole column; Advances keep the map
+    const showMap = room.isBattleType !== false;
     return `
         <div class="side">
+            ${showMap ? `
             <div class="panel map">
                 <div class="ptitle">${esc(map || L("Karte", "Map"))}</div>
                 ${renderMapGrid()}
-            </div>
+            </div>` : ""}
             ${renderChat()}
         </div>`;
 }
