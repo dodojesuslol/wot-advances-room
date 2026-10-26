@@ -198,6 +198,8 @@ body {
 .veh.none { color: rgba(233, 231, 220, 0.3); font-size: 11rem; }
 .veh.bad .vname { color: #ff9a72; }
 .tier { width: 26rem; flex-shrink: 0; text-align: center; color: rgba(233, 231, 220, 0.55); font-size: 11rem; }
+/* WG class icon (gui/maps/icons/vehicleTypes, 16 x 16) before the tank name */
+.vclass { width: 16rem; height: 16rem; margin-right: 4rem; flex-shrink: 0; background-size: 16rem 16rem; }
 .vname { color: #ffe4c0; font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .vfold { width: 12rem; margin-right: 3rem; flex-shrink: 0; text-align: center; color: #ffd79a; font-size: 9rem; cursor: pointer; }
 .vfold:hover { color: #ffffff; }

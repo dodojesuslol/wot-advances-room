@@ -454,6 +454,7 @@ function renderSlot(slot, idx, tankCount, tankId) {
                 <!-- no tank image (user, 0.7.19): more room for the name and the role icons -->
                 <div class="tier">${ROMAN[v.level] || ""}</div>
                 ${tankCount ? `<div class="vfold" data-act="foldTank" data-tank="${esc(tankId)}" data-tip="${esc(ui.foldTanks[tankId] ? L("Alle zeigen", "Show all") : L("Zuklappen", "Fold"))}">${ui.foldTanks[tankId] ? "▶" : "▼"}</div>` : tankId ? `<div class="vfold"></div>` : ""}
+                ${TANK_CLASS_ORDER.indexOf(v.type) !== -1 ? `<div class="vclass" style="background-image:url(img://gui/maps/icons/vehicleTypes/${v.type}.png)"></div>` : ""}
                 <div class="vname">${esc(v.shortUserName || v.userName)}</div>
                 ${tankCount ? `<div class="vcount" data-tip="${esc(F("{0} Spieler mit diesem Panzer", "{0} players with this tank", tankCount))}">×${tankCount}</div>` : ""}
                 ${roleIcons}
