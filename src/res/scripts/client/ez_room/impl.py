@@ -22,7 +22,7 @@ from helpers.i18n import makeString
 from adisp import adisp_process
 from skeletons.gui.impl import IGuiLoader
 
-__version__ = '0.7.39'
+__version__ = '0.7.40'
 _logger = logging.getLogger('EZ_ROOM')
 _logger.setLevel(logging.INFO)
 _LAYOUT_PATH = ('ez_room', 'views', 'EzRoomView')
@@ -72,6 +72,9 @@ _TRACK_INTERVAL = 0.0  # every frame: the overlay follows WG's window / the curs
 _WIN_W, _WIN_H = 12 + _ROOM_W + 13, 35 + _ROOM_H + 19
 _EZ_W, _EZ_H = _WIN_W, _WIN_H
 _EZ_DX, _EZ_DY = (_WIN_W - _EZ_W) // 2, (_WIN_H - _EZ_H) // 2
+# Window.onEndDrag: free while dragged, on release only top >= 0 and top <= screen height - 33
+# (bgForm.y), so the title bar can always be grabbed again; no limit left / right
+_DRAG_KEEP = 33
 
 
 def _rect(window):
@@ -131,8 +134,8 @@ def _frame(roomRect, config):
     if offset:
         dx, dy, w, h = offset
         return (int(round(x + dx)), int(round(y + dy)), int(w), int(h))
-    x, y = _clampToScreen(x + _EZ_DX, y + _EZ_DY)
-    return (x, y, _EZ_W, _EZ_H)
+    # no clamping: WG keeps its own window in bounds (or lets the user drag it partly out)
+    return (int(round(x + _EZ_DX)), int(round(y + _EZ_DY)), _EZ_W, _EZ_H)
 
 
 def _screenSize():
@@ -146,11 +149,34 @@ def _screenSize():
     return (w / scale, h / scale, scale)
 
 
-def _clampToScreen(x, y):
-    sw, sh, _ = _screenSize()
-    x = max(0.0, min(float(x), sw - _EZ_W))
-    y = max(0.0, min(float(y), sh - _EZ_H))
-    return (int(round(x)), int(round(y)))
+def _dragBounds(y):
+    # WG's Window.onEndDrag rule for the top edge
+    _, sh, _ = _screenSize()
+    return int(round(max(0.0, min(float(y), sh - _DRAG_KEEP))))
+
+
+_directMove = None  # None = untested, True = WG's window clip can be moved directly, False = no
+
+
+def _moveRoomWindow(view, x, y, rect):
+    # WG's window behind the overlay. as_setGeometryS pulls it back on screen (checkAppBounds), so
+    # first try to set the Window clip's x / y directly, like Window.startDrag does while dragging
+    global _directMove
+    if _directMove is not False:
+        try:
+            window = view.flashObject.window
+            window.x = x
+            window.y = y
+            if _directMove is None:
+                geom = view.as_getGeometryS()
+                _directMove = bool(geom) and abs(geom[0] - x) < 1 and abs(geom[1] - y) < 1
+                _logger.info('moving WG window directly: %s (%r -> %r)', 'ok' if _directMove else 'no effect', (x, y), geom)
+            if _directMove:
+                return
+        except Exception as e:
+            _directMove = False
+            _logger.info('moving WG window directly not possible (%s), using as_setGeometryS', e)
+    view.as_setGeometryS(x, y, rect[2], rect[3])
 
 
 def _cursor():
@@ -771,23 +797,29 @@ class EzRoomView(ViewImpl):
                 return
             cx, cy = _cursor()
             sx, sy, fx, fy = self._drag
-            x, y = _clampToScreen(fx + cx - sx, fy + cy - sy)
-            if (x, y) == tuple(self._frame[:2]):
-                return
-            self._frame = (x, y) + tuple(self._frame[2:])
-            window = self.getParentWindow()
-            if window is not None:
-                window.move(x, y)
-            view = _roomWindowView(self._bridge)
-            if view is not None:
-                rect = self._roomRect or (0, 0, _WIN_W, _WIN_H)
-                view.as_setGeometryS(x - _EZ_DX, y - _EZ_DY, rect[2], rect[3])
+            self._moveTo(int(round(fx + cx - sx)), int(round(fy + cy - sy)))
         except Exception:
             _logger.exception('dragging failed')
             self._drag = None
 
+    def _moveTo(self, x, y):
+        if (x, y) == tuple(self._frame[:2]):
+            return
+        self._frame = (x, y) + tuple(self._frame[2:])
+        window = self.getParentWindow()
+        if window is not None:
+            window.move(x, y)
+        view = _roomWindowView(self._bridge)
+        if view is not None:
+            _moveRoomWindow(view, x - _EZ_DX, y - _EZ_DY, self._roomRect or (0, 0, _WIN_W, _WIN_H))
+
     def _dragEnd(self):
         self._drag = None
+        try:
+            if self._frame is not None:
+                self._moveTo(self._frame[0], _dragBounds(self._frame[1]))
+        except Exception:
+            _logger.exception('drag end failed')
         # take WG's (possibly clamped) position as seen, so the overlay does not jump afterwards
         self._roomRect = _roomRect(self._bridge)
 
