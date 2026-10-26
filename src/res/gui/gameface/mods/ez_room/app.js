@@ -743,6 +743,11 @@ function chatHtml(line) {
     return out;
 }
 
+// the chat log element is kept over re-renders while its lines are the same: a new element lost
+// its scroll position in game on every room change (user 0.7.46)
+let chatLinesNext = null;
+let chatLinesShown = null;
+
 function renderChat() {
     const chat = data.chat || {};
     const lines = chat.lines || [];
@@ -750,7 +755,7 @@ function renderChat() {
         <div class="panel chat">
             <div class="ptitle chattitle">${L("Chat-Kanal", "Chat channel")}</div>
             <div class="pwrap">
-                <div class="chatlog" id="chatlog" data-scroll="40">${lines.map((l) => `<p class="cline" cohinline="true">${chatHtml(l)}</p>`).join("")}</div>
+                <div class="chatlog" id="chatlog" data-scroll="40">${(chatLinesNext = lines.map((l) => `<p class="cline" cohinline="true">${chatHtml(l)}</p>`).join(""))}</div>
                 ${scrollbar("chatlog")}
             </div>
             <div class="chatin">
@@ -1024,7 +1029,12 @@ function render() {
     if (log) chatStick = log.scrollTop + log.clientHeight >= log.scrollHeight - 8;
     const keep = {};
     root.querySelectorAll("[data-scroll]").forEach((el, i) => (keep[i] = el.scrollTop));
+    chatLinesNext = null;
     const body = ui.raw ? renderRaw() : `${renderCandidates()}${renderTeam()}${renderSide()}`;
+    const keepLog = log && chatLinesNext !== null && chatLinesNext === chatLinesShown ? log : null;
+    const keepLogTop = keepLog ? keepLog.scrollTop : 0;
+    if (keepLog) keepLog.parentNode.removeChild(keepLog);
+    chatLinesShown = chatLinesNext;
     root.innerHTML = `${renderTitlebar()}${renderHeader()}<div class="body">${body}${ui.raw ? "" : renderWaiting()}</div>${renderFooter()}${renderReservePopup()}<div id="tip" class="tip"></div>`;
     // the room re-renders every second (timer, room data): keep an open tooltip where it was (user 0.7.46)
     const tip = document.getElementById("tip");
@@ -1033,6 +1043,13 @@ function render() {
         tip.style.display = "block";
         tip.style.left = tipPos[0];
         tip.style.top = tipPos[1];
+    }
+    if (keepLog) {
+        const fresh = document.getElementById("chatlog");
+        if (fresh) {
+            fresh.parentNode.replaceChild(keepLog, fresh);
+            if (keepLog.scrollTop !== keepLogTop) keepLog.scrollTop = keepLogTop;
+        }
     }
     markHover();
     root.querySelectorAll("[data-scroll]").forEach((el, i) => {
@@ -1413,9 +1430,11 @@ document.addEventListener("keydown", (e) => {
 let lastKey = "";
 let sortLoaded = false;
 
+let lastData = null;
 function changeKey(d) {
     const grid = d.grid ? Object.assign({}, d.grid, { points: (d.grid.points || []).map((p) => [p.x, p.y]) }) : null;
-    return JSON.stringify(Object.assign({}, d, { timer: null, timerAge: null, grid: grid }));
+    // dev raw data holds WG's timer call (new every second): only counts while the raw view is open
+    return JSON.stringify(Object.assign({}, d, { timer: null, timerAge: null, grid: grid, raw: ui.raw ? d.raw : null }));
 }
 
 function readModel() {
@@ -1434,6 +1453,12 @@ function readModel() {
             updateTimer(document.getElementById("timer"));
             return;
         }
+        // dev: which parts of the room data made it render again (finding needless re-renders)
+        if (next.dev && lastData) {
+            const changed = Object.keys(next).filter((k) => k !== "timer" && k !== "timerAge" && k !== "raw" && JSON.stringify(next[k]) !== JSON.stringify(lastData[k]));
+            send({ action: "log", msg: "render: " + changed.join(",") });
+        }
+        lastData = next;
         lastKey = key;
         if (!sortLoaded) {
             sortLoaded = true;
