@@ -202,6 +202,12 @@ body {
 .veh.none { color: rgba(233, 231, 220, 0.3); font-size: 11rem; }
 .veh.bad .vname { color: #ff9a72; }
 .tier { width: 26rem; flex-shrink: 0; text-align: center; color: rgba(233, 231, 220, 0.55); font-size: 11rem; }
+/* class count next to the members title: icon + number per class, then the total */
+.ccounts { display: flex; align-items: center; margin-left: 14rem; font-weight: normal; }
+.ccount { display: flex; align-items: center; margin-right: 10rem; color: #ffe4c0; font-size: 12rem; }
+.ccount .vclass { margin-right: 3rem; }
+.ccount.zero { opacity: 0.35; }
+.ccount.ctotal { padding-left: 10rem; border-left: 1rem solid rgba(255, 255, 255, 0.2); }
 /* WG class icon (gui/maps/icons/vehicleTypes, 16 x 16) before the tank name */
 .vclass { width: 16rem; height: 16rem; margin-right: 4rem; flex-shrink: 0; background-size: 16rem 16rem; }
 .vname { color: #ffe4c0; font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

@@ -549,6 +549,23 @@ function tankKey(slot) {
     return v ? String(v.intCD || v.shortUserName || v.userName || "") : "";
 }
 
+// next to the members: how many tanks of each class are chosen and how many in total (WG's class
+// icons, numbers only; user 0.7.49)
+function renderClassCount(slots) {
+    const counts = {};
+    let total = 0;
+    slots.forEach((s) => {
+        const v = s && s.player && s.selectedVehicle;
+        if (!v) return;
+        total++;
+        const type = String(v.type || "").replace(/_elite$/, "");
+        counts[type] = (counts[type] || 0) + 1;
+    });
+    const items = TANK_CLASS_ORDER.map((type) => `
+        <span class="ccount ${counts[type] ? "" : "zero"}"><span class="vclass" style="background-image:url(img://gui/maps/icons/vehicleTypes/${type}.png)"></span>${counts[type] || 0}</span>`).join("");
+    return `<span class="ccounts">${items}<span class="ccount ctotal">${total}</span></span>`;
+}
+
 function renderTeam() {
     const slots = data.slots || [];
     const header = (data.tableHeader || [])[0];
@@ -557,6 +574,7 @@ function renderTeam() {
         <div class="panel team">
             <div class="ptitle">
                 ${esc(txt(header && header.label) || L("Team", "Team"))}
+                ${renderClassCount(slots)}
                 <span class="grow"></span>
                 ${vt ? `<span class="muted">${esc(txt(vt[0]))}</span>` : ""}
             </div>
