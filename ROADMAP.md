@@ -1,8 +1,23 @@
 # EZ ROOM – Roadmap: Funktionsgleichheit mit dem WG-Original
 
-Stand: v0.7.35 (2026-10-18). Ziel: Jede Funktion des Flash-Raums (`fortClanBattleRoom.swf` + `fortBattleRoomWindow.swf`)
-einzeln mit dem Original vergleichen und alles, was fehlt, nachbauen. Zum Vergleich in einem echten Raum über den
-„Original“-Button umschalten (Esc / Mods-Button bringt die neue Oberfläche zurück).
+Stand: v0.8.7 (2026-11-12, WoT 2.4.1.1). Ziel: Jede Funktion des Flash-Raums (`fortClanBattleRoom.swf` + `fortBattleRoomWindow.swf`)
+einzeln mit dem Original vergleichen und alles, was fehlt, nachbauen. Zum Vergleich in einem echten Raum über „WG-Raum“
+(Titelleiste) umschalten, der Eintrag in der Mods-Liste schaltet zurück.
+
+**Umbau 0.8.0 (im Spiel noch nicht getestet):** WGs Flash-Raum wird nicht mehr geöffnet.
+- Öffnen: Event-Bus-Sperre auf `LoadViewEvent('StrongholdBattleRoomWindow')` (alle Wege: Beitritt, Karussell, Einladung,
+  nach dem Gefecht). Raumliste (Webseite) bleibt WGs Fenster, beim Beitritt wird es geschlossen.
+- Daten: eigener `IGlobalListener` am prb-Dispatcher + `STRONGHOLD_ON_TIMER`, `CoolDownEvent`, `FIGHT_BUTTON_UPDATE`,
+  Messenger-/Voice-Events; VOs mit WGs Buildern (`makeStrongholdsSlotsVOs`, `makeSortieVO`, `StrongholdActionButtonStateVO`,
+  `SortieCandidatesLegionariesDP` …). Neu senden nur bei Änderung, Timer und Suchzeit zählen in der Oberfläche.
+- Aktionen: direkt über Unit-Request-Contexts / Entity (`AssignUnitCtx`, `KickPlayerUnitCtx`, `SetVehicleUnitCtx`,
+  `doAction`, `doLeaveAction` …).
+- Chat: eigener Empfänger statt WGs Flash-Chatfeld am Unit-Kanal (`rqActivateChannel`), Kommandanten-Markierungen über
+  denselben Kanal.
+- Fenster: bildschirmgroß + durchsichtig, nur das Raumfenster nimmt die Maus (v0.8.7, im Spiel bestätigt: `viewEnv.setInputArea` wie WGs StyleBuyingPanel, beim Ziehen kurz der ganze Bildschirm; `setHitTestEnabled` gibt es in normalen Gameface-Fenstern nicht), Ziehen nur per CSS,
+  Position gespeichert. Ausweichmodus `"windowMode": "panel"` in settings.json.
+- Fallback: „WG-Raum“-Knopf, Mods-Liste (gespeichert als `useWgRoom`), automatisch bei Fehler / UI meldet sich nicht /
+  Absturz beim Öffnen (opening.guard).
 
 Legende: ✅ vorhanden · 🟡 teilweise · ❌ fehlt · 🚫 bewusst weggelassen
 
@@ -24,7 +39,7 @@ Legende: ✅ vorhanden · 🟡 teilweise · ❌ fehlt · 🚫 bewusst weggelasse
 | A4 | Richtungs-/Gebäudegrafik (grüne Burg → Flaggen → ⚔ → rote Burg) | ✅ | v0.7.15 (im Spiel bestätigt): eigene Zeile unter dem Kopf, Clans links/rechts, Timer genau mittig im Kopf; 13 Endbilder aus `fortCmp.swf` (`ConnectedDirectsUI`, jeweils ruhiges Bild vor dem nächsten Label) in `gui/maps/icons/ez_room/direction/<value>.png`; `as_updateReadyDirectionsS(false)` → Text „Richtungen werden ermittelt …“; keine Animation. Teamzeilen 27→22 px, damit alle 15 passen; v0.7.46: auch ohne Gegner („Abteilung im Gefecht“), WGs echte Tooltips (BackportTooltipWindow: DIRECT_MODULE 0–5, Schwerter = crossSwords) |
 | A5 | Eigener Clan / Gegner-Clan mit Bereit-Anzeige | ✅ | Namen + Glow da; WGs Bereit-Lämpchen dort nicht gewünscht (Nutzer, 2026-10-18) |
 | A6 | Gefechts-Timer, normale und Alarm-Farbe (#ffdd99 / #ff7f00) | ✅ | v0.7.7: letzte 10 s sofort orange + oranger Rand (Farben aus dem Timer-VO), ohne Animation |
-| A7 | Timer-Alarm-Ton (Flash ruft `onTimerAlert()` → `playBattleRoomTimerAlert`) | 🚫 | nicht nachbauen (Nutzer): der Flash-Timer läuft unter der Oberfläche weiter und spielt den Original-Ton selbst |
+| A7 | Timer-Alarm-Ton (Flash ruft `onTimerAlert()` → `playBattleRoomTimerAlert`) | 🟡 | v0.8.0: ohne Flash-Raum selbst nachgebaut, `g_strongholdSoundController.playBattleRoomTimerAlert()` jede Sekunde der letzten 10 (im Spiel testen) |
 | A8 | „Warten auf Gefecht“-Text (`waitForBattleDescr`) | ✅ | |
 | A9 | 4 Reserve-Plätze + Auswahl | ✅ | eigene Liste statt Popover |
 | A10 | Reserve-Liste: erweiterte Werte (Schaden, Radius, Crew-Bonus …) | ❌ | `FortReserveSelectPopover.__buildReserveParams` |
@@ -94,15 +109,15 @@ Legende: ✅ vorhanden · 🟡 teilweise · ❌ fehlt · 🚫 bewusst weggelasse
 
 | # | Funktion im Original | Status | Hinweise / WG-API |
 |---|---|---|---|
-| F1 | **Automatische Gegnersuche / Warteschlange** (Panel im Fenster) | ✅ | bleibt WG-Original (Nutzerwunsch): Oberfläche blendet sich während der Suche aus und kommt danach zurück (v0.7.3, im Spiel bestätigt) |
-| F2 | **Warte-Overlay** („Daten werden geladen“, `showStrongholdWaiting`) | ✅ | v0.7.4: Hook auf `StrongholdBattleRoomWindow.as_setWaitingS` → eigener Schleier mit Kreisel + WG-Text über dem Raum (Variante 1, Nutzerwahl) |
-| F3 | Wartungsmodus (`onStrongholdMaintenance`) | ❌ | |
+| F1 | **Automatische Gegnersuche / Warteschlange** (Panel im Fenster) | 🟡 | v0.8.0: eigene Anzeige wie WGs Suchformular (Text, Zeit auf/ab, „Abbrechen“ = `exitFromPlayersMatchingMode` / `exitFromQueue`), X gesperrt wie bei WG; mit Ligen öffnet WG seinen eigenen Warteschlangen-Bildschirm (im Spiel testen) |
+| F2 | **Warte-Overlay** („Daten werden geladen“, `showStrongholdWaiting`) | 🟡 | v0.8.0: eigener Schleier, solange `isStrongholdSettingsValid()` falsch ist, mit WGs Text; dazu WGs Hinweis „Kommandant übernommen“ (2,5 s) (im Spiel testen) |
+| F3 | Wartungsmodus (`onStrongholdMaintenance`) | 🟡 | v0.8.0: WGs Hinweis mit Icon + „Erneut versuchen“ (`requestMaintenanceUpdate`) (im Spiel testen) |
 | F4 | Cooldowns: Buttons kurz gesperrt (`as_setCoolDownS`) | 🟡 | v0.7.43 (im Spiel testen): nur Bereit/Nicht-bereit wie WG (SET_PLAYER_STATE = 6, WGs Sekunden, kein Countdown); Loader merkt sich die Sperre pro Anfrage (`bridge.coolDowns`). Raum schließen / Kommentar sperrt WG wegen falscher ID (24 statt 27) selbst nie → nicht nachgebaut |
 | F5 | UI-Klänge (`g_strongholdSoundController`, Klick-Sounds) | ❌ | |
 | F6 | FAQ-Fenster (`showFAQWindow`) | ❌ | falls im Original erreichbar |
-| F7 | Minimieren / Schließen | ✅ | v0.7.36–0.7.39 (im Spiel bestätigt): Overlay 1038×707 deckt WGs ganzes Fenster ab, eigene Titelleiste mit WGs Knöpfen (`windows.swf` Sprites 29/39) → `onWindowMinimize` / `onWindowClose`; Ziehen an der Titelleiste schiebt WGs Fenster mit (`as_setGeometryS`). Aus dem Bild schieben geht nicht (Engine begrenzt Gameface-Fenster, 0.7.40 zurückgenommen). Ab 0.7.38 kann kein anderes Fenster das Overlay schließen (`canBeClosed`) |
-| F8 | Fenster verschieben | ✅ | Abfrage jedes Frame |
-| F9 | Kontextmenüs / Popups / WG-Fenster über der Oberfläche | ✅ | `_whileWgWindow`, `_reopenAfterExternalClose` |
+| F7 | Minimieren / Schließen | 🟡 | v0.8.0: Minimieren = in die Chat-Leiste wie WG (Klick dort öffnet/minimiert), X = WGs Verlassen mit Rückfrage (`doLeaveAction`); WGs Knopf-Grafiken (`windows.swf`) (im Spiel testen) |
+| F8 | Fenster verschieben | 🟡 | v0.8.0: Ziehen nur per CSS (keine Abfrage), Position gespeichert (im Spiel testen) |
+| F9 | Kontextmenüs / Popups / WG-Fenster über der Oberfläche | 🟡 | v0.8.0: Dialoge / Panzerauswahl liegen darüber (höhere Ebene); bei Einladen / Konfigurieren blendet sich das Raumfenster aus, bis WGs Fenster zu ist (Fenster-Events, keine Abfrage) |
 
 ## G. Eigene Erweiterungen und Abschluss
 
@@ -113,7 +128,7 @@ Legende: ✅ vorhanden · 🟡 teilweise · ❌ fehlt · 🚫 bewusst weggelasse
 | G3 | Schritt 4: EZ ROOM und EZ TANK PICKER zu einer Mod zusammenlegen | 🚫 | bleibt eigene Mod (Nutzer, 2026-10-19)
 | G4 | README / Release auf GitHub (Konto dodojesuslol, kein Klarname!) | ❌ |
 | G5 | Dev-Modus vor Release aus (`mods/configs/ez_room/dev.json` löschen) | ❌ |
-| G6 | Zurück-Knopf ohne Mods-Liste | ✅ | v0.7.34 (im Spiel bestätigt): nach „Original“ / Esc / Mods-Liste-aus ein kleiner „EZ ROOM“-Knopf (eigenes Fenster, 96×22) mittig in WGs Titelleiste, folgt dem Fenster; Klick = Oberfläche zurück. Auch nach einem Absturz-Schutz (opening.guard) |
+| G6 | Zurück zu EZ ROOM ohne Mods-Liste | 🚫 | v0.8.0: kleiner „EZ ROOM“-Knopf über WGs Fenster entfällt (brauchte Abfrage der Fensterposition); zurück über die Mods-Liste |
 
 ## Empfohlene Reihenfolge
 

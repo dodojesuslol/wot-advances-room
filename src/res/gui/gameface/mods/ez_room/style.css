@@ -1,7 +1,14 @@
 /* 1rem = 1 design px (Gameface sets the root font size to the UI scale)
-   Look: same as EZ TANK PICKER (WoT 2.0 inspired: dark glass, cream text, orange accent).
-   The view lies exactly over WG's whole room window (1038 x 707, own title bar); app.js sets the
-   body size from data.frame. */
+   Look (0.8.0): light cyberpunk touch on WG's palette. Opaque dark panels (0.8.5), no rounded
+   corners (cut corner marks instead), thin glowing lines, glow only on active elements, faint
+   scanline / grid texture. All colours are WG's own (Gameface CSS of the client: text_styles main
+   #e9e2bf, standard #8c8c7e, highlight #ffdd99, gold #ffc363, orange #ee7000 / #feab34, green
+   #80d43a / #7ab300, red #ff2717 / #b70000, backgrounds #26241b / #2f2e24 / #37362e, lines
+   #595950 / #7e7b68; battle timer #ffdd99 / #ff7f00 from StrongholdsTimerColors).
+   Colours are written out (Gameface does not take CSS variables inside shorthands like border).
+   Full mode: the view is as big as the screen and transparent, #panel is the room (1038 x 707,
+   positioned by app.js). Panel mode: the view is the panel. */
+
 html, body {
     width: 100%;
     height: 100%;
@@ -11,11 +18,8 @@ html, body {
 }
 
 body {
-    background-color: #151515;
-    background-image: url(img://gui/maps/icons/hangar/selectVehicle/bg.jpg);
-    background-size: cover;
-    background-position: center;
-    color: #eeede9;
+    background-color: transparent;
+    color: #e9e2bf;
     font-family: Warhelios;
     font-size: 13rem;
 }
@@ -24,56 +28,141 @@ body {
     position: relative;
     width: 100%;
     height: 100%;
-    display: flex;
-    flex-direction: column;
 }
 
-.muted { color: rgba(233, 231, 220, 0.5); }
-.small { font-size: 12rem; }
+* { border-radius: 0; }
+
+/* the room panel */
+.win {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 1038rem;
+    height: 707rem;
+    display: flex;
+    flex-direction: column;
+    /* opaque (user 0.8.5: no see-through) */
+    background-color: #26241b;
+    background-image: url(img://gui/maps/icons/ez_room/scan.png), url(img://gui/maps/icons/ez_room/grid.png);
+    background-repeat: repeat, repeat;
+    background-size: 4rem 3rem, 32rem 32rem;
+    border: 1rem solid rgba(238, 112, 0, 0.45);
+    box-shadow: 0 0 18rem rgba(0, 0, 0, 0.7), 0 0 6rem rgba(238, 112, 0, 0.18);
+}
+.win.passive { visibility: hidden; }
+/* while the title bar is dragged: no glow (less to redraw per frame) */
+.win.dragging, .win.dragging * { box-shadow: none; text-shadow: none; }
+/* corner marks: cut corners drawn as orange wedges (top left, bottom right) */
+.frame { position: absolute; left: -1rem; top: -1rem; right: -1rem; bottom: -1rem; pointer-events: none; }
+.frame::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 0;
+    height: 0;
+    border-top: 14rem solid #ee7000;
+    border-right: 14rem solid transparent;
+}
+.frame::after {
+    content: "";
+    position: absolute;
+    right: 0;
+    bottom: 0;
+    width: 0;
+    height: 0;
+    border-bottom: 14rem solid #ee7000;
+    border-left: 14rem solid transparent;
+}
+
+.muted { color: #8c8c7e; }
+.small { font-size: 11rem; }
 .grow { flex-grow: 1; }
+
+/* title bar: drag handle */
+.titlebar {
+    height: 34rem;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    padding: 0 10rem 0 22rem;
+    background-image: linear-gradient(to right, rgba(238, 112, 0, 0.22), rgba(38, 36, 27, 0.2) 45%, rgba(18, 17, 13, 0.6));
+    border-bottom: 1rem solid rgba(238, 112, 0, 0.6);
+    cursor: default;
+}
+.tmark { width: 4rem; height: 14rem; margin-right: 9rem; flex-shrink: 0; background-color: #ee7000; box-shadow: 0 0 6rem rgba(238, 112, 0, 0.55); }
+.ttext { flex-grow: 1; width: 0; font-size: 15rem; font-weight: bold; color: #e9e2bf; letter-spacing: 1rem; text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* session counter (skirmish rooms): label / value pairs in the title bar */
+.tsession { flex-shrink: 0; display: flex; align-items: center; height: 20rem; margin-left: 12rem; padding: 0 8rem; border: 1rem solid #595950; background-color: #1a1913; font-size: 11rem; }
+.tsession .sk { margin-left: 8rem; color: #8c8c7e; }
+.tsession .sk:first-child { margin-left: 0; }
+.tsession .sv { margin-left: 4rem; color: #ffdd99; font-weight: bold; }
+.tsession .sv.good { color: #80d43a; }
+.tsession .sv.bad { color: #ff2717; }
+.tbrand { flex-shrink: 0; margin: 0 12rem; color: #feab34; font-size: 11rem; font-weight: bold; letter-spacing: 2rem; text-shadow: 0 0 6rem rgba(238, 112, 0, 0.55); }
+.tbtn {
+    flex-shrink: 0;
+    height: 20rem;
+    margin-right: 8rem;
+    padding: 0 9rem;
+    display: flex;
+    align-items: center;
+    border: 1rem solid #595950;
+    background-color: rgba(18, 17, 13, 0.6);
+    color: #8c8c7e;
+    font-size: 11rem;
+    cursor: pointer;
+}
+.tbtn:hover { border-color: #ee7000; color: #e9e2bf; }
+.wbtn { width: 18rem; height: 19rem; margin-left: 2rem; flex-shrink: 0; background-repeat: no-repeat; background-position: center; cursor: pointer; }
+/* WG's MinimizeButton / CloseButton (windows.swf sprites 29 / 39) */
+.wmin { background-image: url(img://gui/maps/icons/ez_room/window/min_up.png); }
+.wmin:hover { background-image: url(img://gui/maps/icons/ez_room/window/min_over.png); }
+.wmin:active { background-image: url(img://gui/maps/icons/ez_room/window/min_down.png); }
+.wclose { background-image: url(img://gui/maps/icons/ez_room/window/close_up.png); }
+.wclose:hover { background-image: url(img://gui/maps/icons/ez_room/window/close_over.png); }
+.wclose:active { background-image: url(img://gui/maps/icons/ez_room/window/close_down.png); }
 
 /* header */
 .header {
-    height: 52rem;
+    height: 50rem;
     flex-shrink: 0;
     display: flex;
     align-items: center;
     padding: 0 12rem;
-    border-bottom: 1rem solid rgba(242, 138, 58, 0.45);
-    background-image: linear-gradient(to bottom, rgba(40, 34, 28, 0.9), rgba(21, 21, 21, 0.6));
+    border-bottom: 1rem solid #595950;
+    background-color: rgba(18, 17, 13, 0.35);
     position: relative;
 }
 /* timer exactly in the middle of the header while the direction row shows the clans */
 .hcenter { position: absolute; left: 50%; top: 0; bottom: 0; width: 140rem; margin-left: -70rem; display: flex; align-items: center; justify-content: center; }
 .hcenter .timer { margin: 0; }
 .titles { flex-grow: 1; width: 0; min-width: 0; overflow: hidden; }
-.title { font-size: 18rem; font-weight: bold; color: #eeede9; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.sub { display: flex; align-items: center; font-size: 11rem; color: rgba(233, 231, 220, 0.55); margin-top: 2rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.back { display: inline-block; font-size: 11rem; color: #ffe4c0; margin-top: 3rem; white-space: nowrap; cursor: pointer; }
-.back:hover { color: #f28a3a; }
+.sub { display: flex; align-items: center; font-size: 12rem; color: #8c8c7e; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.back { font-size: 11rem; color: #ffdd99; margin-top: 3rem; white-space: nowrap; cursor: pointer; }
+.back:hover { color: #feab34; text-shadow: 0 0 6rem rgba(238, 112, 0, 0.55); }
 /* WG's divisionInfo ⓘ after the description (library/infoIcon.png) */
 .dinfo { width: 14rem; height: 14rem; margin-left: 4rem; flex-shrink: 0; background-image: url(img://gui/maps/icons/library/infoIcon.png); background-size: 14rem 14rem; cursor: default; }
-.btn.disabled { opacity: 0.4; cursor: default; }
 .center { flex-shrink: 0; display: flex; justify-content: center; margin: 0 10rem; }
 .tools { flex-shrink: 0; display: flex; justify-content: flex-end; margin-left: 4rem; }
 
 .vs { display: flex; align-items: center; }
-.clan { width: 120rem; font-size: 15rem; font-weight: bold; color: #ffe4c0; }
+.clan { width: 120rem; font-size: 15rem; font-weight: bold; color: #ffdd99; }
 .clan.mine { text-align: right; }
-.clan.enemy { color: #ff7a52; }
-.clan.ready { text-shadow: 0 0 8rem rgba(150, 205, 110, 0.9); }
+.clan.enemy { color: #ff2717; }
+.clan.ready { text-shadow: 0 0 8rem rgba(128, 212, 58, 0.5); }
 .timer {
     margin: 0 12rem;
     padding: 3rem 12rem;
-    border: 1rem solid rgba(242, 138, 58, 0.55);
-    border-radius: 4rem;
-    background-color: rgba(10, 10, 10, 0.8);
+    border: 1rem solid rgba(238, 112, 0, 0.6);
+    background-color: rgba(18, 17, 13, 0.88);
     color: #ffdd99;
     font-size: 18rem;
     font-weight: bold;
+    box-shadow: 0 0 8rem rgba(238, 112, 0, 0.25);
 }
-.timer.alert { border-color: #ff7f00; background-color: rgba(60, 18, 0, 0.85); }
-.wait { color: rgba(233, 231, 220, 0.7); font-size: 13rem; }
+.timer.alert { border-color: #ff7f00; background-color: rgba(70, 20, 0, 0.9); box-shadow: 0 0 12rem rgba(255, 39, 23, 0.5); }
+.wait { color: #8c8c7e; font-size: 13rem; }
 
 /* direction row (WG's ConnectedDirectsUI frames, 820x128 exported at 2x) */
 .dirrow {
@@ -82,26 +171,28 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    border-bottom: 1rem solid rgba(242, 138, 58, 0.25);
-    background-color: rgba(21, 21, 21, 0.6);
+    border-bottom: 1rem solid #595950;
+    background-color: rgba(18, 17, 13, 0.3);
 }
 .dirimg { width: 410rem; height: 64rem; margin: 0 14rem; background-size: 410rem 64rem; background-repeat: no-repeat; position: relative; }
 .dirzone { position: absolute; top: 8rem; height: 48rem; }
-.dirwait { display: flex; align-items: center; justify-content: center; color: rgba(233, 231, 220, 0.7); font-size: 13rem; }
+.dirwait { display: flex; align-items: center; justify-content: center; color: #8c8c7e; font-size: 13rem; }
 
 .btn {
     margin-left: 6rem;
     padding: 5rem 10rem;
-    border: 1rem solid rgba(255, 255, 255, 0.2);
-    border-radius: 3rem;
-    background-color: rgba(255, 255, 255, 0.06);
-    color: #eeede9;
+    border: 1rem solid #595950;
+    background-color: rgba(18, 17, 13, 0.55);
+    color: #e9e2bf;
     font-size: 12rem;
     white-space: nowrap;
     cursor: pointer;
 }
-.btn:hover { border-color: rgba(255, 255, 255, 0.45); background-color: rgba(255, 255, 255, 0.12); }
-.btn.ghost { background-color: transparent; color: rgba(233, 231, 220, 0.6); }
+.btn:hover { border-color: #ee7000; background-color: rgba(238, 112, 0, 0.12); box-shadow: 0 0 6rem rgba(238, 112, 0, 0.55); }
+.btn.ghost { background-color: transparent; color: #8c8c7e; }
+.btn.disabled { opacity: 0.4; cursor: default; }
+.btn.disabled:hover { border-color: #595950; background-color: rgba(18, 17, 13, 0.55); box-shadow: none; }
+.btn.accent { margin: 14rem 0 0 0; padding: 6rem 26rem; border-color: #ee7000; color: #ffdd99; text-align: center; }
 
 /* body: volunteers | team | map + chat */
 .body {
@@ -113,34 +204,37 @@ body {
 }
 
 .panel {
+    position: relative;
     display: flex;
     flex-direction: column;
-    background-color: rgba(24, 24, 25, 0.88);
-    border: 1rem solid rgba(255, 255, 255, 0.08);
+    background-color: rgba(47, 46, 36, 0.78);
+    border: 1rem solid rgba(89, 89, 80, 0.7);
     min-height: 0;
 }
+/* small orange mark at the top left of every panel */
+.panel::before { content: ""; position: absolute; left: -1rem; top: -1rem; width: 18rem; height: 2rem; background-color: #ee7000; }
 .ptitle {
     flex-shrink: 0;
     display: flex;
     align-items: center;
     height: 30rem;
     padding: 0 10rem;
-    border-bottom: 1rem solid rgba(255, 255, 255, 0.07);
-    color: #ffe4c0;
+    border-bottom: 1rem solid rgba(89, 89, 80, 0.6);
+    color: #e9e2bf;
     font-size: 13rem;
     font-weight: bold;
+    letter-spacing: 1rem;
     text-transform: uppercase;
 }
 .ptitle .count {
     margin-left: 10rem;
     padding: 1rem 7rem;
-    border-radius: 3rem;
-    background-color: rgba(255, 196, 108, 0.18);
-    color: #ffd79a;
+    border: 1rem solid rgba(255, 195, 99, 0.45);
+    color: #ffc363;
     font-size: 12rem;
 }
 .plist { flex-grow: 1; overflow-y: hidden; padding: 4rem 0; }
-.empty { padding: 10rem; color: rgba(233, 231, 220, 0.45); font-size: 13rem; }
+.empty { padding: 10rem; color: #8c8c7e; font-size: 13rem; }
 
 .cands { width: 210rem; flex-shrink: 0; }
 /* volunteers list + chat: fixed basis (height 0) so long content scrolls instead of stretching the
@@ -148,21 +242,21 @@ body {
 .pwrap { position: relative; flex-grow: 1; height: 0; display: flex; flex-direction: column; }
 .pwrap .plist { flex-grow: 1; height: 0; padding-right: 8rem; }
 .pwrap .chatlog { padding-right: 14rem; }
-.sbar { position: absolute; right: 2rem; top: 4rem; bottom: 4rem; width: 6rem; border-radius: 3rem; background-color: rgba(255, 255, 255, 0.05); visibility: hidden; }
-.sthumb { position: absolute; left: 0; top: 0; width: 6rem; height: 20rem; border-radius: 3rem; background-color: rgba(255, 228, 192, 0.35); }
-.sthumb:hover { background-color: rgba(242, 138, 58, 0.8); }
+.sbar { position: absolute; right: 2rem; top: 4rem; bottom: 4rem; width: 4rem; background-color: rgba(233, 226, 191, 0.06); visibility: hidden; }
+.sthumb { position: absolute; left: 0; top: 0; width: 4rem; height: 20rem; background-color: rgba(255, 195, 99, 0.4); }
+.sthumb:hover { background-color: #ee7000; box-shadow: 0 0 6rem rgba(238, 112, 0, 0.55); }
 .cand { display: flex; align-items: center; height: 24rem; padding: 0 10rem; }
-.cgroup { padding: 8rem 10rem 3rem; color: rgba(233, 231, 220, 0.45); font-size: 11rem; text-transform: uppercase; }
+.cgroup { padding: 8rem 10rem 3rem; color: #8c8c7e; font-size: 11rem; letter-spacing: 1rem; text-transform: uppercase; }
 /* WG's user status (statusIcon: library/userStatus/small online / busy / offline, 24x24) */
 .ustatus { width: 16rem; height: 16rem; margin-right: 4rem; margin-left: -4rem; flex-shrink: 0; background-size: 16rem 16rem; background-repeat: no-repeat; }
-.inv { width: 6rem; height: 6rem; margin-right: 6rem; border-radius: 3rem; background-color: #4f9fe0; flex-shrink: 0; }
-.cand:hover { background-color: rgba(255, 255, 255, 0.05); }
+.inv { width: 6rem; height: 6rem; margin-right: 6rem; background-color: #09e2ff; box-shadow: 0 0 5rem rgba(9, 226, 255, 0.7); flex-shrink: 0; }
+.cand:hover { background-color: rgba(233, 226, 191, 0.06); }
 /* speaking in WG's voice chat: WG's VoiceWaves (Voice.swf, "show" end frame, 100x20 behind the name) */
 .name.speak { background-image: url(img://gui/maps/icons/ez_room/speaking.png); background-size: 100rem 20rem; background-repeat: no-repeat; background-position: left center; }
 .cand .name { flex-grow: 1; width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.cand .rating { color: rgba(233, 231, 220, 0.5); font-size: 11rem; margin-left: 6rem; }
+.cand .rating { color: #8c8c7e; font-size: 11rem; margin-left: 6rem; }
 .offline { opacity: 0.45; }
-.own { color: #ffe23b; text-shadow: 0 0 6rem rgba(255, 226, 59, 0.6); }
+.own { color: #fffa9f; text-shadow: 0 0 6rem rgba(255, 195, 99, 0.7); }
 
 .team { flex-grow: 1; width: 0; margin: 0 8rem; }
 .slots { flex-grow: 1; overflow-y: hidden; padding: 4rem; display: flex; flex-direction: column; }
@@ -175,46 +269,39 @@ body {
     max-height: 28rem;
     margin-bottom: 2rem;
     padding-right: 8rem;
-    background-color: rgba(255, 255, 255, 0.035);
-    border-left: 3rem solid rgba(242, 138, 58, 0.35);
+    background-color: rgba(18, 17, 13, 0.35);
+    border-left: 2rem solid rgba(89, 89, 80, 0.8);
 }
-.slot.taken { background-color: rgba(255, 255, 255, 0.06); border-left-color: rgba(242, 138, 58, 0.85); }
+.slot.taken { background-color: rgba(55, 54, 46, 0.55); border-left-color: rgba(238, 112, 0, 0.75); }
 .slot.closed { opacity: 0.4; }
-.slot.hl { background-color: rgba(150, 205, 110, 0.12); border-left-color: #96cd6e; }
-.slot .no { width: 24rem; flex-shrink: 0; text-align: right; padding-right: 8rem; color: rgba(233, 231, 220, 0.4); font-size: 11rem; }
+.slot.hl { background-color: rgba(128, 212, 58, 0.14); border-left-color: #80d43a; box-shadow: inset 0 0 8rem rgba(128, 212, 58, 0.25); }
+.slot .no { width: 24rem; flex-shrink: 0; text-align: right; padding-right: 8rem; color: #8c8c7e; font-size: 11rem; }
 .slot .who { width: 150rem; flex-shrink: 0; display: flex; align-items: center; overflow: hidden; }
 .slot .who .name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.slot .name.free { color: rgba(233, 231, 220, 0.3); }
-.slot .rating { width: 44rem; flex-shrink: 0; text-align: right; padding-right: 8rem; color: rgba(233, 231, 220, 0.5); font-size: 11rem; }
+.slot .name.free { color: rgba(140, 140, 126, 0.6); }
+.slot .rating { width: 44rem; flex-shrink: 0; text-align: right; padding-right: 8rem; color: #8c8c7e; font-size: 11rem; }
 /* WG's commander cap (IconLibrary.swf commanderMc) */
-.crown {
-    width: 18rem;
-    height: 18rem;
-    margin: 0 3rem 0 -3rem;
-    flex-shrink: 0;
-    background-image: url(img://gui/maps/icons/ez_room/commander.png);
-    background-size: 18rem 18rem;
-}
-.tag { margin-left: 6rem; padding: 1rem 4rem; border-radius: 3rem; font-size: 10rem; flex-shrink: 0; }
-.tag.leg { background-color: rgba(79, 159, 224, 0.2); color: #9cc8f0; }
+.crown { width: 18rem; height: 18rem; margin: 0 3rem 0 -3rem; flex-shrink: 0; background-image: url(img://gui/maps/icons/ez_room/commander.png); background-size: 18rem 18rem; }
+.tag { margin-left: 6rem; padding: 0 4rem; font-size: 10rem; flex-shrink: 0; }
+.tag.leg { border: 1rem solid rgba(9, 226, 255, 0.45); color: #ccffff; }
 
 .veh { flex-grow: 1; width: 0; display: flex; align-items: center; overflow: hidden; }
-.veh.none { color: rgba(233, 231, 220, 0.3); font-size: 11rem; }
-.veh.bad .vname { color: #ff9a72; }
-.tier { width: 26rem; flex-shrink: 0; text-align: center; color: rgba(233, 231, 220, 0.55); font-size: 11rem; }
+.veh.none { color: rgba(140, 140, 126, 0.6); font-size: 11rem; }
+.veh.bad .vname { color: #ff2717; }
+.tier { width: 26rem; flex-shrink: 0; text-align: center; color: #8c8c7e; font-size: 11rem; }
 /* class count next to the members title: icon + number per class, then the total */
-.ccounts { display: flex; align-items: center; margin-left: 14rem; font-weight: normal; }
-.ccount { display: flex; align-items: center; margin-right: 10rem; color: #ffe4c0; font-size: 12rem; }
+.ccounts { display: flex; align-items: center; margin-left: 14rem; font-weight: normal; letter-spacing: 0; }
+.ccount { display: flex; align-items: center; margin-right: 10rem; color: #ffdd99; font-size: 12rem; }
 .ccount .vclass { margin-right: 3rem; }
 .ccount.zero { opacity: 0.35; }
-.ccount.ctotal { padding-left: 10rem; border-left: 1rem solid rgba(255, 255, 255, 0.2); }
+.ccount.ctotal { padding-left: 10rem; border-left: 1rem solid #595950; }
 /* WG class icon (gui/maps/icons/vehicleTypes, 16 x 16) before the tank name */
 .vclass { width: 16rem; height: 16rem; margin-right: 4rem; flex-shrink: 0; background-size: 16rem 16rem; }
-.vname { color: #ffe4c0; font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.vfold { width: 12rem; margin-right: 3rem; flex-shrink: 0; text-align: center; color: #ffd79a; font-size: 9rem; cursor: pointer; }
+.vname { color: #e9e2bf; font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.vfold { width: 12rem; margin-right: 3rem; flex-shrink: 0; text-align: center; color: #ffc363; font-size: 9rem; cursor: pointer; }
 .vfold:hover { color: #ffffff; }
-.vcount { margin-left: 5rem; padding: 0 4rem; border-radius: 3rem; background-color: rgba(255, 196, 108, 0.18); color: #ffd79a; font-size: 10rem; flex-shrink: 0; }
-.vstate { margin-left: 6rem; color: #ff9a72; font-size: 10rem; white-space: nowrap; }
+.vcount { margin-left: 5rem; padding: 0 4rem; border: 1rem solid rgba(255, 195, 99, 0.45); color: #ffc363; font-size: 10rem; flex-shrink: 0; }
+.vstate { margin-left: 6rem; color: #ff2717; font-size: 10rem; white-space: nowrap; }
 
 .status { width: 20rem; flex-shrink: 0; display: flex; justify-content: flex-end; }
 .sicon { width: 16rem; height: 16rem; flex-shrink: 0; background-size: 16rem 16rem; }
@@ -226,10 +313,10 @@ body {
 .mapgrid { align-self: center; width: 216rem; margin: 4rem 0 8rem 0; }
 .gtop { display: flex; height: 14rem; }
 .gcorner { width: 15rem; flex-shrink: 0; }
-.gcol { width: 20rem; flex-shrink: 0; text-align: center; font-size: 10rem; color: rgba(233, 231, 220, 0.5); }
+.gcol { width: 20rem; flex-shrink: 0; text-align: center; font-size: 10rem; color: #8c8c7e; }
 .gmid { display: flex; }
 .gleft { width: 14rem; flex-shrink: 0; padding-top: 1rem; display: flex; flex-direction: column; }
-.grow-l { height: 20rem; flex-shrink: 0; display: flex; align-items: center; font-size: 10rem; color: rgba(233, 231, 220, 0.5); }
+.grow-l { height: 20rem; flex-shrink: 0; display: flex; align-items: center; font-size: 10rem; color: #8c8c7e; }
 .gmap {
     position: relative;
     /* 200 x 200 inside the 1 px border: border-box set explicitly, Gameface and Firefox count the
@@ -240,83 +327,83 @@ body {
     flex-shrink: 0;
     display: flex;
     flex-direction: column;
-    background-color: rgba(30, 32, 28, 0.9);
+    background-color: rgba(18, 17, 13, 0.9);
     background-size: 100% 100%;
-    border: 1rem solid rgba(255, 255, 255, 0.12);
+    border: 1rem solid rgba(238, 112, 0, 0.45);
 }
-/* commander markings: WG's MinimapClick dot (MinimapLobby.swf, steady frame), 40 px glow centred */
 .gmap.clickable { cursor: pointer; }
+.gmap.clickable:hover { border-color: #ee7000; box-shadow: 0 0 8rem rgba(238, 112, 0, 0.55); }
 /* random map: WG's dice (MinimapLobby.swf sprite 9, 111 x 77 in WG's 207 px grid) on WG's dark back */
 .gmap.random { background-color: #0f0e0b; }
 .gdice { position: absolute; left: 46rem; top: 63rem; width: 107rem; height: 74rem; background-image: url(img://gui/maps/icons/ez_room/dice.png); background-size: 107rem 74rem; pointer-events: none; }
 .mpoint { position: absolute; width: 32rem; height: 32rem; background-size: 32rem 32rem; pointer-events: none; }
+/* commander markings: WG's MinimapClick dot (MinimapLobby.swf, steady frame), 40 px glow centred */
 .gpoint { position: absolute; width: 40rem; height: 40rem; background-image: url(img://gui/maps/icons/ez_room/gridclick.png); background-size: 40rem 40rem; pointer-events: none; }
 .grow-c { display: flex; flex-shrink: 0; width: 200rem; height: 20rem; }
 .gcell { flex-shrink: 0; width: 20rem; height: 20rem; box-sizing: border-box; border-right: 1rem solid rgba(0, 0, 0, 0.35); border-bottom: 1rem solid rgba(0, 0, 0, 0.35); }
 
 .raw { flex-grow: 1; }
-.rawname { padding: 8rem 16rem 2rem; color: #ffc46c; font-size: 13rem; }
-.rawval { margin: 0; padding: 0 16rem; color: rgba(233, 231, 220, 0.75); font-size: 11rem; white-space: pre-wrap; }
+.rawname { padding: 8rem 16rem 2rem; color: #ffc363; font-size: 13rem; }
+.rawval { margin: 0; padding: 0 16rem; color: #e9e2bf; font-size: 11rem; white-space: pre-wrap; }
 
 /* footer */
 .footer {
-    height: 24rem;
+    height: 22rem;
     flex-shrink: 0;
     display: flex;
     align-items: center;
-    padding: 0 12rem;
-    border-top: 1rem solid rgba(255, 255, 255, 0.07);
-    background-color: rgba(0, 0, 0, 0.4);
+    padding: 0 22rem 0 12rem;
+    border-top: 1rem solid #595950;
+    background-color: rgba(18, 17, 13, 0.55);
     font-size: 11rem;
     white-space: nowrap;
 }
-.comment { margin-left: 12rem; color: #ffd79a; overflow: hidden; text-overflow: ellipsis; }
+.comment { margin-left: 12rem; color: #ffdd99; overflow: hidden; text-overflow: ellipsis; }
 
 /* actions */
 .clickable { cursor: pointer; }
-.slot.clickable:hover { background-color: rgba(255, 255, 255, 0.1); }
-.slot.mine { background-color: rgba(255, 196, 108, 0.1); border-left-color: #ffc46c; }
-.slot.ready, .slot.mine.ready { background-color: rgba(110, 190, 70, 0.22); border-left-color: #7fd04f; }
-.take { color: #c4e2a8; }
-.slot.clickable:hover .take { color: #e6f5d6; }
+.slot.clickable:hover { background-color: rgba(233, 226, 191, 0.08); }
+.slot.mine { background-color: rgba(255, 195, 99, 0.1); border-left-color: #ffc363; }
+.slot.ready, .slot.mine.ready { background-color: rgba(122, 179, 0, 0.22); border-left-color: #80d43a; }
+.take { color: #80d43a; }
+.slot.clickable:hover .take { color: #ffffff; text-shadow: 0 0 6rem rgba(128, 212, 58, 0.5); }
 .veh.pick { cursor: pointer; padding-right: 6rem; }
-.veh.pick:hover .vname, .veh.none.pick:hover { color: #ffffff; }
-.veh.none.pick { color: #ffc46c; }
+.veh.pick:hover .vname, .veh.none.pick:hover { color: #ffffff; text-shadow: 0 0 6rem rgba(238, 112, 0, 0.55); }
+.veh.none.pick { color: #ffc363; }
 
 /* row buttons: laid over the end of the row and shown at once for the row under the mouse
    (.hov, set by app.js markHover; the row layout never changes, tank names keep their width) */
 .slot, .cand { position: relative; }
-.acts { position: absolute; right: 0; top: 0; bottom: 0; display: flex; align-items: center; padding: 0 15rem 0 14rem; background-color: rgba(30, 30, 31, 0.97); visibility: hidden; }
+.acts { position: absolute; right: 0; top: 0; bottom: 0; display: flex; align-items: center; padding: 0 15rem 0 14rem; background-color: rgba(38, 36, 27, 0.97); visibility: hidden; }
 .acts.always, .slot.hov .acts, .cand.hov .acts { visibility: visible; }
 .acts.always { position: relative; padding: 0 0 0 6rem; background-color: transparent; }
-.roleover { position: absolute; right: 100%; top: 0; bottom: 0; display: flex; align-items: center; padding: 0 2rem 0 10rem; background-color: rgba(30, 30, 31, 0.97); visibility: hidden; }
+.roleover { position: absolute; right: 100%; top: 0; bottom: 0; display: flex; align-items: center; padding: 0 2rem 0 10rem; background-color: rgba(38, 36, 27, 0.97); visibility: hidden; }
 .slot.hov .roleover { visibility: visible; }
 .ibtn {
     margin-left: 4rem;
     padding: 2rem 7rem;
-    border: 1rem solid rgba(255, 255, 255, 0.2);
-    border-radius: 3rem;
+    border: 1rem solid #595950;
     font-size: 11rem;
-    color: rgba(233, 231, 220, 0.8);
+    color: #e9e2bf;
     cursor: pointer;
     white-space: nowrap;
 }
+.ibtn:hover { border-color: #ee7000; color: #ffffff; box-shadow: 0 0 5rem rgba(238, 112, 0, 0.55); }
+.ibtn.kick:hover { border-color: #ff2717; color: #ff2717; box-shadow: 0 0 5rem rgba(255, 39, 23, 0.5); }
 /* equipment roles: WG's gunnerIcon frames (fortClanBattleRoom.swf) after the tank name; commander buttons */
 .ricon2 { width: 18rem; height: 18rem; margin-left: 3rem; flex-shrink: 0; background-size: 18rem 18rem; background-repeat: no-repeat; }
 .rolebtn { display: flex; align-items: center; padding: 1rem; }
 .rolebtn .ricon2 { width: 16rem; height: 16rem; background-size: 16rem 16rem; margin: 0; opacity: 0.4; }
 .rolebtn:hover .ricon2 { opacity: 0.8; }
-.rolebtn.on { border-color: rgba(242, 138, 58, 0.8); color: #ffe4c0; background-color: rgba(242, 138, 58, 0.15); }
+.rolebtn.on { border-color: #ee7000; background-color: rgba(238, 112, 0, 0.15); }
 .rolebtn.on .ricon2 { opacity: 1; }
-.ibtn:hover { border-color: rgba(255, 255, 255, 0.5); color: #ffffff; }
-.ibtn.kick:hover { border-color: #ff7a52; color: #ff9a72; }
 
 .cand.pickable { cursor: pointer; }
-.cand.sel { background-color: rgba(150, 205, 110, 0.18); }
+.cand.sel { background-color: rgba(128, 212, 58, 0.16); }
 
-.pfoot { flex-shrink: 0; padding: 8rem; border-top: 1rem solid rgba(255, 255, 255, 0.07); }
+.pfoot { flex-shrink: 0; padding: 8rem; border-top: 1rem solid rgba(89, 89, 80, 0.6); }
 .btn.wide { margin: 0 0 6rem 0; text-align: center; }
-.pnote { color: rgba(233, 231, 220, 0.5); font-size: 11rem; text-align: center; }
+.pnote { color: #8c8c7e; font-size: 11rem; text-align: center; }
 
 /* ready bar: WG's state text above, button centred below (like the Flash room) */
 .readybar {
@@ -327,37 +414,32 @@ body {
     justify-content: center;
     height: 50rem;
     padding: 0 8rem;
-    border-top: 1rem solid rgba(255, 255, 255, 0.07);
+    border-top: 1rem solid rgba(89, 89, 80, 0.6);
 }
-.readybar .state { max-width: 100%; margin-bottom: 4rem; color: #ff9a72; font-size: 12rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.readybar .state { max-width: 100%; margin-bottom: 4rem; color: #ff2717; font-size: 12rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.readybar .state.hint { color: #80d43a; }
 .btn.readybtn {
     margin-left: 0;
-    min-width: 140rem;
-    padding: 5rem 22rem;
-    border: none;
+    min-width: 150rem;
+    padding: 5rem 24rem;
     text-align: center;
     color: #ffffff;
     font-size: 13rem;
     font-weight: bold;
+    letter-spacing: 1rem;
+    text-transform: uppercase;
 }
-.btn.readybtn.ready { background-image: linear-gradient(to bottom, #7fbf55, #4e8a2c); }
-.btn.readybtn.ready:hover { background-image: linear-gradient(to bottom, #94d468, #5c9c36); }
-.btn.readybtn.unready { background-image: linear-gradient(to bottom, #e0553f, #a8301f); }
-.btn.readybtn.unready:hover { background-image: linear-gradient(to bottom, #f06a52, #bb3a27); }
-.btn.readybtn.off { background-image: none; background-color: rgba(255, 255, 255, 0.08); color: rgba(233, 231, 220, 0.35); cursor: default; }
-.readybar .state.hint { color: #c4e2a8; }
+.btn.readybtn.ready { border-color: #80d43a; background-color: rgba(122, 179, 0, 0.55); box-shadow: 0 0 10rem rgba(128, 212, 58, 0.5); }
+.btn.readybtn.ready:hover { background-color: rgba(128, 212, 58, 0.75); }
+.btn.readybtn.unready { border-color: #ff2717; background-color: rgba(183, 0, 0, 0.6); box-shadow: 0 0 10rem rgba(255, 39, 23, 0.5); }
+.btn.readybtn.unready:hover { background-color: rgba(255, 39, 23, 0.6); }
+.btn.readybtn.off { border-color: #595950; background-color: rgba(18, 17, 13, 0.55); color: rgba(140, 140, 126, 0.7); box-shadow: none; cursor: default; }
 
 /* chat: close to WG's Flash chat box (Chat-Kanal) */
 .chat { flex-grow: 1; }
-.ptitle.chattitle {
-    height: 32rem;
-    border-bottom: none;
-    color: #e9e2bf;
-    font-size: 16rem;
-    text-transform: none;
-}
+.ptitle.chattitle { border-bottom: none; }
 .chatlog { flex-grow: 1; height: 0; overflow-y: hidden; padding: 0 10rem 4rem; }
-.cline { margin: 0; font-size: 13rem; line-height: 17rem; color: #979589; word-wrap: break-word; }
+.cline { margin: 0; font-size: 13rem; line-height: 17rem; color: #8c8c7e; word-wrap: break-word; }
 .smiley { width: 16rem; height: 16rem; margin: 0 2rem; vertical-align: middle; }
 .chatin { flex-shrink: 0; display: flex; align-items: center; padding: 8rem 10rem 10rem; }
 .chatin input {
@@ -365,39 +447,29 @@ body {
     width: 0;
     height: 22rem;
     padding: 0 6rem;
-    border: 1rem solid #3c3a33;
+    border: 1rem solid #595950;
     border-radius: 0;
-    background-color: #0c0c0b;
+    background-color: rgba(18, 17, 13, 0.85);
     color: #e9e2bf;
     font-family: Warhelios;
     font-size: 13rem;
 }
-.chatin input:focus { border-color: #6b6550; }
+.chatin input:focus { border-color: #ee7000; box-shadow: 0 0 6rem rgba(238, 112, 0, 0.55); }
 .sendbtn {
     position: relative;
     flex-shrink: 0;
     width: 34rem;
     height: 22rem;
     margin-left: 6rem;
-    border: 1rem solid #55524a;
-    border-radius: 2rem;
-    background-image: linear-gradient(to bottom, #4d4b44, #2b2a26);
+    border: 1rem solid #595950;
+    background-color: rgba(55, 54, 46, 0.9);
     cursor: pointer;
 }
-.sendbtn:hover { background-image: linear-gradient(to bottom, #5c5a52, #34332e); }
+.sendbtn:hover { border-color: #ee7000; box-shadow: 0 0 6rem rgba(238, 112, 0, 0.55); }
 /* return arrow drawn with three boxes */
 .ret-v { position: absolute; left: 21rem; top: 5rem; width: 2rem; height: 7rem; background-color: #e9e2bf; }
 .ret-h { position: absolute; left: 12rem; top: 10rem; width: 11rem; height: 2rem; background-color: #e9e2bf; }
-.ret-tip {
-    position: absolute;
-    left: 8rem;
-    top: 7rem;
-    width: 0;
-    height: 0;
-    border-top: 4rem solid transparent;
-    border-bottom: 4rem solid transparent;
-    border-right: 5rem solid #e9e2bf;
-}
+.ret-tip { position: absolute; left: 8rem; top: 7rem; width: 0; height: 0; border-top: 4rem solid transparent; border-bottom: 4rem solid transparent; border-right: 5rem solid #e9e2bf; }
 
 /* reserves */
 .reserves { flex-shrink: 0; display: flex; align-items: center; margin-left: 4rem; }
@@ -407,52 +479,52 @@ body {
     width: 36rem;
     height: 36rem;
     margin-left: 4rem;
-    border: 1rem solid rgba(255, 255, 255, 0.12);
-    border-radius: 3rem;
-    background-color: rgba(0, 0, 0, 0.35);
+    border: 1rem solid #595950;
+    background-color: rgba(18, 17, 13, 0.6);
 }
 .rslot.on { cursor: pointer; }
-.rslot.on:hover, .rslot.open { border-color: rgba(255, 196, 108, 0.7); }
+.rslot.on:hover, .rslot.open { border-color: #ee7000; box-shadow: 0 0 8rem rgba(238, 112, 0, 0.55); }
 .rslot.off { opacity: 0.55; }
-.rslot.set { border-color: rgba(255, 196, 108, 0.35); }
+.rslot.set { border-color: rgba(255, 195, 99, 0.6); }
 .ricon { width: 100%; height: 100%; background-size: contain; background-repeat: no-repeat; background-position: center; }
-.rlvl { position: absolute; right: 2rem; bottom: 0; font-size: 10rem; color: #ffe4c0; }
+.rlvl { position: absolute; right: 2rem; bottom: 0; font-size: 10rem; color: #ffdd99; }
 
 .rpopup {
     position: absolute;
-    top: 54rem;
+    top: 86rem;
     right: 150rem;
     width: 330rem;
-    background-color: rgba(18, 18, 19, 0.97);
-    border: 1rem solid rgba(255, 196, 108, 0.35);
-    box-shadow: 0 6rem 18rem rgba(0, 0, 0, 0.6);
+    background-color: rgba(26, 25, 19, 0.97);
+    border: 1rem solid #ee7000;
+    box-shadow: 0 6rem 18rem rgba(0, 0, 0, 0.6), 0 0 8rem rgba(238, 112, 0, 0.55);
 }
-.ropt { display: flex; align-items: center; padding: 6rem 10rem; cursor: pointer; border-bottom: 1rem solid rgba(255, 255, 255, 0.05); }
-.ropt:hover { background-color: rgba(255, 255, 255, 0.06); }
-.ropt.sel { background-color: rgba(255, 196, 108, 0.12); }
+.rpopup .ptitle { color: #ffdd99; }
+.ropt { display: flex; align-items: center; padding: 6rem 10rem; cursor: pointer; border-bottom: 1rem solid rgba(89, 89, 80, 0.4); }
+.ropt:hover { background-color: rgba(238, 112, 0, 0.1); }
+.ropt.sel { background-color: rgba(255, 195, 99, 0.12); }
 .ropt.none { opacity: 0.4; cursor: default; }
 .ropt .ricon { width: 40rem; height: 40rem; flex-shrink: 0; }
 .rtext { flex-grow: 1; width: 0; margin: 0 8rem; }
-.rtitle { color: #ffe4c0; font-weight: bold; font-size: 12rem; }
-.rdesc { color: rgba(233, 231, 220, 0.6); font-size: 11rem; }
-.rcount { flex-shrink: 0; font-size: 11rem; color: rgba(233, 231, 220, 0.7); }
-.ropt.sel .rcount { color: #ff9a72; }
+.rtitle { color: #e9e2bf; font-weight: bold; font-size: 12rem; }
+.rdesc { color: #8c8c7e; font-size: 11rem; }
+.rcount { flex-shrink: 0; font-size: 11rem; color: #e9e2bf; }
+.ropt.sel .rcount { color: #ff2717; }
 
 /* team table columns */
 .cols { flex-shrink: 0; display: flex; align-items: center; height: 22rem; padding: 2rem 12rem 0 7rem; }
-.col { font-size: 11rem; color: rgba(233, 231, 220, 0.5); cursor: pointer; white-space: nowrap; }
-.col:hover { color: #eeede9; }
-.col.on { color: #ffd79a; }
+.col { font-size: 11rem; color: #8c8c7e; cursor: pointer; white-space: nowrap; letter-spacing: 1rem; text-transform: uppercase; }
+.col:hover { color: #e9e2bf; }
+.col.on { color: #feab34; text-shadow: 0 0 6rem rgba(238, 112, 0, 0.55); }
 .col.no { width: 32rem; flex-shrink: 0; cursor: default; }
 .col.c-clan { width: 64rem; flex-shrink: 0; }
 .col.c-name { width: 150rem; flex-shrink: 0; }
 .col.c-rating { width: 44rem; flex-shrink: 0; text-align: right; padding-right: 8rem; }
 .col.c-tank { flex-grow: 1; padding-left: 4rem; }
-.ccols { padding: 2rem 18rem 0 10rem; border-bottom: 1rem solid rgba(255, 255, 255, 0.05); }
+.ccols { padding: 2rem 18rem 0 10rem; border-bottom: 1rem solid rgba(89, 89, 80, 0.4); }
 .col.cc-name { flex-grow: 1; }
 .col.cc-rating { flex-shrink: 0; text-align: right; }
 .arrow { margin-left: 3rem; font-size: 9rem; }
-.slot .clan { width: 64rem; flex-shrink: 0; font-size: 11rem; color: rgba(233, 231, 220, 0.55); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.slot .clan { width: 64rem; flex-shrink: 0; font-size: 11rem; color: #8c8c7e; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* tooltip */
 .tip {
@@ -460,14 +532,15 @@ body {
     position: absolute;
     max-width: 280rem;
     padding: 6rem 9rem;
-    background-color: rgba(14, 14, 14, 0.97);
-    border: 1rem solid rgba(255, 255, 255, 0.18);
+    background-color: rgba(18, 17, 13, 0.97);
+    border: 1rem solid #7e7b68;
+    border-left: 2rem solid #ee7000;
     pointer-events: none;
 }
-.thead { color: #ffe4c0; font-weight: bold; font-size: 12rem; margin-bottom: 3rem; }
-.tbody { color: rgba(233, 231, 220, 0.8); font-size: 11rem; }
+.thead { color: #ffdd99; font-weight: bold; font-size: 12rem; margin-bottom: 3rem; }
+.tbody { color: #e9e2bf; font-size: 11rem; }
 
-/* WG's waiting animation (room window as_setWaitingS): covers the room body, blocks clicks */
+/* covers over the room body: WG's waiting animation, search, maintenance, notices */
 .waitcover {
     position: absolute;
     left: 0;
@@ -477,39 +550,52 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    background-color: rgba(10, 10, 10, 0.78);
+    background-color: rgba(18, 17, 13, 0.82);
+    background-image: url(img://gui/maps/icons/ez_room/scan.png);
+    background-size: 4rem 3rem;
 }
 .waitbox {
+    position: relative;
     display: flex;
     flex-direction: column;
     align-items: center;
-    min-width: 260rem;
+    min-width: 280rem;
+    max-width: 460rem;
     padding: 22rem 30rem;
-    background-color: rgba(24, 24, 25, 0.95);
-    border: 1rem solid rgba(255, 255, 255, 0.1);
+    background-color: rgba(38, 36, 27, 0.95);
+    border: 1rem solid rgba(238, 112, 0, 0.6);
+    box-shadow: 0 0 14rem rgba(238, 112, 0, 0.2);
 }
+.waitbox::before { content: ""; position: absolute; left: -1rem; top: -1rem; width: 0; height: 0; border-top: 12rem solid #ee7000; border-right: 12rem solid transparent; }
+/* square spinner (no rounded shapes) */
 .spinner {
-    width: 34rem;
-    height: 34rem;
-    margin-bottom: 12rem;
-    border: 3rem solid rgba(242, 138, 58, 0.25);
-    border-top-color: #f28a3a;
-    border-radius: 50%;
-    animation: ezspin 1s linear infinite;
+    width: 26rem;
+    height: 26rem;
+    margin-bottom: 14rem;
+    border: 2rem solid rgba(238, 112, 0, 0.25);
+    border-top-color: #ee7000;
+    border-right-color: #ee7000;
+    box-shadow: 0 0 8rem rgba(238, 112, 0, 0.55);
+    animation: ezspin 1.2s linear infinite;
 }
 @keyframes ezspin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
-.waittext { color: #ffe4c0; font-size: 14rem; font-weight: bold; text-align: center; }
+.waittext { color: #ffdd99; font-size: 14rem; font-weight: bold; text-align: center; letter-spacing: 1rem; }
+.waitbody { margin-top: 8rem; color: #e9e2bf; font-size: 12rem; text-align: center; }
+.stimer { margin-top: 10rem; color: #ffdd99; font-size: 26rem; font-weight: bold; text-shadow: 0 0 8rem rgba(238, 112, 0, 0.55); }
+/* WG's alert icon (library/alertBigIcon) for the maintenance notice */
+.alerticon { width: 32rem; height: 32rem; margin-bottom: 10rem; background-image: url(img://gui/maps/icons/library/alertBigIcon.png); background-size: 32rem 32rem; }
 
 /* commander drags a volunteer onto a slot, or a member onto the volunteers list */
-.panel.cands.dropout { border-color: #96cd6e; background-color: rgba(60, 90, 40, 0.5); }
+.panel.cands.dropout { border-color: #80d43a; background-color: rgba(122, 179, 0, 0.18); box-shadow: 0 0 10rem rgba(128, 212, 58, 0.5); }
 .dragghost {
     position: absolute;
     padding: 3rem 8rem;
-    background-color: rgba(24, 24, 25, 0.95);
-    border: 1rem solid #f28a3a;
-    color: #ffe4c0;
+    background-color: rgba(26, 25, 19, 0.95);
+    border: 1rem solid #ee7000;
+    color: #ffdd99;
     font-size: 12rem;
     pointer-events: none;
+    box-shadow: 0 0 8rem rgba(238, 112, 0, 0.55);
 }
 
 /* chat author: right click = WG's player menu */
@@ -519,48 +605,8 @@ body {
 .badge { width: 18rem; height: 18rem; margin-right: 4rem; flex-shrink: 0; background-size: 18rem 18rem; }
 
 /* chat links (own extension): click copies */
-.clink { color: #8fc0e8; text-decoration: underline; cursor: pointer; }
-.clink:hover { color: #b9dbf5; }
-
-/* small EZ ROOM button in WG's title bar while the original room is shown */
-body.minibody { background-color: transparent; background-image: none; }
-.mini {
-    box-sizing: border-box;
-    width: 100%;
-    height: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    border: 1rem solid rgba(242, 138, 58, 0.8);
-    border-radius: 3rem;
-    background-color: rgba(30, 24, 18, 0.95);
-    color: #ffe4c0;
-    font-size: 11rem;
-    font-weight: bold;
-    cursor: pointer;
-}
-.mini:hover { background-color: rgba(242, 138, 58, 0.35); color: #ffffff; }
-
-/* own title bar, same height as WG's window title (Window.as content padding top 35) */
-.titlebar {
-    height: 35rem;
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    padding: 0 15rem 0 14rem;
-    background-image: linear-gradient(to bottom, rgba(52, 46, 38, 0.95), rgba(28, 26, 23, 0.95));
-    border-bottom: 1rem solid rgba(0, 0, 0, 0.6);
-    cursor: default;
-}
-.ttext { flex-grow: 1; font-size: 14rem; font-weight: bold; color: #ffe4c0; letter-spacing: 1rem; }
-.wbtn { width: 18rem; height: 19rem; margin-left: 2rem; flex-shrink: 0; background-repeat: no-repeat; background-position: center; cursor: pointer; }
-.wmin { background-image: url(img://gui/maps/icons/ez_room/window/min_up.png); }
-.wmin:hover { background-image: url(img://gui/maps/icons/ez_room/window/min_over.png); }
-.wclose { background-image: url(img://gui/maps/icons/ez_room/window/close_up.png); }
-.wclose:hover { background-image: url(img://gui/maps/icons/ez_room/window/close_over.png); }
-/* WG's MinimizeButton / CloseButton (windows.swf sprites 29 / 39) */
-.wmin:active { background-image: url(img://gui/maps/icons/ez_room/window/min_down.png); }
-.wclose:active { background-image: url(img://gui/maps/icons/ez_room/window/close_down.png); }
+.clink { color: #09e2ff; text-decoration: underline; cursor: pointer; }
+.clink:hover { color: #ccffff; }
 
 /* frozen vehicle: WG's VehBrokenIcon (fortClanBattleRoom.swf sprite 120) and the unfreeze button
    (ButtonIconTextTransparent with the "gear" icon, guiControlsLobbyBattle.swf), at the right end
@@ -568,10 +614,10 @@ body.minibody { background-color: transparent; background-image: none; }
 .frzicon { width: 16rem; height: 16rem; margin-left: auto; padding-left: 6rem; flex-shrink: 0; background-image: url(img://gui/maps/icons/ez_room/frozen/broken.png); background-size: 16rem 16rem; background-repeat: no-repeat; background-position: right center; }
 .frzbtn {
     width: 22rem; height: 20rem; margin-left: auto; flex-shrink: 0;
-    border: 1rem solid rgba(255, 255, 255, 0.25); border-radius: 2rem;
+    border: 1rem solid #595950;
     background-image: url(img://gui/maps/icons/ez_room/frozen/gear.png); background-size: 17rem 17rem; background-repeat: no-repeat; background-position: center;
     cursor: pointer;
 }
-.frzbtn:hover { border-color: rgba(255, 255, 255, 0.6); background-color: rgba(255, 255, 255, 0.08); }
+.frzbtn:hover { border-color: #ee7000; background-color: rgba(238, 112, 0, 0.12); }
 .frzbtn.disabled { opacity: 0.4; cursor: default; }
-.frzbtn.disabled:hover { border-color: rgba(255, 255, 255, 0.25); background-color: transparent; }
+.frzbtn.disabled:hover { border-color: #595950; background-color: transparent; }

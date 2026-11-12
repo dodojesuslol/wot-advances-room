@@ -10,6 +10,7 @@ html = '''<!DOCTYPE html><html><head><meta charset="UTF-8"><style>
 @font-face { font-family: Warhelios; src: url(file://%(res)s/gui/gameface/fonts/Warhelios-Regular.ttf); }
 @font-face { font-family: Warhelios; font-weight: bold; src: url(file://%(res)s/gui/gameface/fonts/Warhelios-Bold.ttf); }
 html { font-size: 1px; }
+body { background: #2a2a28 url(file://%(res)s/gui/maps/icons/hangar/selectVehicle/bg.jpg) center / cover; }
 %(css)s</style></head><body><div id="root"></div><script>
 window.onerror = function (m, f, l) { document.body.insertAdjacentHTML('afterbegin', '<div style="position:fixed;z-index:9;background:red;color:#fff;font-size:20px">JS ERROR: ' + m + ' line ' + l + '</div>'); };
 window.model = { data: %(data)s, dev: "", onAction: function (a) { console.log(JSON.stringify(a)); } };

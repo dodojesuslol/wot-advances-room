@@ -1,41 +1,55 @@
 # -*- coding: utf-8 -*-
 # EZ ROOM for ADV: loader.
-# WG's Flash battle room (StrongholdBattleRoom) keeps running and keeps all its logic. This loader
-# records every as_*S call the room sends to Flash (the full UI state) in a RoomBridge and shows
-# our own Gameface view (ez_room.impl) on top, which renders that state and calls the room's
-# own request methods for actions.
+# Since 0.8.0 WG's Flash battle room window (fortClanBattleRoom.swf) is not opened any more. WG
+# opens it only through EventDispatcher.showStrongholdsWindow (from loadStrongholds, the channel
+# carousel, invites, returning from battle, ...). That method is wrapped: in a room it shows our
+# own Gameface room (ez_room.impl) instead, which talks to WG's stronghold unit entity directly.
+# (0.8.0 used an event bus restriction: WG's event bus catches the "no" of a sync restriction
+# itself, so WG's window opened anyway.)
+#
+# Fallback to WG's room, so nobody is left without a room:
+#  - "WG-Raum" button in the room: WG's room once (minimize it, the next carousel click is EZ ROOM
+#    again); the mods list entry always brings EZ ROOM back; settings.json "useWgRoom": true
+#    switches EZ ROOM off for good
+#  - automatically when EZ ROOM fails: an exception while opening, the web UI not reporting back,
+#    or a client crash while the room was opening last time (opening.guard)
+#  - any exception inside the wrapper opens WG's window as usual
 #
 # Dev mode: create <game>/mods/configs/ez_room/dev.json with
 #   {"src": "X:/Projekte/wot-advances-room/src"}
-# Then impl.py, app.js and style.css are read fresh from that folder every time the overlay
-# opens (F5 inside the overlay reopens it). Optional: "layer" (frameworks.wulf WindowLayer name),
-# "offset" [dx, dy, w, h] = overlay rect relative to WG's room window position (default
-# [12, 35, 1013, 653]: the room content, WG's title bar stays free).
+# Then impl.py, app.js and style.css are read fresh from that folder every time the room opens
+# (F5 inside the room reopens it).
 import json
 import logging
 import os
-import time
 import types
-import weakref
 
 import BigWorld
-from gui.Scaleform.daapi.view.lobby.fortifications.stronghold_battle_room import StrongholdBattleRoom
-from gui.Scaleform.daapi.view.lobby.fortifications.stronghold_battle_room_window import StrongholdBattleRoomWindow
+from gui.shared import events, g_eventBus
+from gui.shared.event_bus import EVENT_BUS_SCOPE, EventPriority
+from gui.prb_control.events_dispatcher import EventDispatcher
 
 _logger = logging.getLogger('EZ_ROOM')
 _logger.setLevel(logging.INFO)
 _DEV_FILE = os.path.join('mods', 'configs', 'ez_room', 'dev.json')
-# crash guard: exists while the overlay is being opened; if the client dies in between, the next
-# start finds it and keeps the overlay off for that session (WG's Flash room stays usable)
+# crash guard: exists while the room is being opened; if the client dies in between, the next
+# start finds it and uses WG's room for that session
 _GUARD_FILE = os.path.join('mods', 'configs', 'ez_room', 'opening.guard')
-_guardTripped = False
 _IMPL_PATH = 'res/scripts/client/ez_room/impl.py'
 # Python 2 sets a module's globals to None when the module object dies, so every dev-loaded
 # impl is kept alive here (open views and callbacks still use its functions).
 _devModules = []
-# as_*S calls whose first argument is a slot index: kept per slot, reset by as_setMembersS
-_PER_SLOT = ('as_setMemberStatusS', 'as_setMemberOfflineS', 'as_setMemberVehicleS')
-_SKIP = ('as_getCandidatesDPS',)
+
+# shared with impl (survives dev reloads): the open room window and the fallback state
+_state = {
+    'window': None,
+    'opening': False,
+    'bypass': False,         # WG's room for the current room (until the player leaves it)
+    'bypassOnce': False,     # bypass only until WG's window closes ("WG-Raum" button)
+    'guardTripped': False,   # crash while opening last time: WG's room this session
+    'carouselClick': False,  # the coming LoadViewEvent comes from a click on the carousel item
+}
+_implCache = [None]
 
 
 def _devConfig():
@@ -50,9 +64,11 @@ def _devConfig():
     return None
 
 
-def _impl():
+def _impl(fresh=False):
     config = _devConfig()
     if config is not None:
+        if _implCache[0] is not None and not fresh:
+            return _implCache[0]
         path = os.path.join(config['src'], _IMPL_PATH)
         try:
             with open(path, 'rb') as f:
@@ -62,136 +78,13 @@ def _impl():
             exec compile(source, path, 'exec') in module.__dict__
             module.DEV = config
             _devModules.append(module)
+            _implCache[0] = module
             _logger.info('dev: loaded impl from %s', path)
             return module
         except Exception:
             _logger.exception('dev: loading %s failed, using packaged impl', path)
     from ez_room import impl
     return impl
-
-
-class RoomBridge(object):
-    """State of the open Flash room plus the link to our overlay window."""
-
-    def __init__(self, view):
-        self._view = weakref.ref(view)
-        self.calls = {}      # as_*S name -> last args
-        self.slotCalls = {}  # as_*S name -> {slotIdx: args}
-        self.times = {}      # as_*S name -> time.time() of the last call (seconds)
-        self.coolDowns = {}  # as_setCoolDownS requestID -> (time.time(), seconds), like BaseRallyView.as
-        self.minimap = {'texture': u'', 'points': []}  # what WG's lobby minimap got (as_*S of MinimapLobby)
-        self.grid = {'points': [], 'clickEnabled': False}  # commander markings (as_*S of MinimapGrid)
-        self.window = None
-        self.miniWindow = None  # small "EZ ROOM" button in WG's title bar while the original is shown
-        self.hidden = False
-        self._pushPending = False
-
-    @property
-    def view(self):
-        return self._view()
-
-    def roomWindowView(self):
-        # WG's Flash room window view (StrongholdBattleRoomWindow); as_getGeometryS() = (x, y, w, h)
-        return _roomWindowView() if _roomWindowView is not None else None
-
-    def record(self, name, args):
-        if name in _PER_SLOT and args:
-            self.slotCalls.setdefault(name, {})[args[0]] = list(args[1:])
-        else:
-            self.calls[name] = list(args)
-            if name == 'as_setMembersS':
-                self.slotCalls = {}
-        self.times[name] = time.time()
-        if name == 'as_setCoolDownS' and len(args) >= 2:
-            # BaseRallyView.as_setCoolDown ignores a new one while that request's cooldown runs
-            start, seconds = self.coolDowns.get(args[1], (0.0, 0.0))
-            now = time.time()
-            if now >= start + (seconds or 0):
-                self.coolDowns[args[1]] = (now, float(args[0] or 0))
-        self.changed()
-
-    def changed(self):
-        # many as_*S calls arrive in a burst: push once on the next tick
-        if self._pushPending or self.window is None:
-            return
-        self._pushPending = True
-        BigWorld.callback(0.0, self._push)
-
-    def _push(self):
-        self._pushPending = False
-        window = self.window
-        if window is None or window.content is None:
-            return
-        try:
-            window.content.onRoomChanged()
-        except Exception:
-            _logger.exception('pushing room state failed')
-
-    def call(self, name, *args):
-        # runs one of the room's own Flash->Python handlers (assignSlotRequest, toggleReadyStateRequest, ...)
-        view = self.view
-        if view is None:
-            _logger.warning('room is gone, %s ignored', name)
-            return
-        getattr(view, name)(*args)
-
-    def open(self, manual=False):
-        if self.window is not None or self.view is None:
-            return
-        if _guardTripped and not manual:
-            _logger.warning('overlay stays off this session (last start crashed while opening it); open it with the EZ ROOM button')
-            self.showMini()
-            return
-        self.closeMini()
-        self.hidden = False
-        _setGuard(True)
-        try:
-            self.window = _impl().openOverlay(self, _devConfig())
-        except Exception:
-            _logger.exception('opening room overlay failed, Flash room stays')
-            self.window = None
-        BigWorld.callback(3.0, lambda: _setGuard(False))
-
-    def close(self, hide=False):
-        self.hidden = hide
-        window, self.window = self.window, None
-        if window is not None:
-            try:
-                window.destroy()
-            except Exception:
-                _logger.exception('closing room overlay failed')
-        if not hide:
-            self.closeMini()
-
-    def showOriginal(self):
-        # the user wants WG's room: overlay off, the small button brings it back
-        self.close(hide=True)
-        self.showMini()
-
-    def showMini(self):
-        if self.miniWindow is not None or self.view is None:
-            return
-        try:
-            self.miniWindow = _impl().openMini(self, _devConfig())
-        except Exception:
-            _logger.exception('opening the EZ ROOM button failed')
-            self.miniWindow = None
-
-    def closeMini(self):
-        window, self.miniWindow = self.miniWindow, None
-        if window is not None:
-            try:
-                window.destroy()
-            except Exception:
-                _logger.exception('closing the EZ ROOM button failed')
-
-    def reopen(self):
-        self.close()
-        BigWorld.callback(0.1, self.open)
-
-
-_bridge = None  # bridge of the room that is open right now
-_roomWindowView = None  # weakref to the StrongholdBattleRoomWindow (Flash window view)
 
 
 def _setGuard(on):
@@ -208,189 +101,189 @@ def _setGuard(on):
         _logger.exception('crash guard file failed')
 
 
-def currentBridge():
-    return _bridge
+def _enabled():
+    if _state['bypass'] or _state['guardTripped']:
+        return False
+    try:
+        return not _impl().loadSettings().get('useWgRoom')
+    except Exception:
+        _logger.exception('reading settings failed')
+        return False
 
 
-def _wrapCall(name, orig):
-    def wrapper(self, *args):
-        result = orig(self, *args)
+def _openWgRoom():
+    # WG's own room window (straight to WG's method, past our wrapper)
+    from gui.prb_control.events_dispatcher import g_eventDispatcher
+    _origShowStrongholdsWindow(g_eventDispatcher)
+
+
+def _fallback(reason):
+    # EZ ROOM failed or the player wants WG's room: WG's room for this room
+    _logger.warning("WG's room instead of EZ ROOM (%s)", reason)
+    _state['bypass'] = True
+    _state['bypassOnce'] = reason == 'user'
+    try:
+        impl = _impl()
+        impl.closeRoom(_state)
+        if impl.roomEntity() is not None:
+            BigWorld.callback(0.0, _openWgRoom)
+    except Exception:
+        _logger.exception('fallback failed')
+        BigWorld.callback(0.0, _openWgRoom)
+
+
+def _devReload():
+    _impl().closeRoom(_state)
+    impl = _impl(fresh=True)
+    BigWorld.callback(0.1, lambda: impl.showRoom(_state))
+
+
+_state['fallback'] = _fallback
+_state['devReload'] = _devReload
+
+
+_origShowStrongholdsWindow = EventDispatcher.showStrongholdsWindow
+
+
+def _showStrongholdsWindow(self):
+    # WG wants to show its room window: in a room ours instead (web room list stays WG's)
+    click, _state['carouselClick'] = _state['carouselClick'], False
+    if _enabled():
         try:
-            bridge = _bridge
-            if bridge is not None and bridge.view is self:
-                bridge.record(name, args)
+            impl = _impl()
+            if impl.roomEntity() is not None:
+                if _state.get('window') is None and not _state.get('opening'):
+                    _setGuard(True)
+                    BigWorld.callback(5.0, lambda: _setGuard(False))
+                if impl.showRoom(_state, toggle=click):
+                    return
         except Exception:
-            _logger.exception('recording %s failed', name)
-        return result
-    wrapper.__name__ = name
-    return wrapper
+            _logger.exception('EZ ROOM failed, WG room instead')
+            _state['bypass'] = True
+    return _origShowStrongholdsWindow(self)
 
 
-def _wrapNotify(orig):
-    def wrapper(self, *args, **kwargs):
-        result = orig(self, *args, **kwargs)
-        bridge = _bridge
-        if bridge is not None and bridge.view is self:
-            bridge.changed()
-        return result
-    return wrapper
+def _onCarouselClick(event):
+    # before WG's carousel handler: its click ends in showStrongholdsWindow (it only knows WG's
+    # Flash window), there it toggles our room like WG's (open / minimize)
+    try:
+        if event.clientID == _clientID():
+            _state['carouselClick'] = True
+            BigWorld.callback(0.0, _clearClick)
+    except Exception:
+        _logger.exception('carousel click failed')
 
 
-_origPopulate = StrongholdBattleRoom._populate
-_origDispose = StrongholdBattleRoom._dispose
+def _clearClick():
+    _state['carouselClick'] = False
 
 
-# WG's lobby minimap in the room (MinimapLobby.build): record exactly what Flash gets for the
-# room's own minimap instance (bases, spawns, control points, points of interest)
-def _roomMinimapBridge(minimap):
-    bridge = _bridge
-    view = bridge.view if bridge is not None else None
-    if view is not None and getattr(view, '_StrongholdBattleRoom__minimap', None) is minimap:
-        return bridge
-    return None
+def _clientID():
+    from constants import PREBATTLE_TYPE
+    from messenger.ext import channel_num_gen
+    return channel_num_gen.getClientID4Prebattle(PREBATTLE_TYPE.STRONGHOLD)
 
 
-def _wrapMinimap(name, orig):
-    def wrapper(self, *args):
-        result = orig(self, *args)
+def _onRemoveChannel(event):
+    # WG removes the room from the carousel when the player leaves it, enters the queue screen,
+    # goes to battle, ...: the signal WG's carousel uses to close the room window
+    try:
+        if event.clientID != _clientID():
+            return
+        if (event.ctx or {}).get('closeWindow', True):
+            _closeRoom()
+        _state['bypass'] = False
+        _state['bypassOnce'] = False
+    except Exception:
+        _logger.exception('remove channel handler failed')
+
+
+def _closeRoom(*args):
+    try:
+        _impl().closeRoom(_state)
+    except Exception:
+        _logger.exception('closing the room failed')
+
+
+def _toggle():
+    # mods list entry: EZ ROOM back (also after "WG-Raum", a fallback or useWgRoom in settings.json)
+    impl = _impl()
+    settings = impl.loadSettings()
+    if settings.get('useWgRoom'):
+        settings['useWgRoom'] = False
+        impl.saveSettings(settings)
+    _state['bypass'] = False
+    _state['bypassOnce'] = False
+    _state['guardTripped'] = False
+    _logger.info('EZ ROOM on (mods list)')
+    if impl.roomEntity() is not None:
+        impl.showRoom(_state)
+
+
+def _onWgWindowDispose(orig):
+    # WG's room closed or minimized after "WG-Raum": the next time it is EZ ROOM again
+    def _dispose(self):
         try:
-            bridge = _roomMinimapBridge(self)
-            if bridge is not None:
-                mm = bridge.minimap
-                if name == 'as_clearS':
-                    mm['points'] = []
-                elif name == 'as_changeMapS':
-                    mm['texture'] = args[0] if args else u''
-                elif name == 'as_addPointS':
-                    x, y, kind, color, number = args
-                    mm['points'].append({'x': x, 'y': y, 'type': kind, 'color': color, 'id': number})
-                elif name == 'as_addPoiS':
-                    x, y, kind, number = args
-                    mm['points'].append({'x': x, 'y': y, 'type': 'poi', 'poi': kind, 'id': number})
-                bridge.changed()
+            if _state['bypassOnce']:
+                _state['bypass'] = False
+                _state['bypassOnce'] = False
+                _logger.info("WG's room closed, EZ ROOM next time")
         except Exception:
-            _logger.exception('recording minimap %s failed', name)
-        return result
-    wrapper.__name__ = name
-    return wrapper
+            _logger.exception('WG window dispose hook failed')
+        return orig(self)
+    return _dispose
 
 
-# WG's MinimapGrid in the room (commander clicks a spot, everyone gets an ATTENTIONTOCELL unit chat
-# command): record its points (WG grid px, 207 x 207) and whether clicking is allowed
-def _wrapGrid(name, orig):
-    def wrapper(self, *args):
-        result = orig(self, *args)
+def _sessionCall(name):
+    def call(*args):
         try:
-            bridge = _bridge
-            view = bridge.view if bridge is not None else None
-            if view is not None and getattr(view, '_StrongholdBattleRoom__minimapGrid', None) is self:
-                grid = bridge.grid
-                if name == 'as_addPointS':
-                    grid['points'] = [p for p in grid['points'] if time.time() - p['time'] < 10.0]
-                    grid['points'].append({'x': args[0], 'y': args[1], 'time': time.time()})
-                elif name == 'as_clearPointsS':
-                    grid['points'] = []
-                elif name == 'as_clickEnabledS':
-                    grid['clickEnabled'] = bool(args[0]) if args else False
-                bridge.changed()
+            getattr(_impl(), name)(_state, *args)
         except Exception:
-            _logger.exception('recording grid %s failed', name)
-        return result
-    wrapper.__name__ = name
-    return wrapper
-
-
-def _populate(self):
-    global _bridge
-    old = _bridge
-    if old is not None:
-        old.close()
-    _bridge = RoomBridge(self)
-    _origPopulate(self)
-    BigWorld.callback(0.0, _bridge.open)
-
-
-def _dispose(self):
-    global _bridge
-    bridge = _bridge
-    if bridge is not None and bridge.view is self:
-        _bridge = None
-        bridge.close()
-    _origDispose(self)
-
-
-_origWindowPopulate = StrongholdBattleRoomWindow._populate
-_origWindowDispose = StrongholdBattleRoomWindow._dispose
-
-
-def _windowPopulate(self):
-    global _roomWindowView
-    _roomWindowView = weakref.ref(self)
-    _origWindowPopulate(self)
-
-
-def _windowDispose(self):
-    global _roomWindowView
-    if _roomWindowView is not None and _roomWindowView() is self:
-        _roomWindowView = None
-        if _bridge is not None:
-            _bridge.close()
-    _origWindowDispose(self)
-
-
-def _toggleOverlay():
-    bridge = _bridge
-    if bridge is None:
-        return
-    if bridge.window is None:
-        bridge.open(manual=True)
-    else:
-        bridge.showOriginal()
+            _logger.exception('session counter %s failed', name)
+    return call
 
 
 def _registerModsList():
-    # "show / hide" entry in Poliroid's mods list button: brings the overlay back after
-    # "show original"
     try:
         from gui.modsListApi import g_modsListApi
         g_modsListApi.addModification(
             id='ez_advances_room',
             name='EZ ROOM for ADV',
-            description='Vorstoß-Raum: neue Oberfläche ein/aus  ·  Advances room: toggle the new UI',
+            description='Vorstoß-Raum: EZ ROOM wieder anzeigen  ·  Advances room: show EZ ROOM again',
             icon='gui/maps/icons/ez_room/modslist.png',
             enabled=True,
             login=False,
             lobby=True,
-            callback=_toggleOverlay)
+            callback=_toggle)
     except Exception:
         _logger.exception('mods list entry failed')
 
 
-for _name in dir(StrongholdBattleRoom):
-    if _name.startswith('as_') and _name.endswith('S') and _name not in _SKIP:
-        setattr(StrongholdBattleRoom, _name, _wrapCall(_name, getattr(StrongholdBattleRoom, _name)))
-try:
-    from gui.Scaleform.daapi.view.lobby.MinimapLobby import MinimapLobby
-    for _name in ('as_clearS', 'as_changeMapS', 'as_addPointS', 'as_addPoiS'):
-        setattr(MinimapLobby, _name, _wrapMinimap(_name, getattr(MinimapLobby, _name)))
-except Exception:
-    _logger.exception('minimap hooks failed')
-try:
-    from gui.Scaleform.daapi.view.lobby.MinimapGrid import MinimapGrid
-    for _name in ('as_addPointS', 'as_clearPointsS', 'as_clickEnabledS'):
-        setattr(MinimapGrid, _name, _wrapGrid(_name, getattr(MinimapGrid, _name)))
-except Exception:
-    _logger.exception('grid hooks failed')
-StrongholdBattleRoom._populate = _populate
-StrongholdBattleRoomWindow._populate = _windowPopulate
-StrongholdBattleRoomWindow._dispose = _windowDispose
-StrongholdBattleRoom._dispose = _dispose
-StrongholdBattleRoom._rebuildCandidatesDP = _wrapNotify(StrongholdBattleRoom._rebuildCandidatesDP)
-StrongholdBattleRoom.initCandidatesDP = _wrapNotify(StrongholdBattleRoom.initCandidatesDP)
+def _install():
+    EventDispatcher.showStrongholdsWindow = _showStrongholdsWindow
+    from gui.Scaleform.daapi.view.lobby.fortifications.stronghold_battle_room_window import StrongholdBattleRoomWindow
+    StrongholdBattleRoomWindow._dispose = _onWgWindowDispose(StrongholdBattleRoomWindow._dispose)
+    g_eventBus.addListener(events.ChannelCarouselEvent.OPEN_BUTTON_CLICK, _onCarouselClick, scope=EVENT_BUS_SCOPE.LOBBY, priority=EventPriority.HIGH)
+    g_eventBus.addListener(events.PreBattleChannelEvent.REQUEST_TO_REMOVE_PRE_BATTLE_CHANNEL, _onRemoveChannel, scope=EVENT_BUS_SCOPE.LOBBY)
+    from PlayerEvents import g_playerEvents
+    g_playerEvents.onAvatarBecomePlayer += _closeRoom
+    g_playerEvents.onAccountBecomeNonPlayer += _closeRoom
+    g_playerEvents.onDisconnected += _closeRoom
+    # session counter: battles started from the room (impl.onAvatarReady / onServiceMessage)
+    g_playerEvents.onAvatarReady += _sessionCall('onAvatarReady')
+    g_playerEvents.onArenaPeriodChange += _sessionCall('onArenaPeriodChange')
+    from messenger.proto.events import g_messengerEvents
+    g_messengerEvents.serviceChannel.onChatMessageReceived += lambda seqID, message: _sessionCall('onServiceMessage')(message)
+
+
 if os.path.isfile(_GUARD_FILE):
-    _guardTripped = True
+    _state['guardTripped'] = True
     _setGuard(False)
-    _logger.warning('last start crashed while opening the overlay: overlay off for this session')
+    _logger.warning("last start crashed while opening EZ ROOM: WG's room this session (mods list entry turns EZ ROOM back on)")
+try:
+    _install()
+except Exception:
+    _logger.exception("EZ ROOM hooks failed, WG's room stays")
 _registerModsList()
 try:
     from ez_room.impl import __version__

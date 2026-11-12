@@ -1,12 +1,15 @@
-// EZ ROOM for ADV: web UI for the Advances battle room. Data comes from the Python view as one
-// JSON string (model.data) built from what WG's room sends to its Flash UI; actions go back
-// through model.onAction({...}), which runs the room's own handlers (same as WG's Flash UI).
+// EZ ROOM for ADV: web UI for the Advances battle room (replaces WG's Flash room since 0.8.0).
+// Data comes from the Python view as one JSON string (model.data), built with WG's own builders
+// from WG's stronghold unit entity, sent only when it changed; actions go back through
+// model.onAction({...}), which calls WG's prb API.
+// Window: in "full" mode the view is as big as the screen and transparent; only the room panel
+// takes mouse input (Gameface hit test), so it is moved by plain CSS while dragging (no Python,
+// no polling). "panel" mode (settings.json "windowMode": "panel") = small window moved by Python.
 
 const ROMAN = ["", "I", "II", "III", "IV", "V", "VI", "VII", "VIII", "IX", "X", "XI"];
 const STATUS = { NORMAL: 0, READY: 2, BATTLE: 3, LOCKED: 4, CREATOR: 5 };
 
 let data = {};
-let sizeLogged = false;
 const ui = {
     raw: false,
     selCand: 0, // commander: volunteer being dragged onto a slot (green slots = WG's allowed ones)
@@ -20,6 +23,8 @@ const ui = {
 // text, "{0}" = a value filled in by F). Missing entries fall back to English.
 const TR = {
     pl: {
+        "Battles": "Bitwy", "Wins": "Wygrane", "Victories": "Zwycięstwa", "Total": "Łącznie", "Session in this room": "Sesja w tym pokoju", "Avg. battle time": "Śr. czas bitwy",
+        "Cancel": "Anuluj", "WG room": "Pokój WG",
         "Take {0} away": "Odbierz: {0}", "Give {0}": "Przydziel: {0}", "{0} players with this tank": "{0} graczy z tym czołgiem",
         "Show all": "Pokaż wszystkie", "Artillery strike": "Ostrzał artyleryjski", "Drop onto a green slot (Esc = cancel)": "Upuść na zielone miejsce (Esc = anuluj)",
         "Kick from the room": "Wyrzuć z pokoju", "Ready!": "Gotowy!", "Chat channel": "Kanał czatu", "Clan": "Klan", "Invite": "Zaproś",
@@ -33,6 +38,8 @@ const TR = {
         "Rating": "Ocena", "Fold": "Zwiń", "Back to the volunteers": "Z powrotem do ochotników", "Back to the EZ ROOM view": "Powrót do widoku EZ ROOM", "Minimize": "Minimalizuj", "Close": "Zamknij",
     },
     cs: {
+        "Battles": "Bitvy", "Wins": "Výhry", "Victories": "Vítězství", "Total": "Celkem", "Session in this room": "Relace v této místnosti", "Avg. battle time": "Prům. délka bitvy",
+        "Cancel": "Zrušit", "WG room": "Místnost WG",
         "Take {0} away": "Odebrat: {0}", "Give {0}": "Přidělit: {0}", "{0} players with this tank": "{0} hráčů s tímto tankem",
         "Show all": "Zobrazit vše", "Artillery strike": "Dělostřelecký úder", "Drop onto a green slot (Esc = cancel)": "Přetáhněte na zelené místo (Esc = zrušit)",
         "Kick from the room": "Vyhodit z místnosti", "Ready!": "Připraven!", "Chat channel": "Kanál chatu", "Clan": "Klan", "Invite": "Pozvat",
@@ -46,6 +53,8 @@ const TR = {
         "Rating": "Hodnocení", "Fold": "Sbalit", "Back to the volunteers": "Zpět k dobrovolníkům", "Back to the EZ ROOM view": "Zpět do zobrazení EZ ROOM", "Minimize": "Minimalizovat", "Close": "Zavřít",
     },
     fr: {
+        "Battles": "Batailles", "Wins": "Victoires", "Victories": "Victoires", "Total": "Total", "Session in this room": "Session dans ce salon", "Avg. battle time": "Durée moy. de bataille",
+        "Cancel": "Annuler", "WG room": "Salon WG",
         "Take {0} away": "Retirer : {0}", "Give {0}": "Attribuer : {0}", "{0} players with this tank": "{0} joueurs avec ce char",
         "Show all": "Tout afficher", "Artillery strike": "Frappe d'artillerie", "Drop onto a green slot (Esc = cancel)": "Déposer sur une place verte (Échap = annuler)",
         "Kick from the room": "Exclure du salon", "Ready!": "Prêt !", "Chat channel": "Canal de discussion", "Clan": "Clan", "Invite": "Inviter",
@@ -59,6 +68,8 @@ const TR = {
         "Rating": "Cote", "Fold": "Replier", "Back to the volunteers": "Retour aux volontaires", "Back to the EZ ROOM view": "Retour à la vue EZ ROOM", "Minimize": "Réduire", "Close": "Fermer",
     },
     es: {
+        "Battles": "Batallas", "Wins": "Victorias", "Victories": "Victorias", "Total": "Total", "Session in this room": "Sesión en esta sala", "Avg. battle time": "Duración media",
+        "Cancel": "Cancelar", "WG room": "Sala WG",
         "Take {0} away": "Quitar: {0}", "Give {0}": "Asignar: {0}", "{0} players with this tank": "{0} jugadores con este tanque",
         "Show all": "Mostrar todo", "Artillery strike": "Ataque de artillería", "Drop onto a green slot (Esc = cancel)": "Soltar en un puesto verde (Esc = cancelar)",
         "Kick from the room": "Expulsar de la sala", "Ready!": "¡Listo!", "Chat channel": "Canal de chat", "Clan": "Clan", "Invite": "Invitar",
@@ -72,6 +83,8 @@ const TR = {
         "Rating": "Índice", "Fold": "Contraer", "Back to the volunteers": "Volver a los voluntarios", "Back to the EZ ROOM view": "Volver a la vista EZ ROOM", "Minimize": "Minimizar", "Close": "Cerrar",
     },
     it: {
+        "Battles": "Battaglie", "Wins": "Vittorie", "Victories": "Vittorie", "Total": "Totale", "Session in this room": "Sessione in questa stanza", "Avg. battle time": "Durata media",
+        "Cancel": "Annulla", "WG room": "Stanza WG",
         "Take {0} away": "Revoca: {0}", "Give {0}": "Assegna: {0}", "{0} players with this tank": "{0} giocatori con questo carro",
         "Show all": "Mostra tutti", "Artillery strike": "Attacco d'artiglieria", "Drop onto a green slot (Esc = cancel)": "Rilascia su un posto verde (Esc = annulla)",
         "Kick from the room": "Espelli dalla stanza", "Ready!": "Pronto!", "Chat channel": "Canale chat", "Clan": "Clan", "Invite": "Invita",
@@ -85,6 +98,8 @@ const TR = {
         "Rating": "Valutazione", "Fold": "Comprimi", "Back to the volunteers": "Torna ai volontari", "Back to the EZ ROOM view": "Torna alla vista EZ ROOM", "Minimize": "Riduci a icona", "Close": "Chiudi",
     },
     tr: {
+        "Battles": "Savaşlar", "Wins": "Galibiyet", "Victories": "Zaferler", "Total": "Toplam", "Session in this room": "Bu odadaki oturum", "Avg. battle time": "Ort. savaş süresi",
+        "Cancel": "İptal", "WG room": "WG odası",
         "Take {0} away": "Geri al: {0}", "Give {0}": "Ver: {0}", "{0} players with this tank": "Bu tankla {0} oyuncu",
         "Show all": "Tümünü göster", "Artillery strike": "Topçu saldırısı", "Drop onto a green slot (Esc = cancel)": "Yeşil bir yere bırak (Esc = iptal)",
         "Kick from the room": "Odadan at", "Ready!": "Hazır!", "Chat channel": "Sohbet kanalı", "Clan": "Klan", "Invite": "Davet et",
@@ -98,6 +113,8 @@ const TR = {
         "Rating": "Derece", "Fold": "Daralt", "Back to the volunteers": "Gönüllülere geri", "Back to the EZ ROOM view": "EZ ROOM görünümüne dön", "Minimize": "Simge durumuna küçült", "Close": "Kapat",
     },
     ru: {
+        "Battles": "Бои", "Wins": "Победы", "Victories": "Победы", "Total": "Всего", "Session in this room": "Сессия в этой комнате", "Avg. battle time": "Ср. длительность боя",
+        "Cancel": "Отмена", "WG room": "Комната WG",
         "Take {0} away": "Забрать: {0}", "Give {0}": "Назначить: {0}", "{0} players with this tank": "Игроков с этим танком: {0}",
         "Show all": "Показать все", "Artillery strike": "Артиллерийский удар", "Drop onto a green slot (Esc = cancel)": "Перетащите на зелёный слот (Esc = отмена)",
         "Kick from the room": "Исключить из комнаты", "Ready!": "Готов!", "Chat channel": "Канал чата", "Clan": "Клан", "Invite": "Пригласить",
@@ -226,10 +243,7 @@ function renderHeader() {
             <div class="center">${center}</div>
             ${showDir ? `<div class="hcenter"><div class="timer" id="timer">${esc(timerText())}</div></div>` : ""}
             ${renderReserves()}
-            <div class="tools">
-                ${data.dev ? `<div class="btn ghost" data-act="raw">${ui.raw ? L("Raum", "Room") : L("Rohdaten", "Raw data")}</div>` : ""}
-                <div class="btn" data-act="hide">${L("Original", "Original")}</div>
-            </div>
+            ${data.dev ? `<div class="tools"><div class="btn ghost" data-act="raw">${ui.raw ? L("Raum", "Room") : L("Rohdaten", "Raw data")}</div></div>` : ""}
         </div>
         ${showDir ? `
         <div class="dirrow">
@@ -905,16 +919,55 @@ function renderFooter() {
         </div>`;
 }
 
-// WG's waiting animation of the room window ("loading data"): dark cover over the whole room
+// covers over the room body, like WG's room window showed them over its content:
+// maintenance (as_setInfoS + "retry"), enemy / legionnaire search (auto search form with its
+// timer and "cancel"), WG's waiting animation ("loading data") and the leadership notice
 function renderWaiting() {
-    if (data.waiting == null) return "";
+    const m = data.maintenance;
+    if (m) {
+        return `
+        <div class="waitcover">
+            <div class="waitbox">
+                <div class="alerticon"></div>
+                <div class="waittext">${esc(txt(m.header))}</div>
+                <div class="waitbody">${esc(txt(m.body))}</div>
+                <div class="btn accent" data-act="maintenanceRefresh">${esc(txt(m.button))}</div>
+            </div>
+        </div>`;
+    }
+    const s = data.search;
+    if (s) {
+        return `
+        <div class="waitcover">
+            <div class="waitbox search">
+                <div class="spinner"></div>
+                <div class="waittext">${esc(txt(s.label))}</div>
+                <div class="stimer" id="stimer">${esc(searchText())}</div>
+                ${s.canCancel ? `<div class="btn accent" data-act="searchCancel">${L("Abbrechen", "Cancel")}</div>` : ""}
+            </div>
+        </div>`;
+    }
+    const text = data.waiting != null ? data.waiting : data.notice;
+    if (text == null) return "";
     return `
         <div class="waitcover">
             <div class="waitbox">
                 <div class="spinner"></div>
-                <div class="waittext">${esc(txt(data.waiting))}</div>
+                <div class="waittext">${esc(txt(text))}</div>
             </div>
         </div>`;
+}
+
+// search panel time: counts down (squad in the queue) or up (searching) from what Python sent
+let searchBase = 0;
+function searchText() {
+    const s = data.search;
+    if (!s) return "";
+    const elapsed = Math.floor((Date.now() - searchBase) / 1000);
+    const v = Math.max(0, (s.seconds || 0) + (s.dir > 0 ? elapsed : -elapsed));
+    const m = Math.floor(v / 60);
+    const sec = v % 60;
+    return (m < 10 ? "0" : "") + m + ":" + (sec < 10 ? "0" : "") + sec;
 }
 
 function renderRaw() {
@@ -962,98 +1015,268 @@ function updateTimer(el) {
     el.style.color = alert ? fmtColor(t.alertHtmlFormatter, "#ff7f00") : fmtColor(t.htmlFormatter, "#ffdd99");
 }
 
-setInterval(() => updateTimer(document.getElementById("timer")), 500);
+setInterval(() => {
+    updateTimer(document.getElementById("timer"));
+    const st = document.getElementById("stimer");
+    if (st) st.textContent = searchText();
+}, 500);
 
-// --- render ----------------------------------------------------------------------
+// --- window: size, position, drag, hit test ---------------------------------------------------
 
-// view size = room content area of WG's window (px); Gameface windows are sized from JS
-// (viewEnv.resizeViewPx, same as WG's own OfferBannerWindow)
-// Right after the view opens, resizeViewPx can be ignored (game.log: viewSizePx 0x0, only the
-// top-left corner drawn): check the real size and set it again every 0.2 s until it sticks.
-const RESIZE_RETRY_MS = 50; // short: until the size is applied WG's room shows through
-const RESIZE_RETRY_MAX = 100; // 5 s
+const PANEL_W = 1038; // rem, same size as WG's whole room window
+const PANEL_H = 707;
+const RESIZE_RETRY_MS = 50;
 let appliedSize = "";
 let resizeTimer = 0;
+let pos = null; // panel position in rem (full mode: inside the screen-sized view; panel mode: window position)
+let wdrag = null; // title bar drag {mx, my, x, y}
+let moveFrame = 0;
+
+function env(fn, fallback) {
+    try {
+        return fn();
+    } catch (e) {
+        return fallback; // browser preview: no viewEnv
+    }
+}
+function pxToRem(v) {
+    return env(() => viewEnv.pxToRem(v), v);
+}
+function remToPx(v) {
+    return env(() => viewEnv.remToPx(v), v);
+}
+function fullMode() {
+    return data.mode !== "panel";
+}
+function clientRem() {
+    const s = env(() => viewEnv.getClientSizeRem(), null);
+    return s && s.width ? { w: s.width, h: s.height } : { w: document.body.offsetWidth || 1920, h: document.body.offsetHeight || 1080 };
+}
 
 function viewSizeOk(w, h) {
-    try {
-        const size = viewEnv.getViewSizePx();
-        return Math.abs(size.width - w) <= 1 && Math.abs(size.height - h) <= 1;
-    } catch (e) {
-        return true; // no way to check (browser preview)
-    }
+    const size = env(() => viewEnv.getViewSizePx(), null);
+    return !size || (Math.abs(size.width - w) <= 1 && Math.abs(size.height - h) <= 1);
 }
 
-function resizeView(w, h, attempt) {
-    try {
-        if (window.viewEnv && viewEnv.resizeViewPx) viewEnv.resizeViewPx(w, h);
-    } catch (e) {
-        send({ action: "log", msg: "resizeViewPx failed: " + e });
-    }
+// Gameface windows are sized from JS (viewEnv.resizeViewPx, like WG's OfferBannerWindow). The
+// document gets the same size in px, so Gameface's own size calculation finds a fixed content size
+// (0.8.0: "Size calculation timeout" reset the view to its default size about 2 s after opening and
+// the room was gone). The size is checked for a few seconds and on every render, set again if lost.
+const SIZE_WATCH_MS = 6000;
+let sizeWatchUntil = 0;
+
+function setDocSize(w, h) {
+    [document.documentElement, document.body, document.getElementById("root")].forEach((el) => {
+        if (!el) return;
+        el.style.width = typeof w === "number" ? w + "px" : w;
+        el.style.height = typeof h === "number" ? h + "px" : h;
+    });
+}
+
+function watchSize(w, h) {
     resizeTimer = setTimeout(() => {
         resizeTimer = 0;
-        if (appliedSize !== w + "x" + h) return; // a newer size is being applied
-        if (viewSizeOk(w, h)) {
-            if (attempt > 0) send({ action: "log", msg: "view size " + w + "x" + h + " ok after " + (attempt + 1) + " tries" });
-            return;
+        if (appliedSize !== w + "x" + h) return;
+        if (!viewSizeOk(w, h)) {
+            env(() => viewEnv.resizeViewPx(w, h));
+            send({ action: "log", msg: "view size lost, set again " + w + "x" + h });
         }
-        if (attempt + 1 >= RESIZE_RETRY_MAX) {
-            send({ action: "log", msg: "view size " + w + "x" + h + " not applied after " + RESIZE_RETRY_MAX + " tries" });
-            return;
-        }
-        send({ action: "log", msg: "view size not applied yet, retry " + (attempt + 1) });
-        resizeView(w, h, attempt + 1);
-    }, RESIZE_RETRY_MS);
+        if (Date.now() < sizeWatchUntil) watchSize(w, h);
+    }, RESIZE_RETRY_MS * 2);
 }
 
-function applyFrame() {
-    const f = data.frame;
-    if (!f || f.length < 4 || f[2] <= 0 || f[3] <= 0) return;
-    const key = f[2] + "x" + f[3];
-    if (key === appliedSize) return;
-    appliedSize = key;
-    if (resizeTimer) clearTimeout(resizeTimer);
-    resizeView(f[2], f[3], 0);
-    document.documentElement.style.width = document.body.style.width = "100%";
-    document.documentElement.style.height = document.body.style.height = "100%";
+function wantedSize() {
+    if (fullMode()) {
+        const s = env(() => viewEnv.getClientSizePx(), null);
+        return s && s.width ? [Math.round(s.width), Math.round(s.height)] : null;
+    }
+    return [Math.round(remToPx(PANEL_W)), Math.round(remToPx(PANEL_H))];
 }
+
+function applyViewSize() {
+    if (fullMode()) {
+        // full mode: the game sizes the window (WINDOW_FULLSCREEN), the document fills it
+        if (appliedSize !== "full") {
+            appliedSize = "full";
+            setDocSize("100%", "100%");
+        }
+        return;
+    }
+    const size = wantedSize();
+    if (!size) return;
+    const w = size[0];
+    const h = size[1];
+    const key = w + "x" + h;
+    if (key === appliedSize) {
+        if (!viewSizeOk(w, h)) env(() => viewEnv.resizeViewPx(w, h));
+        return;
+    }
+    appliedSize = key;
+    setDocSize(w, h);
+    env(() => viewEnv.resizeViewPx(w, h));
+    if (resizeTimer) clearTimeout(resizeTimer);
+    sizeWatchUntil = Date.now() + SIZE_WATCH_MS;
+    watchSize(w, h);
+}
+
+// keeps at least a part of the title bar on the screen
+function clampPos(p) {
+    const c = clientRem();
+    return { x: Math.round(Math.max(120 - PANEL_W, Math.min(c.w - 120, p.x))), y: Math.round(Math.max(0, Math.min(c.h - 35, p.y))) };
+}
+
+function initPos() {
+    if (pos) return;
+    const saved = data.pos;
+    const c = clientRem();
+    pos = clampPos(saved && saved.length === 2 ? { x: saved[0], y: saved[1] } : { x: (c.w - PANEL_W) / 2, y: (c.h - PANEL_H) / 2 });
+}
+
+function placePanel() {
+    const panel = document.getElementById("panel");
+    if (!panel || !pos) return;
+    panel.style.left = "0rem";
+    panel.style.top = "0rem";
+    // full mode: moved with transform (no new layout of the room while dragging, 0.8.5)
+    panel.style.transform = fullMode() ? "translate(" + pos.x + "rem, " + pos.y + "rem)" : "none";
+    updateInputArea();
+}
+
+function mouseRem() {
+    const m = env(() => viewEnv.getMouseGlobalPositionRem(), null);
+    return m ? { x: m.x, y: m.y } : null;
+}
+
+document.addEventListener("mousedown", (e) => {
+    if (e.button !== 0 || !closest(e.target, "data-drag") || closest(e.target, "data-act")) return;
+    e.preventDefault();
+    initPos();
+    if (fullMode()) wdrag = { mx: e.clientX, my: e.clientY, x: pos.x, y: pos.y };
+    else {
+        const m = mouseRem();
+        if (!m) return;
+        wdrag = { mx: m.x, my: m.y, x: pos.x, y: pos.y };
+    }
+    // keep getting mouse moves when the cursor leaves the view while dragging
+    env(() => viewEnv.setTrackMouseOnStage(true));
+    const panel = document.getElementById("panel");
+    if (panel) panel.className += " dragging";
+    const tip = document.getElementById("tip");
+    if (tip) tip.style.display = "none";
+    tipRaw = "";
+    updateInputArea();
+});
+
+document.addEventListener("mousemove", (e) => {
+    if (!wdrag) return;
+    if (fullMode()) {
+        pos = clampPos({ x: wdrag.x + pxToRem(e.clientX - wdrag.mx), y: wdrag.y + pxToRem(e.clientY - wdrag.my) });
+        // one move per frame, however many mouse events come
+        if (!moveFrame)
+            moveFrame = requestAnimationFrame(() => {
+                moveFrame = 0;
+                placePanel();
+            });
+        return;
+    }
+    const m = mouseRem();
+    if (!m) return;
+    pos = clampPos({ x: wdrag.x + m.x - wdrag.mx, y: wdrag.y + m.y - wdrag.my });
+    // one window move per frame
+    if (!moveFrame)
+        moveFrame = requestAnimationFrame(() => {
+            moveFrame = 0;
+            send({ action: "moveTo", x: pos.x, y: pos.y });
+        });
+});
+
+document.addEventListener("mouseup", (e) => {
+    if (!wdrag || e.button !== 0) return;
+    wdrag = null;
+    env(() => viewEnv.setTrackMouseOnStage(false));
+    const panel = document.getElementById("panel");
+    if (panel) panel.className = panel.className.replace(/\s*\bdragging\b/g, "");
+    if (fullMode()) placePanel();
+    send({ action: "savePos", x: pos.x, y: pos.y });
+});
+
+// The room's window is screen-sized: only the panel's rectangle takes the mouse, the rest goes
+// to the garage. WG's normal Gameface views have no onHitTest (viewEnv.setHitTestEnabled is
+// missing there); they use viewEnv.setInputArea(x, y, w, h) like WG's StyleBuyingPanel
+// (x = pxToRem(px) * getScale()).
+let inputAreaKey = "";
+function updateInputArea() {
+    if (!fullMode()) return;
+    const panel = document.getElementById("panel");
+    if (!panel) return;
+    try {
+        const s = viewEnv.getScale();
+        let x = 0, y = 0, w = 1, h = 1; // passive (a WG window is up): nothing of ours takes the mouse
+        if (wdrag || drag) {
+            // while dragging the whole screen is ours, else a fast mouse leaves the area and is lost
+            const c = viewEnv.getClientSizePx();
+            w = c.width; h = c.height;
+        } else if (!data.passive) {
+            const r = panel.getBoundingClientRect();
+            if (r.width < 1 || r.height < 1) return; // mid re-render: keep the last area
+            x = r.left * s; y = r.top * s; w = r.width * s; h = r.height * s;
+        }
+        const key = [x, y, w, h].map(Math.round).join(",");
+        if (key === inputAreaKey) return;
+        inputAreaKey = key;
+        viewEnv.setInputArea(x, y, w, h);
+    } catch (e) {
+        send({ action: "log", msg: "inputArea failed: " + e });
+    }
+}
+
+// --- render ----------------------------------------------------------------------
 
 let chatDraft = "";
 let chatFocus = false;
 let chatStick = true; // keep the chat scrolled to the newest line
 
-// small EZ ROOM button over WG's title bar while the original room is shown (data.mini)
-// title bar drag: Python moves the overlay with the cursor until the left button is released
-document.addEventListener("mousedown", (e) => {
-    if (e.button !== 0 || !closest(e.target, "data-drag") || closest(e.target, "data-act")) return;
-    send({ action: "dragStart" });
-});
-document.addEventListener("mouseup", (e) => {
-    if (e.button === 0 && closest(e.target, "data-drag")) send({ action: "dragEnd" });
-});
-
-// own title bar (the overlay covers WG's whole window incl. its title bar): drag = move the room,
-// minimize / X do the same as WG's buttons (Window.as minimizeBtn / closeBtnEx)
+// own title bar: drag = move the room, WG-Raum = WG's own room (fallback), minimize / X like
+// WG's window buttons (Window.as minimizeBtn / closeBtnEx); X is off while a search runs (WG too)
 function renderTitlebar() {
     return `
         <div class="titlebar" data-drag="1">
-            <div class="ttext">EZ ROOM</div>
+            <div class="tmark"></div>
+            <div class="ttext">${esc(data.title || "EZ ROOM")}</div>
+            ${renderSession()}
+            <div class="tbrand">EZ ROOM</div>
+            <div class="tbtn" data-act="wgRoom" data-tip="${esc(L("{HEADER}WG-Raum{/HEADER}{BODY}WGs eigenen Raum öffnen. WGs Raum minimieren und unten in der Chat-Leiste wieder anklicken = EZ ROOM (oder Mods-Liste).{/BODY}", "{HEADER}WG room{/HEADER}{BODY}Open WG's own room. Minimize it and click it in the chat bar again = EZ ROOM (or the mods list).{/BODY}"))}">${L("WG-Raum", "WG room")}</div>
             <div class="wbtn wmin" data-act="minimize" data-tip="${esc(L("Minimieren", "Minimize"))}"></div>
-            <div class="wbtn wclose" data-act="close" data-tip="${esc(L("Schließen", "Close"))}"></div>
+            ${data.search ? "" : `<div class="wbtn wclose" data-act="close" data-tip="${esc(L("Schließen", "Close"))}"></div>`}
         </div>`;
 }
 
-function renderMini() {
-    return `<div class="mini" data-act="restore" data-tip="${esc(L("Zurück zur EZ-ROOM-Oberfläche", "Back to the EZ ROOM view"))}">EZ ROOM</div>`;
+// session counter in the title bar (skirmish rooms only): battles from this room, win rate,
+// average and total battle time
+function mmss(v) {
+    if (v == null) return "–";
+    const m = Math.floor(v / 60);
+    const sec = v % 60;
+    return m + ":" + (sec < 10 ? "0" : "") + sec;
+}
+function renderSession() {
+    const s = data.session;
+    if (!s) return "";
+    const tip = `{HEADER}${L("Sitzung in diesem Raum", "Session in this room")}{/HEADER}{BODY}${L("Gefechte", "Battles")}: ${s.battles}\n${L("Siege", "Victories")}: ${s.wins}\n${L("Ø Gefechtsdauer", "Avg. battle time")}: ${mmss(s.avg)}\n${L("Gesamt", "Total")}: ${mmss(s.total)}{/BODY}`;
+    return `
+        <div class="tsession" data-tip="${esc(tip)}">
+            <span class="sk">${L("Gefechte", "Battles")}</span><span class="sv">${s.battles}</span>
+            <span class="sk">${L("Siege", "Wins")}</span><span class="sv ${s.winrate == null ? "" : s.winrate >= 50 ? "good" : "bad"}">${s.winrate == null ? "–" : s.winrate + "%"}</span>
+            <span class="sk">Ø</span><span class="sv">${mmss(s.avg)}</span>
+            <span class="sk">Σ</span><span class="sv">${mmss(s.total)}</span>
+        </div>`;
 }
 
+let readySent = false;
+
 function render() {
-    applyFrame();
-    document.body.className = data.mini ? "minibody" : "";
-    if (data.mini) {
-        document.getElementById("root").innerHTML = renderMini();
-        return;
-    }
+    applyViewSize();
+    initPos();
     lastKey = changeKey(data);
     const root = document.getElementById("root");
     const input = document.getElementById("chatinput");
@@ -1071,8 +1294,15 @@ function render() {
     const keepLogTop = keepLog ? keepLog.scrollTop : 0;
     if (keepLog) keepLog.parentNode.removeChild(keepLog);
     chatLinesShown = chatLinesNext;
-    root.innerHTML = `${renderTitlebar()}${renderHeader()}<div class="body">${body}${ui.raw ? "" : renderWaiting()}</div>${renderFooter()}${renderReservePopup()}<div id="tip" class="tip"></div>`;
-    // the room re-renders every second (timer, room data): keep an open tooltip where it was (user 0.7.46)
+    document.body.className = fullMode() ? "full" : "panelmode";
+    root.innerHTML = `
+        <div id="panel" class="win ${data.passive ? "passive" : ""}">
+            <div class="frame"></div>
+            ${renderTitlebar()}${renderHeader()}<div class="body">${body}${ui.raw ? "" : renderWaiting()}</div>${renderFooter()}${renderReservePopup()}
+        </div>
+        <div id="tip" class="tip"></div>`;
+    placePanel();
+    // the room re-renders on room changes: keep an open tooltip where it was (user 0.7.46)
     const tip = document.getElementById("tip");
     if (tip && tipRaw) {
         tip.innerHTML = tipHtml(tipRaw);
@@ -1110,7 +1340,14 @@ function render() {
         const lateLog = document.getElementById("chatlog");
         if (lateLog && stick) lateLog.scrollTop = lateLog.scrollHeight;
         updateScrollbars();
+        updateInputArea();
     });
+    if (!readySent) {
+        readySent = true;
+        updateInputArea();
+        // tells Python the UI works (else WG's room is opened after a few seconds)
+        send({ action: "uiReady" });
+    }
 }
 
 // own scrollbars for the volunteers list and the chat (Gameface draws none): thumb size/position
@@ -1186,6 +1423,7 @@ function markHover() {
 }
 
 document.addEventListener("mousemove", (e) => {
+    if (wdrag) return;
     const row = closest(e.target, "data-user");
     const id = row ? row.getAttribute("data-user") : "";
     if (id === ui.hoverRow) return;
@@ -1215,8 +1453,7 @@ document.addEventListener("click", (e) => {
     const act = el.getAttribute("data-act");
     const id = Number(el.getAttribute("data-id"));
     const slot = Number(el.getAttribute("data-slot"));
-    if (act === "hide") send({ action: "hide" });
-    else if (act === "minimize" || act === "close") send({ action: act });
+    if (act === "minimize" || act === "close" || act === "wgRoom" || act === "searchCancel" || act === "maintenanceRefresh") send({ action: act });
     else if (act === "unfreeze") send({ action: "unfreeze", slot: slot });
     else if (act === "raw") {
         ui.raw = !ui.raw;
@@ -1261,7 +1498,7 @@ document.addEventListener("click", (e) => {
         render();
     } else if (act === "chatSend") sendChat();
     else if (act === "chooseVehicle") send({ action: "chooseVehicle", cd: Number(el.getAttribute("data-cd")) || 0 });
-    else if (act === "ready" || act === "invite" || act === "toggleOpen" || act === "configure" || act === "back" || act === "restore") send({ action: act });
+    else if (act === "ready" || act === "invite" || act === "toggleOpen" || act === "configure" || act === "back") send({ action: act });
 });
 
 // commander: click a volunteer = WG puts him into the next free allowed slot (Python picks it),
@@ -1290,6 +1527,7 @@ function dragGhost(show, e, name) {
 
 function endDrag() {
     drag = null;
+    updateInputArea();
     dragGhost(false);
     if (ui.selCand || ui.dragOut) {
         ui.selCand = ui.dragOut = 0;
@@ -1307,6 +1545,7 @@ document.addEventListener("mousedown", (e) => {
     e.preventDefault();
     const nameEl = el.querySelector(".name");
     drag = { kind: cand ? "cand" : "member", id: Number(el.getAttribute(cand ? "data-cand" : "data-member")), x: e.clientX, y: e.clientY, started: false, name: nameEl ? nameEl.textContent : "" };
+    updateInputArea();
 });
 
 document.addEventListener("mousemove", (e) => {
@@ -1328,6 +1567,7 @@ document.addEventListener("mouseup", (e) => {
     const d = drag;
     if (!d.started) {
         drag = null;
+        updateInputArea();
         if (d.kind === "cand") send({ action: "assignNext", dbID: d.id }); // a click on a member does nothing
         return;
     }
@@ -1351,6 +1591,7 @@ let tipPos = ["0px", "0px"];
 // data-wgtip: WG shows its own tooltip (Python, BackportTooltipWindow); "swords" or building index 0-5
 let wgTipTarget = "";
 document.addEventListener("mousemove", (e) => {
+    if (wdrag) return;
     const wg = closest(e.target, "data-wgtip");
     const v = wg ? wg.getAttribute("data-wgtip") : "";
     if (v !== wgTipTarget) {
@@ -1452,7 +1693,7 @@ document.addEventListener("keydown", (e) => {
                 ui.selCand = 0;
                 render();
             }
-        } else send({ action: "hide" });
+        }
     }
 });
 
@@ -1466,8 +1707,9 @@ let sortLoaded = false;
 let lastData = null;
 function changeKey(d) {
     const grid = d.grid ? Object.assign({}, d.grid, { points: (d.grid.points || []).map((p) => [p.x, p.y]) }) : null;
-    // dev raw data holds WG's timer call (new every second): only counts while the raw view is open
-    return JSON.stringify(Object.assign({}, d, { timer: null, timerAge: null, grid: grid, raw: ui.raw ? d.raw : null }));
+    // timer and search time count here; dev raw data only counts while the raw view is open
+    const search = d.search ? Object.assign({}, d.search, { seconds: null }) : null;
+    return JSON.stringify(Object.assign({}, d, { timer: null, timerAge: null, readyCoolDown: null, search: search, grid: grid, raw: ui.raw ? d.raw : null }));
 }
 
 function readModel() {
@@ -1481,6 +1723,7 @@ function readModel() {
         const key = changeKey(next);
         data = next;
         timerBase = { at: Date.now() };
+        searchBase = Date.now();
         setReadyCoolDown(data.readyCoolDown);
         if (key === lastKey) {
             updateTimer(document.getElementById("timer"));
@@ -1502,18 +1745,6 @@ function readModel() {
         }
         if (ui.selCand && (!(data.candidates || []).some((c) => c.dbID === ui.selCand) || slotOf(ui.selCand) !== -1)) ui.selCand = 0;
         render();
-        if (data.frame && !sizeLogged) {
-            sizeLogged = true;
-            setTimeout(() => {
-                let env = "";
-                try {
-                    env = " viewSizePx " + JSON.stringify(viewEnv.getViewSizePx()) + " posRem " + JSON.stringify(viewEnv.getViewGlobalPositionRem()) + " scale " + viewEnv.getScale();
-                } catch (e) {
-                    env = " viewEnv: " + e;
-                }
-                send({ action: "log", msg: "frame " + JSON.stringify(data.frame) + " body " + document.body.offsetWidth + "x" + document.body.offsetHeight + env });
-            }, 500);
-        }
     } catch (e) {
         console.error("ez_room: bad model data", e);
         send({ action: "log", msg: "bad model data: " + e });
@@ -1521,6 +1752,12 @@ function readModel() {
 }
 
 engine.whenReady.then(() => {
+    // size the view at once (before the first data), Gameface's size calculation waits for it
+    try {
+        const raw = window.model && window.model.data;
+        if (raw) data = JSON.parse(raw);
+    } catch (e) {}
+    applyViewSize();
     engine.on("viewEnv.onDataChanged", readModel);
     viewEnv.addDataChangedCallback("model", 0, true);
     readModel();

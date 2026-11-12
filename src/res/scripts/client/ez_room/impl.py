@@ -1,40 +1,51 @@
 # -*- coding: utf-8 -*-
 # EZ ROOM for ADV: implementation. Loaded by gui/mods/mod_ez_room.py, either as the packaged
 # module or, in dev mode, straight from the project source.
-# The view gets the recorded Flash room state from the loader's RoomBridge, packs it into one
-# JSON string for the web UI and runs actions through the room's own request methods.
+# Since 0.8.0 WG's Flash room (fortClanBattleRoom.swf) is never opened. This view does what WG's
+# StrongholdBattleRoom + StrongholdBattleRoomWindow did: it listens to the stronghold unit entity
+# (IUnitListener / IStrongholdListener, the same callbacks and event bus events), builds the same
+# VOs with WG's own Python builders (vo_converters, StrongholdActionButtonStateVO, rally_dps) and
+# runs every action through WG's prb API (unit request contexts, entity methods). The web UI gets
+# one JSON string, only when something changed.
 import json
 import logging
 import os
 import time
+import weakref
 
 import BigWorld
-import GUI
-import Keys
+import Event
 from frameworks.wulf import ViewFlags, ViewModel, ViewSettings, WindowFlags, WindowLayer
 from gui.impl.gen import R
 from gui.impl.pub import ViewImpl
 from gui.impl.pub.window_impl import WindowImpl
 from gui.Scaleform.locale.TOOLTIPS import TOOLTIPS
+from gui.prb_control.entities.listener import IGlobalListener
 from gui.shared.utils.functions import getArenaGeometryName
 from helpers import dependency, getClientLanguage
 from helpers.i18n import makeString
 from adisp import adisp_process
 from skeletons.gui.impl import IGuiLoader
 
-__version__ = '0.7.51'
+__version__ = '0.8.7'
 _logger = logging.getLogger('EZ_ROOM')
 _logger.setLevel(logging.INFO)
 _LAYOUT_PATH = ('ez_room', 'views', 'EzRoomView')
 _UI_DIR = 'res/gui/gameface/mods/ez_room'
 _SNAPSHOT_FILE = os.path.join('mods', 'configs', 'ez_room', 'last_room.json')  # dev only, for the preview
-_SETTINGS_FILE = os.path.join('mods', 'configs', 'ez_room', 'settings.json')  # UI settings (table sorting)
+_SETTINGS_FILE = os.path.join('mods', 'configs', 'ez_room', 'settings.json')  # UI settings (sorting, position, ...)
+ROOM_ALIAS = 'StrongholdBattleRoomWindow'  # FORTIFICATION_ALIASES.STRONGHOLD_BATTLE_ROOM_WINDOW_ALIAS
+_READY_TIMEOUT = 6.0  # s for the web UI to report itself, else WG's room is opened instead
+_CHAT_LINES = 150
+_PANEL_W, _PANEL_H = 1038, 707  # size of the room panel (same as WG's whole room window)
 
+# set by the loader in dev mode: contents of dev.json ({'src': 'X:/.../src', ...})
+DEV = None
 
 _settings = None  # cache of settings.json (read once, then only written)
 
 
-def _loadSettings():
+def loadSettings():
     global _settings
     if _settings is None:
         _settings = {}
@@ -49,7 +60,7 @@ def _loadSettings():
     return dict(_settings)
 
 
-def _saveSettings(settings):
+def saveSettings(settings):
     global _settings
     _settings = dict(settings)
     try:
@@ -60,104 +71,6 @@ def _saveSettings(settings):
             json.dump(settings, f)
     except Exception:
         _logger.exception('writing %s failed', _SETTINGS_FILE)
-
-# set by the loader in dev mode: contents of dev.json ({'src': 'X:/.../src', optional 'layer', 'offset'})
-DEV = None
-# size of the room content in WG's Flash window (FortClanBattleRoomUI, fortClanBattleRoom.swf)
-_ROOM_W, _ROOM_H = 1013, 653
-_CONTENT_OFFSET = (12, 35, _ROOM_W, _ROOM_H)
-_TRACK_INTERVAL = 0.0  # every frame: the overlay follows WG's window / the cursor while dragged
-# WG's whole room window (Window.as content padding 35/13/19/12 around the content); the overlay
-# covers exactly that, own title bar included (1200 x 800 in 0.7.36-0.7.38 was too big)
-_WIN_W, _WIN_H = 12 + _ROOM_W + 13, 35 + _ROOM_H + 19
-_EZ_W, _EZ_H = _WIN_W, _WIN_H
-_EZ_DX, _EZ_DY = (_WIN_W - _EZ_W) // 2, (_WIN_H - _EZ_H) // 2
-
-
-def _rect(window):
-    # (x, y, w, h) of a wulf window, None if unknown
-    if window is None:
-        return None
-    try:
-        # plain position only: calculateGlobalPosition is a native call that may not be safe
-        # on WG's Flash windows
-        pos = window.position
-        size = window.size
-        return (float(pos[0]), float(pos[1]), float(size[0]), float(size[1]))
-    except Exception:
-        _logger.exception('reading window rect failed')
-        return None
-
-
-def _roomWindowView(bridge):
-    getter = getattr(bridge, 'roomWindowView', None)
-    if getter is not None:
-        return getter()
-    # loader < 0.2.2 (dev reload into an older client): read its module global
-    import sys
-    loader = sys.modules.get('gui.mods.mod_ez_room')
-    ref = getattr(loader, '_roomWindowView', None) if loader is not None else None
-    return ref() if ref is not None else None
-
-
-def _roomRect(bridge):
-    # geometry of WG's Flash room window, straight from Flash (the wulf window reports 0,0,0,0)
-    view = _roomWindowView(bridge)
-    if view is None:
-        return None
-    try:
-        geom = view.as_getGeometryS()
-        if geom and len(geom) >= 2:
-            return tuple(float(v) for v in geom[:4])
-    except Exception:
-        _logger.exception('as_getGeometryS failed')
-    return None
-
-
-_MINI_W, _MINI_H = 96, 22
-
-
-def _frame(roomRect, config):
-    if (config or {}).get('mini'):
-        # small button in the middle of WG's title bar (the title text is on the left, the window
-        # buttons on the right)
-        x, y = roomRect[0], roomRect[1]
-        dx, dy = _CONTENT_OFFSET[0], 7
-        return (int(round(x + dx + (_ROOM_W - _MINI_W) / 2.0)), int(round(y + dy)), _MINI_W, _MINI_H)
-    # as_getGeometryS gives the window's top-left and -1 as size; the content starts 12 px right /
-    # 35 px down and is 1013 x 653 (fortClanBattleRoom.swf). Dev 'offset' = old content-only overlay.
-    x, y = roomRect[0], roomRect[1]
-    offset = (config or {}).get('offset')
-    if offset:
-        dx, dy, w, h = offset
-        return (int(round(x + dx)), int(round(y + dy)), int(w), int(h))
-    x, y = _clampToScreen(x + _EZ_DX, y + _EZ_DY)
-    return (x, y, _EZ_W, _EZ_H)
-
-
-def _screenSize():
-    # lobby size in UI px (window pixels / interface scale, like WG's armor inspector tooltip)
-    w, h = BigWorld.windowSize()
-    try:
-        from skeletons.account_helpers.settings_core import ISettingsCore
-        scale = float(dependency.instance(ISettingsCore).interfaceScale.get()) or 1.0
-    except Exception:
-        scale = 1.0
-    return (w / scale, h / scale, scale)
-
-
-def _clampToScreen(x, y):
-    sw, sh, _ = _screenSize()
-    x = max(0.0, min(float(x), sw - _EZ_W))
-    y = max(0.0, min(float(y), sh - _EZ_H))
-    return (int(round(x)), int(round(y)))
-
-
-def _cursor():
-    # cursor in UI px (GUI.mcursor().position is -1..1, y up)
-    sw, sh, _ = _screenSize()
-    nx, ny = GUI.mcursor().position
-    return ((nx + 1) / 2.0 * sw, (1 - ny) / 2.0 * sh)
 
 
 _LANGS = ('de', 'en', 'pl', 'cs', 'fr', 'es', 'it', 'tr', 'ru')
@@ -208,10 +121,89 @@ def _devUI():
         return u''
 
 
-def _backLink():
-    # WG's back link (FortClanBattleRoom.backBtn): label in normal case from the tooltip header
-    # (#fortifications:sortie/room/leaveBtn is all caps), tooltip body explains that it leaves the unit
+# --- WG prb access ---------------------------------------------------------------------
+
+def _dispatcher():
+    from gui.prb_control.dispatcher import g_prbLoader
+    return g_prbLoader.getDispatcher()
+
+
+def roomEntity():
+    # WG's stronghold unit entity while the player is in a room (not the web room list, whose
+    # StrongholdBrowserEntity keeps WG's own Flash window), else None
     try:
+        dispatcher = _dispatcher()
+        entity = dispatcher.getEntity() if dispatcher is not None else None
+        if entity is None or not hasattr(entity, 'isStrongholdSettingsValid'):
+            return None
+        from gui.prb_control.settings import FUNCTIONAL_FLAG
+        flags = entity.getFunctionalFlags()
+        if not (flags & FUNCTIONAL_FLAG.UNIT and flags & FUNCTIONAL_FLAG.STRONGHOLD):
+            return None
+        return entity if entity.getID() > 0 else None
+    except Exception:
+        _logger.exception('room entity lookup failed')
+        return None
+
+
+@adisp_process
+def _sendRequest(ctx):
+    # same as BaseRallyRoomView.sendRequest: dispatcher checks cooldowns and shows WG's messages
+    dispatcher = _dispatcher()
+    if dispatcher is not None:
+        yield dispatcher.sendPrbRequest(ctx)
+
+
+@adisp_process
+def _leave(isExit):
+    # WG's X (AbstractRallyWindow._doLeave, isExit True) / back link (isExit False): WG's leave
+    # confirmation dialog included
+    from gui.prb_control.entities.base.ctx import LeavePrbAction
+    dispatcher = _dispatcher()
+    if dispatcher is not None:
+        yield dispatcher.doLeaveAction(LeavePrbAction(isExit=isExit))
+
+
+def _clientID():
+    from constants import PREBATTLE_TYPE
+    from messenger.ext import channel_num_gen
+    return channel_num_gen.getClientID4Prebattle(PREBATTLE_TYPE.STRONGHOLD)
+
+
+def _carouselOpenState(flag):
+    # same as StrongholdBattleRoomWindow.__updateWindowOpenState (carousel item shown as open)
+    from gui.Scaleform.genConsts.MESSENGER_CHANNEL_CAROUSEL_ITEM_TYPES import MESSENGER_CHANNEL_CAROUSEL_ITEM_TYPES
+    from gui.shared import g_eventBus
+    from gui.shared.event_bus import EVENT_BUS_SCOPE
+    from gui.shared.events import ChannelCarouselEvent
+    g_eventBus.handleEvent(ChannelCarouselEvent(None, ChannelCarouselEvent.ON_WINDOW_CHANGE_OPEN_STATE, _clientID(),
+                                                MESSENGER_CHANNEL_CAROUSEL_ITEM_TYPES.CHANNEL_CAROUSEL_ITEM_TYPE_PREBATTLE, flag),
+                           scope=EVENT_BUS_SCOPE.LOBBY)
+
+
+def destroyWgRoomWindow():
+    # WG's Flash room window (web room list phase) when the player has just joined a room
+    try:
+        from gui.Scaleform.framework.managers.containers import POP_UP_CRITERIA
+        from skeletons.gui.app_loader import IAppLoader
+        app = dependency.instance(IAppLoader).getApp()
+        if app is None or app.containerManager is None:
+            return
+        view = app.containerManager.getView(WindowLayer.WINDOW, criteria={POP_UP_CRITERIA.VIEW_ALIAS: ROOM_ALIAS})
+        if view is not None:
+            _logger.info("closing WG's Flash room window")
+            view.destroy()
+    except Exception:
+        _logger.exception("closing WG's room window failed")
+
+
+# --- texts and small VOs (unchanged from 0.7) ---------------------------------------------
+
+def _backLink(entity):
+    # WG's back link (FortClanBattleRoom.backBtn, visible when canGoBack = entity.canKeepMode())
+    try:
+        if not entity.canKeepMode():
+            return {'label': u'', 'tip': u''}
         return {'label': _u(makeString(TOOLTIPS.FORTIFICATION_SORTIE_BATTLEROOM_LEAVEBTN_HEADER)),
                 'tip': _u(makeString(TOOLTIPS.FORTIFICATION_SORTIE_BATTLEROOM_LEAVEBTN_BODY))}
     except Exception:
@@ -248,13 +240,12 @@ def _speaking(slots, candidates, events):
     return result
 
 
-def _roleRights(view, slots):
+def _roleRights(entity, slots):
     # per player: may I give / take each role? Same checks as WG's context menu
     # (UnitUserCMHandler._canGiveEquipmentCommander / _canTakeEquipmentCommander)
     rights = {}
     try:
         from gui.prb_control.items.stronghold_items import BOOST_TYPE, SUPPORT_TYPE
-        entity = view.prbEntity
         if not entity.getPermissions().canChangeExtraEquipmentRole():
             return rights
         for slot in slots:
@@ -275,27 +266,20 @@ def _roleRights(view, slots):
     return rights
 
 
-@adisp_process
 def _setEquipmentCommander(dbID, kind):
     # same request as WG's context menu (UnitUserCMHandler.giveEquipmentCommander): dbID None = take
     # the role away; giving moves it from whoever had it (one player per role)
-    from gui.prb_control.dispatcher import g_prbLoader
     from gui.prb_control.entities.stronghold.unit.ctx import GiveEquipmentCommanderCtx
     from gui.prb_control.items.stronghold_items import ARTILLERY_COMMANDER, INSPIRE_COMMANDER
     role = ARTILLERY_COMMANDER if kind == 'artillery' else INSPIRE_COMMANDER
-    yield g_prbLoader.getDispatcher().sendPrbRequest(GiveEquipmentCommanderCtx(dbID, role, 'prebattle/giveEquipmentCommander'))
+    _sendRequest(GiveEquipmentCommanderCtx(dbID, role, 'prebattle/giveEquipmentCommander'))
 
 
 def _divisionTip():
     # WG's divisionInfo tooltip (FortClanBattleRoom ⓘ -> TOOLTIPS_CONSTANTS.SORTIE_DIVISION): same data
     # as SortieDivisionTooltipData, labels from #tooltips:fortification/sortieDivisionToolTip/*
     try:
-        # only while WG's current entity is the stronghold unit (leaving the room switches it to the
-        # stronghold browser / random entity before our overlay is gone)
-        from gui.prb_control.dispatcher import g_prbLoader
-        dispatcher = g_prbLoader.getDispatcher()
-        entity = dispatcher.getEntity() if dispatcher is not None else None
-        if entity is None or not hasattr(entity, 'isStrongholdSettingsValid'):
+        if roomEntity() is None:
             return u''
         from gui.shared.tooltips import common, contexts
         result = common.SortieDivisionTooltipData(contexts.FortificationContext()).getDisplayableData()
@@ -326,44 +310,26 @@ def _configureTips():
         return {}
 
 
-_SET_PLAYER_STATE = 6  # REQUEST_TYPE.SET_PLAYER_STATE: the only cooldown WG's room shows (ready button)
-
-
-def _readyCoolDown(bridge):
-    # seconds left of the ready button cooldown (FortClanBattleRoom.coolDownControls -> enableFightButton)
-    coolDowns = getattr(bridge, 'coolDowns', None)
-    if coolDowns is None:
-        # loader < 0.7.43: only the last call is known
-        args = bridge.calls.get('as_setCoolDownS')
-        if not args or len(args) < 2 or args[1] != _SET_PLAYER_STATE:
-            return 0.0
-        start, seconds = bridge.times.get('as_setCoolDownS', 0.0), float(args[0] or 0)
-    else:
-        start, seconds = coolDowns.get(_SET_PLAYER_STATE, (0.0, 0.0))
-    return max(0.0, start + seconds - time.time())
-
-
-def _directTips():
-    # WG's direction tooltips are shown by WG itself (_showWgTip), here only: is the stronghold data there
+def _frozenTips():
+    # WG's tooltips of the frozen vehicle marker and the unfreeze button (SortieSlot.as)
     try:
-        from gui.prb_control.dispatcher import g_prbLoader
-        dispatcher = g_prbLoader.getDispatcher()
-        entity = dispatcher.getEntity() if dispatcher is not None else None
-        return bool(entity is not None and hasattr(entity, 'isStrongholdSettingsValid') and entity.isStrongholdSettingsValid())
+        T = lambda key: _u(makeString(key))
+        return {'icon': T(TOOLTIPS.FORTIFICATION_SORTIE_BATTLEROOM_VEHBROKENICON),
+                'btn': T(TOOLTIPS.FORTIFICATION_SORTIE_BATTLEROOM_UNFROZEVEHICLEBTN),
+                'btnOff': u'{HEADER}%s{/HEADER}{BODY}%s{/BODY}' % (
+                    T(TOOLTIPS.FORTIFICATION_SORTIE_BATTLEROOM_UNFROZEVEHICLEBTN_DISABLED_HEADER),
+                    T(TOOLTIPS.FORTIFICATION_SORTIE_BATTLEROOM_UNFROZEVEHICLEBTN_DISABLED_BODY))}
     except Exception:
-        _logger.exception('direction tooltips failed')
-        return False
+        _logger.exception('frozen tooltips failed')
+        return {}
 
 
-def _battleMapPoints():
+def _battleMapPoints(entity):
     # bases / control points of the current battle exactly as WG's direction tooltip has them
     # (ToolTipRefSysDirects.getDisplayableData -> mapPoints: x, y in 300 x 300 minimap units around
     # the centre, pointType 'base' (current battle) or 'control', color blue / red / empty, id)
     try:
-        from gui.prb_control.dispatcher import g_prbLoader
-        dispatcher = g_prbLoader.getDispatcher()
-        entity = dispatcher.getEntity() if dispatcher is not None else None
-        if entity is None or not hasattr(entity, 'isStrongholdSettingsValid') or not entity.isStrongholdSettingsValid():
+        if not entity.isStrongholdSettingsValid():
             return None
         series = entity.getStrongholdSettings().getData().getHeader().getBattleSeriesStatus() or []
         current = [idx for idx, battle in enumerate(series) if battle.getCurrentBattle()]
@@ -381,18 +347,32 @@ def _battleMapPoints():
         return None
 
 
-def _frozenTips():
-    # WG's tooltips of the frozen vehicle marker and the unfreeze button (SortieSlot.as)
-    try:
-        T = lambda key: _u(makeString(key))
-        return {'icon': T(TOOLTIPS.FORTIFICATION_SORTIE_BATTLEROOM_VEHBROKENICON),
-                'btn': T(TOOLTIPS.FORTIFICATION_SORTIE_BATTLEROOM_UNFROZEVEHICLEBTN),
-                'btnOff': u'{HEADER}%s{/HEADER}{BODY}%s{/BODY}' % (
-                    T(TOOLTIPS.FORTIFICATION_SORTIE_BATTLEROOM_UNFROZEVEHICLEBTN_DISABLED_HEADER),
-                    T(TOOLTIPS.FORTIFICATION_SORTIE_BATTLEROOM_UNFROZEVEHICLEBTN_DISABLED_BODY))}
-    except Exception:
-        _logger.exception('frozen tooltips failed')
-        return {}
+def _arenaPoints(mapId, playerTeam):
+    # WG's MinimapLobby.build without Flash: spawns, bases, control points of the arena in WG's
+    # 300 x 300 minimap units around the centre (y up)
+    import ArenaType
+    arenaType = ArenaType.g_cache[int(mapId)]
+    bottomLeft, upperRight = arenaType.boundingBox
+    multX, multY = (upperRight - bottomLeft) / 300.0
+    offset = (upperRight + bottomLeft) * 0.5
+    norm = lambda x, y: ((x - offset.x) / multX, (y - offset.y) / multY)
+    color = lambda team: 'blue' if team == playerTeam else 'red'
+    points = []
+    for team, spawns in enumerate(arenaType.teamSpawnPoints or (), 1):
+        spawns = list(spawns or ())
+        for number, point in enumerate(spawns, 1):
+            x, y = norm(point[0], point[1])
+            points.append({'x': x, 'y': y, 'type': 'spawn', 'color': color(team), 'id': number + 1 if len(spawns) > 1 else 1})
+    for team, bases in enumerate(arenaType.teamBasePositions or (), 1):
+        bases = list((bases or {}).values())
+        for number, point in enumerate(bases, 2):
+            x, y = norm(point[0], point[1])
+            points.append({'x': x, 'y': y, 'type': 'base', 'color': color(team), 'id': number if len(bases) > 1 else 1})
+    controls = list(arenaType.controlPoints or ())
+    for number, point in enumerate(controls, 2):
+        x, y = norm(point[0], point[1])
+        points.append({'x': x, 'y': y, 'type': 'control', 'color': 'empty', 'id': number if len(controls) > 1 else 1})
+    return points
 
 
 def _mapIcon(mapID):
@@ -414,11 +394,11 @@ def _mapIcon(mapID):
     return u'img://' + path
 
 
-def _me(view):
+def _me(entity):
     try:
-        info = view.prbEntity.getPlayerInfo()
+        info = entity.getPlayerInfo()
         try:
-            canChangeRoles = bool(view.prbEntity.getPermissions().canChangeExtraEquipmentRole())
+            canChangeRoles = bool(entity.getPermissions().canChangeExtraEquipmentRole())
         except Exception:
             canChangeRoles = False
         return {'dbID': info.dbID, 'isCommander': info.isCommander(), 'isInSlot': info.isInSlot,
@@ -429,172 +409,9 @@ def _me(view):
         return {}
 
 
-# --- room chat ----------------------------------------------------------------------
-# The room window's ChannelComponent (Flash chat box) is bound to the unit channel controller.
-# We read the controller's history, send through the component (same checks as Flash) and get
-# notified of new lines through a hook on ChannelComponent.as_addMessageS.
-_CHAT_LINES = 150
-
-
-def _chatComponent(bridge):
-    windowView = _roomWindowView(bridge)
-    try:
-        return getattr(windowView, 'chat', None) if windowView is not None else None
-    except Exception:
-        _logger.exception('chat component lookup failed')
-        return None
-
-
-def _packChat(bridge):
-    component = _chatComponent(bridge)
-    controller = component._controller() if component is not None else None
-    if controller is None:
-        return {'joined': False, 'lines': []}
-    try:
-        history = list(controller.getHistory() or ())
-        return {'joined': bool(controller.isJoined()), 'lines': history[-_CHAT_LINES:]}
-    except Exception:
-        _logger.exception('chat history failed')
-        return {'joined': False, 'lines': []}
-
-
-def _installChatHook():
-    # once per client session (survives dev reloads: the wrapper only uses the loader module)
-    from messenger.gui.Scaleform.view.lobby.ChannelComponent import ChannelComponent
-    if getattr(ChannelComponent, '_ezRoomChatHook', False):
-        return
-    orig = ChannelComponent.as_addMessageS
-
-    def as_addMessageS(self, message):
-        result = orig(self, message)
-        try:
-            import sys
-            loader = sys.modules.get('gui.mods.mod_ez_room')
-            bridge = loader.currentBridge() if loader is not None else None
-            if bridge is not None and bridge.window is not None:
-                windowView = bridge.roomWindowView() if hasattr(bridge, 'roomWindowView') else None
-                if windowView is not None and getattr(windowView, 'chat', None) is self:
-                    bridge.changed()
-        except Exception:
-            logging.getLogger('EZ_ROOM').exception('chat hook failed')
-        return result
-
-    ChannelComponent.as_addMessageS = as_addMessageS
-    ChannelComponent._ezRoomChatHook = True
-
-
-# --- enemy search stays WG's original -------------------------------------------------
-# While WG's room window shows its auto search form (as_changeAutoSearchStateS ...
-# as_hideAutoSearchS) the overlay is hidden so the original form is visible and usable; it comes
-# back when the search ends.
-
-def _searchActive(bridge):
-    windowView = _roomWindowView(bridge)
-    return bool(getattr(windowView, 'currentState', '')) if windowView is not None else False
-
-
-def _installSearchHooks():
-    # once per client session; the wrappers only use the loader module
-    from gui.Scaleform.daapi.view.lobby.fortifications.stronghold_battle_room_window import StrongholdBattleRoomWindow
-    if StrongholdBattleRoomWindow.__dict__.get('_ezRoomSearchHooks'):
-        return
-    origShow = StrongholdBattleRoomWindow.as_changeAutoSearchStateS
-    origHide = StrongholdBattleRoomWindow.as_hideAutoSearchS
-
-    def bridgeOf(windowView):
-        import sys
-        loader = sys.modules.get('gui.mods.mod_ez_room')
-        bridge = loader.currentBridge() if loader is not None else None
-        if bridge is None or bridge.roomWindowView() is not windowView:
-            return None
-        return bridge
-
-    def as_changeAutoSearchStateS(self, value):
-        result = origShow(self, value)
-        try:
-            bridge = bridgeOf(self)
-            if bridge is not None and bridge.window is not None:
-                logging.getLogger('EZ_ROOM').info('enemy search started: overlay hidden, WG form visible')
-                bridge.searchHid = True
-                bridge.close(hide=True)
-        except Exception:
-            logging.getLogger('EZ_ROOM').exception('search start hook failed')
-        return result
-
-    def as_hideAutoSearchS(self):
-        result = origHide(self)
-        try:
-            bridge = bridgeOf(self)
-            if bridge is not None and getattr(bridge, 'searchHid', False):
-                logging.getLogger('EZ_ROOM').info('enemy search ended: overlay back')
-                bridge.searchHid = False
-                BigWorld.callback(0.1, lambda: bridge.open(manual=True))
-        except Exception:
-            logging.getLogger('EZ_ROOM').exception('search end hook failed')
-        return result
-
-    StrongholdBattleRoomWindow.as_changeAutoSearchStateS = as_changeAutoSearchStateS
-    StrongholdBattleRoomWindow.as_hideAutoSearchS = as_hideAutoSearchS
-    StrongholdBattleRoomWindow._ezRoomSearchHooks = True
-
-
-# --- WG's waiting animation ("loading data") -------------------------------------------
-# The room window shows it (as_setWaitingS) while the stronghold data is not valid, e.g. after
-# the commander changed the settings. The overlay shows its own cover with WG's text meanwhile.
-
-def _installWaitingHook():
-    # once per client session; state is kept on the window view (survives dev reloads)
-    from gui.Scaleform.daapi.view.lobby.fortifications.stronghold_battle_room_window import StrongholdBattleRoomWindow
-    if StrongholdBattleRoomWindow.__dict__.get('_ezRoomWaitingHook'):
-        return
-    orig = StrongholdBattleRoomWindow.as_setWaitingS
-
-    def as_setWaitingS(self, visible, message):
-        result = orig(self, visible, message)
-        try:
-            self._ezRoomWaiting = (bool(visible), message)
-            import sys
-            loader = sys.modules.get('gui.mods.mod_ez_room')
-            bridge = loader.currentBridge() if loader is not None else None
-            if bridge is not None and bridge.window is not None and bridge.roomWindowView() is self:
-                bridge.changed()
-        except Exception:
-            logging.getLogger('EZ_ROOM').exception('waiting hook failed')
-        return result
-
-    StrongholdBattleRoomWindow.as_setWaitingS = as_setWaitingS
-    StrongholdBattleRoomWindow._ezRoomWaitingHook = True
-
-
-def _packWaiting(bridge):
-    # WG's waiting text while the room waits for data, else None
-    windowView = _roomWindowView(bridge)
-    if windowView is None:
-        return None
-    state = getattr(windowView, '_ezRoomWaiting', None)
-    if state is None:
-        # hook came after the room opened (dev reload): same rule as WG's invalidateStrongholdWaiting
-        try:
-            view = bridge.view
-            state = (view is not None and not view.prbEntity.isStrongholdSettingsValid(), '#waiting:prebattle/change_settings')
-        except Exception:
-            _logger.exception('waiting state failed')
-            return None
-    visible, message = state
-    if not visible:
-        return None
-    try:
-        text = _u(makeString(message)) if message else u''
-    except Exception:
-        text = u''
-    return text if text and not text.startswith(u'#') else u'…'
-
-
-# --- reserves ------------------------------------------------------------------------
-# Same list as WG's FortReserveSelectPopover; selecting runs the room's _selectReserve.
-def _packReserveOptions(view, slotIndex):
+def _packReserveOptions(entity, slotIndex):
+    # same list as WG's FortReserveSelectPopover
     from gui.Scaleform.daapi.view.lobby.rally import vo_converters as rally_vo
-    entity = view.prbEntity
     settings = entity.getStrongholdSettings()
     order = settings.getReserveOrder()
     if not 0 <= slotIndex < len(order):
@@ -640,91 +457,92 @@ _GRID_SIZE = 207.0      # WG's MinimapGrid hit area (MinimapLobby.swf LobbyMinim
 _GRID_POINT_LIFE = 5.0  # WG's MinimapClick animation: 140 frames, about 5 s, then it removes itself
 
 
-def _packGrid(bridge, now):
-    grid = getattr(bridge, 'grid', None) or {}
-    points = [{'x': p['x'] / _GRID_SIZE, 'y': p['y'] / _GRID_SIZE, 'left': _GRID_POINT_LIFE - (now - p['time'])}
-              for p in grid.get('points') or [] if now - p['time'] < _GRID_POINT_LIFE]
-    return {'points': points, 'clickEnabled': bool(grid.get('clickEnabled'))}
+# --- listener --------------------------------------------------------------------------
+# One object registered with WG's prb dispatcher (IGlobalListener, like WG's room and window):
+# it gets every entity callback and forwards it by name to the view.
+_PRB_CALLBACKS = (
+    'onUnitAutoSearchStarted', 'onUnitAutoSearchFinished', 'onUnitAutoSearchSuccess', 'onUnitFlagsChanged',
+    'onUnitPlayerStateChanged', 'onUnitPlayerRolesChanged', 'onUnitPlayerOnlineStatusChanged',
+    'onUnitPlayerBecomeCreator', 'onUnitPlayerNoLongerCreator', 'onUnitPlayerEnterOrLeaveArena',
+    'onUnitRosterChanged', 'onUnitMembersListChanged', 'onUnitPlayerAdded', 'onUnitPlayerInfoChanged',
+    'onUnitPlayerRemoved', 'onUnitPlayersListChanged', 'onUnitVehiclesChanged', 'onUnitPlayerVehDictChanged',
+    'onUnitSettingChanged', 'onUnitRejoin', 'onUnitErrorReceived', 'onUnitExtraChanged', 'onUnitSizeChanged',
+    'onUnitCurfewChanged', 'onUnitPlayerProfileVehicleChanged',
+    'onUpdateHeader', 'onUpdateTimer', 'onUpdateState', 'onUpdateReserve', 'onStrongholdDataChanged',
+    'onStrongholdOnReadyStateChanged', 'onStrongholdMaintenance', 'onCommanderIsReady',
+    'onStrongholdDoBattleQueue', 'onPlayersMatching', 'onSlotVehileFiltersChanged', 'onEventFrozenVehiclesChanged',
+    'onPrbEntitySwitching', 'onPrbEntitySwitched')
 
 
-def _pack(bridge, frame=None, reserveSlot=-1, speakEvents=None):
-    view = bridge.view
-    calls = bridge.calls
-    first = lambda name, default=None: calls[name][0] if name in calls and calls[name] else default
-    now = time.time()
-    room = first('as_setBattleRoomDataS', {}) or {}
-    members = calls.get('as_setMembersS')
-    slots = list(members[1]) if members and len(members) > 1 else list((first('as_updateRallyS', {}) or {}).get('slots') or [])
-    # per-slot updates that came after the last full member list
-    slots = [dict(s) if isinstance(s, dict) else s for s in slots]
-    for idx, args in bridge.slotCalls.get('as_setMemberStatusS', {}).iteritems():
-        if 0 <= idx < len(slots) and isinstance(slots[idx], dict):
-            slots[idx]['playerStatus'] = args[0]
-    for idx, args in bridge.slotCalls.get('as_setMemberOfflineS', {}).iteritems():
-        if 0 <= idx < len(slots) and isinstance(slots[idx], dict) and slots[idx].get('player'):
-            slots[idx]['player'] = dict(slots[idx]['player'], isOffline=args[0])
-    for idx, args in bridge.slotCalls.get('as_setMemberVehicleS', {}).iteritems():
-        if 0 <= idx < len(slots) and isinstance(slots[idx], dict) and len(args) > 1:
-            slots[idx]['selectedVehicle'] = args[1]
-    candidates = []
-    try:
-        dp = getattr(view, '_candidatesDP', None) if view is not None else None
-        if dp is not None:
-            candidates = list(dp.collection)
-    except Exception:
-        _logger.exception('candidates failed')
-    timer = first('as_setTimerDeltaS')
-    data = {
-        'version': __version__,
-        'frame': list(frame) if frame else None,
-        'lang': _lang(),
-        'dev': bool(DEV),
-        'back': _backLink(),
-        'divisionTip': _divisionTip(),
-        'configureTips': _configureTips(),
-        'frozenTips': _frozenTips(),
-        'directTips': _directTips(),
-        'battleMap': _battleMapPoints(),
-        'me': _me(view) if view is not None else {},
-        'room': room,
-        'mapIcon': _mapIcon(room.get('mapID')),
-        # WG minimap units: centre 0,0, 300 x 300 (MinimapLobby.build _normalizePoint)
-        'minimapPoints': list(getattr(bridge, 'minimap', {}).get('points') or []),
-        'grid': _packGrid(bridge, now),
-        'rally': first('as_updateRallyS', {}),
-        'slots': slots,
-        'candidates': candidates,
-        'speaking': _speaking(slots, candidates, speakEvents or {}),
-        'roleRights': _roleRights(view, slots) if view is not None else {},
-        'tableHeader': first('as_setTableHeaderS', []),
-        'timer': timer,
-        'timerAge': now - bridge.times.get('as_setTimerDeltaS', now),
-        'readyStatus': calls.get('as_updateReadyStatusS'),
-        'readyDirections': first('as_updateReadyDirectionsS'),
-        'direction': calls.get('as_setDirectionS'),
-        'reserves': first('as_setReservesDataS', []),
-        'reservesEnabled': first('as_setReservesEnabledS', []),
-        'opened': calls.get('as_setOpenedS'),
-        'configure': first('as_setConfigureButtonStateS'),
-        'actionButton': _actionButton(first('as_setActionButtonStateS')),
-        'readyCoolDown': _readyCoolDown(bridge),
-        'comment': first('as_setCommentS', u''),
-        'vehiclesTitle': calls.get('as_setVehiclesTitleS'),
-        'highlight': first('as_highlightSlotsS'),
-        'chat': _packChat(bridge),
-        'waiting': _packWaiting(bridge),
-        'reserveOptions': None,
-        'settings': _loadSettings(),
-    }
-    if reserveSlot >= 0 and view is not None:
+class _Listener(IGlobalListener):
+
+    def __init__(self, view):
+        super(_Listener, self).__init__()
+        self._view = weakref.ref(view)
+
+
+def _forward(name):
+    def method(self, *args):
+        view = self._view()
+        if view is not None:
+            view.onPrbCallback(name, args)
+    method.__name__ = name
+    return method
+
+
+for _name in _PRB_CALLBACKS:
+    setattr(_Listener, _name, _forward(_name))
+
+
+class _ChatSink(object):
+    # stands in for WG's Flash ChannelComponent / MinimapGrid on the unit chat controller
+    # (LobbyLayout.setView): gets every formatted line and every unit chat command while active
+
+    def __init__(self, view):
+        self._view = weakref.ref(view)
+        self._controller = lambda: None
+        self.onDispose = Event.Event()
+        self.alive = True
+
+    def controller(self):
+        return self._controller()
+
+    def setController(self, controller):
+        controller.activate()
         try:
-            data['reserveOptions'] = _packReserveOptions(view, reserveSlot)
+            from messenger.gui import events_dispatcher
+            events_dispatcher.notifyCarousel(controller.getChannel().getClientID(), notify=False)
         except Exception:
-            _logger.exception('reserve options failed')
-    if DEV:
-        data['raw'] = {'calls': calls, 'slotCalls': bridge.slotCalls}
-    return _clean(data)
+            _logger.exception('chat carousel notify failed')
+        self._controller = weakref.ref(controller)
+        view = self._view()
+        if view is not None and self.alive:
+            view.onChatController(controller)
 
+    def removeController(self):
+        self._controller = lambda: None
+
+    def as_addMessageS(self, text):
+        view = self._view()
+        if view is not None and self.alive and text:
+            view.onChatLine(text)
+
+    def addCommand(self, command):
+        view = self._view()
+        if view is not None and self.alive:
+            view.onChatCommand(command)
+
+    def as_setJoinedS(self, flag):
+        pass
+
+
+class _PopoverShim(object):
+    # EZ TANK PICKER reads the entity from a popover-like object (picker._frozenCDs)
+    def __init__(self, entity):
+        self.prbEntity = entity
+
+
+# --- view ------------------------------------------------------------------------------
 
 class EzRoomModel(ViewModel):
     __slots__ = ('onAction',)
@@ -747,201 +565,1326 @@ class EzRoomModel(ViewModel):
 
 class EzRoomView(ViewImpl):
 
-    def __init__(self, layoutID, bridge, config):
+    def __init__(self, layoutID, state):
         settings = ViewSettings(layoutID, flags=ViewFlags.VIEW, model=EzRoomModel())
         super(EzRoomView, self).__init__(settings)
-        self._bridge = bridge
-        self._config = config or {}
-        self._snapshotPending = False
-        self._frame = None      # (x, y, w, h) the overlay should cover
-        self._roomRect = None   # last seen rect of WG's room window
-        self._tracking = False
+        self._state = state
+        self._mode = 'panel' if (loadSettings().get('windowMode') == 'panel') else 'full'
+        self._unitID = 0
+        self._listener = None
+        self._chat = None
+        self._chatSeeding = False
+        self._chatLines = []
+        self._grid = []           # commander markings: {'x', 'y', 'time'} in WG's 207 px grid
+        self._gridMap = 0
+        self._speakEvents = {}    # dbID -> bool from g_messengerEvents.voip.onPlayerSpeaking
+        self._highlight = []      # slots a dragged volunteer may go to (WG's getAvailableSlots)
+        self._reserveSlot = -1    # reserve slot whose list is open
+        self._parts = {}          # room data rebuilt on unit / stronghold events
+        self._header = {}         # data from onUpdateHeader: direction, minimap, title
+        self._room = None         # WG's FortClanBattleRoomVO (from the timer event)
+        self._timer = None        # WG's ClanBattleTimerVO
+        self._timerAt = 0.0
+        self._timerEnd = None     # time.time() when the battle timer reaches 0 (change detection)
+        self._enemyReady = False
+        self._inQueue = False
+        self._search = None       # enemy / legionnaire search panel (window auto search state)
+        self._searchRef = None
+        self._maintenance = False
+        self._notice = None       # WG's leadership notice text (2.5 s)
+        self._queueLock = False   # onStrongholdDoBattleQueue: configure + reserves off until flags change
+        self._waitingShown = None
+        self._dirty = False
+        self._lastKey = None
+        self._uiReady = False
+        self._minimizing = False
+        self._closing = False     # closed on purpose (ours or WG's signals), not by the game
+        self._passive = None      # a WG Flash window opened from the room is up: panel hidden
+        self._configureBrowserId = 0
+        self._vehiclesInSlotFilters = {}
+        self._candidatesDP = None
         self._finalized = False
-        self._placed = False    # overlay window moved onto WG's window at least once
-        self._drag = None       # (cursor x, y, overlay x, y) while the title bar is dragged
-        self._loggedRect = False
-        self._reserveSlot = -1  # reserve slot whose list is open
-        self._speakEvents = {}  # dbID -> bool from g_messengerEvents.voip.onPlayerSpeaking
 
     @property
     def viewModel(self):
         return super(EzRoomView, self).getViewModel()
+
+    def _getEvents(self):
+        return ((self.viewModel.onAction, self.__onAction),)
+
+    def canBeClosed(self):
+        # only our own close / minimize / leave destroy the room window
+        return False
+
+    # life cycle ------------------------------------------------------------------------
 
     def _onLoading(self, *args, **kwargs):
         super(EzRoomView, self)._onLoading(*args, **kwargs)
         if DEV:
             self.viewModel.setDev(_devUI())
         try:
-            from messenger.proto.events import g_messengerEvents
-            g_messengerEvents.voip.onPlayerSpeaking += self.__onPlayerSpeaking
+            self._start()
         except Exception:
-            _logger.exception('voip subscribe failed')
-        # frame known right away: the first data already carries the size, so the UI resizes
-        # itself on its first render instead of after the first tracking step
-        self._roomRect = _roomRect(self._bridge)
-        if self._roomRect is not None:
-            self._frame = _frame(self._roomRect, self._config)
-        self.onRoomChanged()
-        # move only after the window is loaded (like WG's OfferBannerWindow: load(), then move):
-        # _onLoaded starts the tracking, the callback is a fallback if it never comes
-        BigWorld.callback(0.2, self._startTracking)
+            _logger.exception('starting the room failed, WG room instead')
+            BigWorld.callback(0.0, lambda: self._fallback('start failed'))
+            return
+        BigWorld.callback(_READY_TIMEOUT, self.__checkReady)
 
     def _onLoaded(self, *args, **kwargs):
         super(EzRoomView, self)._onLoaded(*args, **kwargs)
-        self._startTracking()
+        self._placeWindow()
 
-    def _startTracking(self):
-        if self._tracking or self._finalized:
-            return
-        self._tracking = True
-        self._track()
-
-    # follow WG's room window (moved by dragging its title bar) ---------------------
-
-    def _track(self):
-        if self._drag is not None:
-            self._dragStep()
-            BigWorld.callback(_TRACK_INTERVAL, self._trackNext)
-            return
+    def _start(self):
+        entity = roomEntity()
+        if entity is None:
+            raise RuntimeError('no stronghold unit')
+        self._unitID = entity.getID()
+        session = self._state.get('session')
+        if session is None or session.get('unitID') != self._unitID:
+            # session counter: new room, new session
+            self._state['session'] = {'unitID': self._unitID, 'battles': [], 'pending': {}, 'current': None}
+        from gui.Scaleform.daapi.view.lobby.rally import rally_dps
+        self._candidatesDP = rally_dps.SortieCandidatesLegionariesDP()
+        self._listener = _Listener(self)
+        _dispatcher().addListener(self._listener)
+        self._listenAll(True)
+        # chat: our sink takes the place of WG's Flash chat box on the unit channel controller
+        from messenger.gui import events_dispatcher
+        self._chat = _ChatSink(self)
+        events_dispatcher.rqActivateChannel(_clientID(), self._chat)
+        self._room = self._makeRoomVO(entity, 0, '', '', '', '', False, False, self._isSortie(entity))
+        # same start as WG's room + window (_populate): replays of the current state to us
+        entity.initEvents(self._listener)
+        entity.updateStrongholdData()
+        entity.forceTimerEvent()
+        self._postMinimiseFilterUpdate(entity)
+        self._validateNationGroup(entity)
+        pInfo = entity.getPlayerInfo()
+        if pInfo.isInSlot and not pInfo.isReady:
+            entity.resetPlayerReadiness()
         try:
-            roomRect = _roomRect(self._bridge)
-            if roomRect is not None and (roomRect != self._roomRect or not self._placed):
-                self._placed = True
-                self._roomRect = roomRect
-                frame = _frame(roomRect, self._config)
-                sizeChanged = self._frame is None or frame[2:] != self._frame[2:]
-                self._frame = frame
-                window = self.getParentWindow()
-                if window is not None:
-                    window.move(frame[0], frame[1])
-                if not self._loggedRect:
-                    self._loggedRect = True
-                    _logger.info('room window rect %r -> overlay frame %r', roomRect, frame)
-                    BigWorld.callback(1.0, lambda: _logger.info('overlay window after move: %r', _rect(self.getParentWindow())))
-                if sizeChanged:
-                    self.onRoomChanged()
+            from gui.prb_control.settings import SELECTOR_BATTLE_TYPES
+            from gui.shared.utils import SelectorBattleTypesUtils as selectorUtils
+            selectorUtils.setBattleTypeAsKnown(SELECTOR_BATTLE_TYPES.SORTIE)
         except Exception:
-            _logger.exception('tracking room window failed')
-        BigWorld.callback(_TRACK_INTERVAL, self._trackNext)
+            _logger.exception('battle type known failed')
+        from gui.prb_control.events_dispatcher import g_eventDispatcher
+        from constants import PREBATTLE_TYPE
+        g_eventDispatcher.hideUnitProgressInCarousel(PREBATTLE_TYPE.STRONGHOLD)
+        _carouselOpenState(True)
+        self._initSearchState(entity)
+        self._showLeadershipNotification(entity)
+        self._build()
 
-    # own title bar dragged: the overlay follows the cursor, WG's window is moved behind it
-    # (as_setGeometryS, the same call WG uses to restore a stored window position)
-
-    def _dragStart(self):
-        if self._frame is None or self._config.get('mini'):
-            return
-        try:
-            cx, cy = _cursor()
-        except Exception:
-            _logger.exception('reading cursor failed')
-            return
-        self._drag = (cx, cy, self._frame[0], self._frame[1])
-
-    def _dragStep(self):
-        try:
-            if not BigWorld.isKeyDown(Keys.KEY_LEFTMOUSE):
-                self._dragEnd()
-                return
-            cx, cy = _cursor()
-            sx, sy, fx, fy = self._drag
-            x, y = _clampToScreen(fx + cx - sx, fy + cy - sy)
-            if (x, y) == tuple(self._frame[:2]):
-                return
-            self._frame = (x, y) + tuple(self._frame[2:])
-            window = self.getParentWindow()
-            if window is not None:
-                window.move(x, y)
-            view = _roomWindowView(self._bridge)
-            if view is not None:
-                rect = self._roomRect or (0, 0, _WIN_W, _WIN_H)
-                view.as_setGeometryS(x - _EZ_DX, y - _EZ_DY, rect[2], rect[3])
-        except Exception:
-            _logger.exception('dragging failed')
-            self._drag = None
-
-    def _dragEnd(self):
-        self._drag = None
-        # take WG's (possibly clamped) position as seen, so the overlay does not jump afterwards
-        self._roomRect = _roomRect(self._bridge)
-
-    def _trackNext(self):
-        if self._tracking:
-            self._track()
-
-    def _getEvents(self):
-        return ((self.viewModel.onAction, self.__onAction),)
-
-    def canBeClosed(self):
-        # WG's fullscreen manager destroys every FULLSCREEN_WINDOW when any lobby window opens
-        # (e.g. another mod's window after a battle) unless it says no here; it is the only caller.
-        # Our own close / minimize / Original destroy the window directly.
-        return False
+    def _listenAll(self, on):
+        from CurrentVehicle import g_currentVehicle
+        from gui.shared import events, g_eventBus
+        from gui.shared.event_bus import EVENT_BUS_SCOPE
+        from messenger.proto.events import g_messengerEvents
+        from skeletons.gui.shared import IItemsCache
+        from skeletons.account_helpers.settings_core import ISettingsCore
+        bus = (g_eventBus.addListener if on else g_eventBus.removeListener)
+        bus(events.StrongholdEvent.STRONGHOLD_ON_TIMER, self.__onTimer, scope=EVENT_BUS_SCOPE.STRONGHOLD)
+        bus(events.CoolDownEvent.PREBATTLE, self.__onCoolDown, scope=EVENT_BUS_SCOPE.LOBBY)
+        bus(events.FightButtonEvent.FIGHT_BUTTON_UPDATE, self.__onAnyChange, scope=EVENT_BUS_SCOPE.LOBBY)
+        bus(events.HideWindowEvent.HIDE_UNIT_WINDOW, self.__onHideUnitWindow, scope=EVENT_BUS_SCOPE.LOBBY)
+        # vehicle chosen in WG's selector or EZ TANK PICKER (both fire this, DEFAULT scope)
+        bus(events.CSVehicleSelectEvent.VEHICLE_SELECTED, self.__onVehicleSelected)
+        users = g_messengerEvents.users
+        voip = g_messengerEvents.voip
+        itemsCache = dependency.instance(IItemsCache)
+        settingsCore = dependency.instance(ISettingsCore)
+        wm = dependency.instance(IGuiLoader).windowsManager
+        if on:
+            g_currentVehicle.onChanged += self.__onAnyChange
+            itemsCache.onSyncCompleted += self.__onCacheResync
+            users.onUsersListReceived += self.__onAnyChange
+            users.onUserActionReceived += self.__onUserChange
+            users.onUserStatusUpdated += self.__onAnyChange
+            voip.onPlayerSpeaking += self.__onPlayerSpeaking
+            settingsCore.onSettingsChanged += self.__onAnyChange
+            wm.onWindowStatusChanged += self.__onWindowStatus
+        else:
+            g_currentVehicle.onChanged -= self.__onAnyChange
+            itemsCache.onSyncCompleted -= self.__onCacheResync
+            users.onUsersListReceived -= self.__onAnyChange
+            users.onUserActionReceived -= self.__onUserChange
+            users.onUserStatusUpdated -= self.__onAnyChange
+            voip.onPlayerSpeaking -= self.__onPlayerSpeaking
+            settingsCore.onSettingsChanged -= self.__onAnyChange
+            wm.onWindowStatusChanged -= self.__onWindowStatus
 
     def _finalize(self):
-        self._tracking = False
         self._finalized = True
         self._hideWgTip()
         try:
-            from messenger.proto.events import g_messengerEvents
-            g_messengerEvents.voip.onPlayerSpeaking -= self.__onPlayerSpeaking
+            if self._listener is not None:
+                dispatcher = _dispatcher()
+                if dispatcher is not None:
+                    dispatcher.removeListener(self._listener)
+            self._listenAll(False)
         except Exception:
-            _logger.exception('voip unsubscribe failed')
-        if self._config.get('mini'):
-            bridge = self._bridge
-            if getattr(bridge, 'miniWindow', None) is not None and bridge.miniWindow.content in (None, self):
-                bridge.miniWindow = None
-            super(EzRoomView, self)._finalize()
+            _logger.exception('unsubscribing failed')
+        try:
+            if self._chat is not None:
+                self._chat.alive = False
+                self._chat.onDispose(self._chat)
+                if self._chat.controller() is not None:
+                    from messenger.gui import events_dispatcher
+                    events_dispatcher.rqDeactivateChannel(_clientID())
+        except Exception:
+            _logger.exception('chat deactivate failed')
+        try:
+            # same clean-up as WG's room (BaseRallyRoomView._dispose / StrongholdBattleRoom._dispose)
+            from gui.shared import events, g_eventBus
+            g_eventBus.handleEvent(events.HideWindowEvent(events.HideWindowEvent.HIDE_VEHICLE_SELECTOR_WINDOW))
+            self._destroyFlashWindow('StrongholdSendInvitesWindow', alias=True)
+            self._destroyConfigureWindow()
+            _carouselOpenState(False)
+            if self._minimizing and roomEntity() is not None:
+                from gui.prb_control.events_dispatcher import g_eventDispatcher
+                from constants import PREBATTLE_TYPE
+                g_eventDispatcher.showUnitProgressInCarousel(PREBATTLE_TYPE.STRONGHOLD)
+        except Exception:
+            _logger.exception('room clean-up failed')
+        if self._candidatesDP is not None:
+            try:
+                self._candidatesDP.fini()
+            except Exception:
+                pass
+            self._candidatesDP = None
+        state = self._state
+        window = state.get('window')
+        if window is not None and window.content in (None, self):
+            state['window'] = None
+        if self._minimizing:
+            _logger.info('room minimized')
+        elif self._closing or state.get('closing'):
+            _logger.info('room window closed')
+        elif roomEntity() is not None and self._uiReady:
+            # destroyed by the game (0.8.2: opening the vehicle hub): back with the garage
+            import traceback
+            _logger.warning('room window closed by the game, it comes back with the garage:\n%s', ''.join(traceback.format_stack(limit=12)))
+            armReopen(state)
+        super(EzRoomView, self)._finalize()
+
+    def _fallback(self, reason):
+        fallback = self._state.get('fallback')
+        if fallback is not None:
+            fallback(reason)
+
+    def __checkReady(self):
+        if not self._finalized and not self._uiReady:
+            _logger.error('room UI did not report back in %s s', _READY_TIMEOUT)
+            self._fallback('ui not ready')
+
+    def _placeWindow(self):
+        window = self.getParentWindow()
+        if window is None:
             return
         try:
-            bridge = self._bridge
-            window = bridge.window
-            if window is not None and window.content in (None, self):
-                # destroyed by the game, not by us (bridge.close clears bridge.window first): WG's
-                # fullscreen manager closes every other FULLSCREEN_WINDOW when one opens
-                bridge.window = None
-                _reopenAfterExternalClose(bridge, window.uniqueID)
+            if self._mode == 'panel':
+                pos = loadSettings().get('pos') or []
+                x, y = (pos[0], pos[1]) if len(pos) == 2 else (100, 60)
+                window.move(int(x), int(y))
+
         except Exception:
-            _logger.exception('finalize failed')
-        super(EzRoomView, self)._finalize()
+            _logger.exception('placing the room window failed')
+
+    def minimize(self):
+        # WG's minimize (StrongholdBattleRoomWindow.onWindowMinimize): room into the channel carousel
+        self._minimizing = True
+        window = self.getParentWindow()
+        if window is not None:
+            window.destroy()
+
+    def close(self):
+        self._closing = True
+        window = self.getParentWindow()
+        if window is not None:
+            window.destroy()
+
+    # prb callbacks ----------------------------------------------------------------------
+
+    def onPrbCallback(self, name, args):
+        if self._finalized:
+            return
+        try:
+            handler = getattr(self, '_on_' + name, None)
+            if handler is not None:
+                handler(*args)
+        except Exception:
+            _logger.exception('%s failed', name)
+        self.mark()
+
+    def _on_onPrbEntitySwitched(self):
+        entity = roomEntity()
+        if entity is None or entity.getID() != self._unitID:
+            _logger.info('room entity gone, closing the room window')
+            BigWorld.callback(0.0, self.close)
+
+    def _on_onUnitFlagsChanged(self, flags, timeLeft):
+        self._queueLock = False
+        if flags.isExternalLegionariesMatchingChanged() and not flags.isInExternalLegionariesMatching():
+            from gui import SystemMessages
+            from gui.impl import backport
+            SystemMessages.pushMessage(backport.text(R.strings.system_messages.unit.warnings.EXTERNAL_LEGIONARIES_MATCHING_CANCELED()),
+                                       type=SystemMessages.SM_TYPE.Warning)
+        entity = roomEntity()
+        if entity is not None:
+            self._initSearchState(entity)
+
+    def _on_onUnitPlayerAdded(self, pInfo):
+        if not pInfo.isInvite():
+            self._playerNotification('PLAYER_ADDED', pInfo)
+
+    def _on_onUnitPlayerRemoved(self, pInfo):
+        if not pInfo.isInvite():
+            self._playerNotification('PLAYER_REMOVED', pInfo)
+
+    def _on_onUnitPlayerOnlineStatusChanged(self, pInfo):
+        self._playerNotification('PLAYER_OFFLINE' if pInfo.isOffline() else 'PLAYER_ONLINE', pInfo)
+
+    def _on_onUnitPlayerRolesChanged(self, pInfo, pPermissions):
+        entity = roomEntity()
+        if entity is not None:
+            entity.strongholdDataChanged()
+
+    def _on_onUnitPlayerBecomeCreator(self, pInfo):
+        if pInfo.isCurrentPlayer():
+            entity = roomEntity()
+            if entity is not None:
+                self._showLeadershipNotification(entity)
+
+    def _on_onUnitAutoSearchFinished(self):
+        self._search = None
+
+    def _on_onUnitRejoin(self):
+        self._search = None
+
+    def _on_onUnitErrorReceived(self, errorCode):
+        pass
+
+    def _on_onUpdateHeader(self, header, isFirstBattle, isUnitFreezed):
+        entity = roomEntity()
+        if entity is None:
+            return
+        self._updateMap(header)
+        self._updateBuildings(entity)
+        self._updateTitle(header)
+        if self._room is not None:
+            self._room['isBattleType'] = not header.isSortie()
+
+    def _on_onStrongholdDataChanged(self, header, isFirstBattle, reserve, reserveOrder):
+        entity = roomEntity()
+        if entity is not None:
+            self._initSearchState(entity)
+
+    def _on_onStrongholdMaintenance(self, state):
+        self._maintenance = bool(state)
+        entity = roomEntity()
+        if not state and entity is not None:
+            self._updateBuildings(entity)
+        self._updateUI()
+
+    def _on_onStrongholdOnReadyStateChanged(self):
+        self._updateUI()
+
+    def _on_onStrongholdDoBattleQueue(self, isFirstBattle, readyButtonEnabled, reserveOrder):
+        self._queueLock = not readyButtonEnabled
+
+    def _on_onPlayersMatching(self, isPlayersMatchingInProgress):
+        entity = roomEntity()
+        if isPlayersMatchingInProgress and entity is not None:
+            self._showPlayerSearch(entity)
+
+    def __onAnyChange(self, *args, **kwargs):
+        self.mark()
+
+    def __onUserChange(self, *args):
+        self.mark()
+
+    def __onHideUnitWindow(self, event):
+        self.close()
+
+    def __onCoolDown(self, event):
+        from gui.prb_control.settings import REQUEST_TYPE
+        if getattr(event, 'requestID', None) == REQUEST_TYPE.SET_PLAYER_STATE:
+            self.mark()
 
     def __onPlayerSpeaking(self, accountDBID, isSpeak):
         # same live event WG's voice chat manager forwards to Flash (as_onPlayerSpeakS)
         self._speakEvents[accountDBID] = bool(isSpeak)
-        self.onRoomChanged()
+        self.mark()
 
-    def onRoomChanged(self):
-        if self._config.get('mini'):
-            # the button only needs its size and the language
-            try:
-                self.viewModel.setData(json.dumps({'mini': True, 'frame': list(self._frame) if self._frame else None,
-                                                   'lang': _lang(), 'version': __version__}))
-            except Exception:
-                _logger.exception('packing button data failed')
+    def __onVehicleSelected(self, event):
+        # BaseRallyRoomView.__onVehicleSelectHandler -> _selectVehicles
+        items = event.ctx
+        if items and roomEntity() is not None:
+            from gui.prb_control.entities.base.unit.ctx import SetVehicleUnitCtx
+            _sendRequest(SetVehicleUnitCtx(vTypeCD=items[0], waitingID='prebattle/change_settings'))
+
+    def __onCacheResync(self, reason, diff):
+        # BaseRallyRoomView._onCacheResync + StrongholdBattleRoom._onCacheResync (nation groups)
+        self.mark()
+        try:
+            from gui.shared.gui_items import GUI_ITEM_TYPE
+            from gui.shared.items_cache import CACHE_SYNC_REASON
+            from nation_change.nation_change_helpers import iterVehTypeCDsInNationGroup, hasNationGroup
+            from skeletons.gui.shared import IItemsCache
+            entity = roomEntity()
+            if entity is None or diff is None or GUI_ITEM_TYPE.VEHICLE not in diff:
+                return
+            items = dependency.instance(IItemsCache).items
+            if reason == CACHE_SYNC_REASON.CLIENT_UPDATE:
+                selected = self._selectedVehicles(entity)
+                for cd in diff[GUI_ITEM_TYPE.VEHICLE]:
+                    vehicle = items.getItemByCD(cd)
+                    if selected and not vehicle.activeInNationGroup and selected[0] == cd:
+                        self._selectVehicle(next(iterVehTypeCDsInNationGroup(vehicle.intCD)))
+            mnVehs = dict((cd, items.getItemByCD(cd)) for cd in diff[GUI_ITEM_TYPE.VEHICLE] if hasNationGroup(cd))
+            if mnVehs:
+                from gui.prb_control.entities.base.external_battle_unit.base_external_battle_ctx import ChangeVehiclesInSlotFilterCtx
+                for slotIndex, vehCDs in self._vehiclesInSlotFilters.items():
+                    vehCDs = list(vehCDs or [])
+                    for cd in list(vehCDs):
+                        if cd in mnVehs and not mnVehs[cd].activeInNationGroup:
+                            vehCDs[vehCDs.index(cd)] = next(iterVehTypeCDsInNationGroup(cd))
+                    self._vehiclesInSlotFilters[slotIndex] = vehCDs
+                    _sendRequest(ChangeVehiclesInSlotFilterCtx(slotIndex, vehCDs or [], waitingID='prebattle/change_settings'))
+        except Exception:
+            _logger.exception('cache resync failed')
+
+    def __onWindowStatus(self, uniqueID, newStatus):
+        # a WG Flash window opened from the room (invites, configure) went away: panel back
+        passive = self._passive
+        if passive is None:
             return
         try:
-            data = _pack(self._bridge, self._frame, self._reserveSlot, self._speakEvents)
+            count = _wgWindowCount(self._ownWindowID())
+        except Exception:
+            _logger.exception('counting windows failed')
+            return
+        if count > passive['baseline']:
+            passive['seen'] = True
+        elif passive['seen'] and count <= passive['baseline']:
+            self._passive = None
+            self._push(force=True)
+
+    def _ownWindowID(self):
+        window = self.getParentWindow()
+        return window.uniqueID if window is not None else -1
+
+    # helpers like WG's room / window ------------------------------------------------------
+
+    @staticmethod
+    def _isSortie(entity):
+        try:
+            if entity.isStrongholdSettingsValid():
+                return entity.getStrongholdSettings().getHeader().isSortie()
+        except Exception:
+            pass
+        return False
+
+    @staticmethod
+    def _makeRoomVO(entity, mapId, headerDescr, mineClanName, enemyClanName, waitForBattleDescr, isMapEnabled, isBattleTimerVisible, isSortie):
+        from gui.Scaleform.daapi.view.lobby.rally import vo_converters
+        vo = vo_converters.makeFortClanBattleRoomVO(mapId, headerDescr, mineClanName, enemyClanName, waitForBattleDescr, isMapEnabled, isBattleTimerVisible, isSortie)
+        vo['levelsRange'] = entity.getRosterSettings().getLevelsRange()
+        return vo
+
+    @staticmethod
+    def _selectedVehicles(entity):
+        return [vInfo.vehTypeCD for vInfo in entity.getVehiclesInfo() if not vInfo.isEmpty()]
+
+    @staticmethod
+    def _selectVehicle(vehTypeCD):
+        from gui.prb_control.entities.base.unit.ctx import SetVehicleUnitCtx
+        _sendRequest(SetVehicleUnitCtx(vTypeCD=vehTypeCD, waitingID='prebattle/change_settings'))
+
+    def _postMinimiseFilterUpdate(self, entity):
+        # StrongholdBattleRoom.__postMinimiseFilterUpdate: slot vehicle filters with nation-group fixes
+        try:
+            from nation_change.nation_change_helpers import iterVehTypeCDsInNationGroup, hasNationGroup
+            from skeletons.gui.shared import IItemsCache
+            from gui.prb_control.entities.base.external_battle_unit.base_external_battle_ctx import ChangeVehiclesInSlotFilterCtx
+            items = dependency.instance(IItemsCache).items
+            for slotIndex, data in (entity.getSlotFilters() or {}).items():
+                vehCDs = list(data.get('vehicle_cds') or [])
+                for cd in list(vehCDs):
+                    if hasNationGroup(cd) and not items.getItemByCD(cd).activeInNationGroup:
+                        vehCDs[vehCDs.index(cd)] = next(iterVehTypeCDsInNationGroup(cd))
+                self._vehiclesInSlotFilters[slotIndex] = vehCDs
+                _sendRequest(ChangeVehiclesInSlotFilterCtx(slotIndex, vehCDs, waitingID='prebattle/change_settings'))
+        except Exception:
+            _logger.exception('slot filter update failed')
+
+    def _validateNationGroup(self, entity):
+        # StrongholdBattleRoom.__validateNationGroup
+        try:
+            from nation_change.nation_change_helpers import iterVehTypeCDsInNationGroup
+            from skeletons.gui.shared import IItemsCache
+            selected = self._selectedVehicles(entity)
+            if selected:
+                vehicle = dependency.instance(IItemsCache).items.getItemByCD(selected[0])
+                if not vehicle.activeInNationGroup:
+                    self._selectVehicle(next(iterVehTypeCDsInNationGroup(vehicle.intCompactDescr)))
+        except Exception:
+            _logger.exception('nation group check failed')
+
+    def _updateUI(self):
+        try:
+            from gui.prb_control.events_dispatcher import g_eventDispatcher
+            g_eventDispatcher.updateUI()
+        except Exception:
+            _logger.exception('updateUI failed')
+
+    def _playerNotification(self, key, pInfo):
+        # StrongholdBattleRoomWindow.__addPlayerNotification: shown in the chat, not stored
+        if pInfo.isCurrentPlayer():
+            return
+        try:
+            from gui.prb_control import settings
+            from gui.prb_control.formatters import messages
+            text = messages.getUnitPlayerNotification(getattr(settings.UNIT_NOTIFICATION_KEY, key), pInfo)
+            self._addChatLine(_u(text))
+        except Exception:
+            _logger.exception('player notification failed')
+
+    def _showLeadershipNotification(self, entity):
+        # BaseRallyMainWindow._showLeadershipNotification: WG's waiting text for 2.5 s
+        try:
+            if not entity.getShowLeadershipNotification():
+                return
+            from gui.impl import backport
+            self._notice = _u(backport.text(R.strings.waiting.prebattle.giveLeadership()))
+            self._push(force=True)
+
+            def done():
+                self._notice = None
+                e = roomEntity()
+                if e is not None:
+                    e.doLeadershipNotificationShown()
+                if not self._finalized:
+                    self._push(force=True)
+
+            BigWorld.callback(2.5, done)
+        except Exception:
+            _logger.exception('leadership notification failed')
+
+    def _updateTitle(self, header):
+        # StrongholdBattleRoom._updateTitle (WG's window title)
+        from gui.Scaleform.locale.FORTIFICATIONS import FORTIFICATIONS
+        from gui.Scaleform.daapi.view.lobby.rally import vo_converters
+        if header.isSortie():
+            title = makeString(FORTIFICATIONS.STRONGHOLDTITLE_SORTIE)
+        else:
+            title = makeString(FORTIFICATIONS.STRONGHOLDTITLE_STRONGHOLD) % {'direction': vo_converters.getDirection(header.getDirection())}
+            multiplier = header.getIndustrialResourceMultiplier()
+            if multiplier > 1:
+                title += ' (x%s)' % multiplier
+        self._header['title'] = _u(title)
+
+    def _updateMap(self, header):
+        # StrongholdBattleRoom._updateMiniMapData: arena of the current battle, our team's colour
+        currentBattle = header.getCurrentBattle()
+        clan = header.getClan()
+        mapId = 0
+        points = []
+        if currentBattle:
+            mapId = currentBattle.getMapId()
+            playerTeam = 1 if clan is not None and clan.getId() == currentBattle.getFirstClanId() else 2
+            try:
+                points = _arenaPoints(mapId, playerTeam) if mapId else []
+            except Exception:
+                _logger.exception('minimap points failed')
+        if mapId != self._gridMap:
+            self._grid = []  # MinimapGrid.setMapId clears the markings
+        self._gridMap = mapId
+        self._header['minimapPoints'] = points
+
+    def _updateBuildings(self, entity):
+        # StrongholdBattleRoom._updateBuildings: direction graphic (not for skirmishes)
+        data = entity.getStrongholdSettings()
+        if not (data.isValid() and data.getHeader() and not data.getHeader().isSortie()):
+            return
+        from gui.Scaleform.daapi.view.lobby.rally import vo_converters
+        header = data.getHeader()
+        waitingForData = entity.isStrongholdUnitWaitingForData() or self._maintenance
+        if not waitingForData:
+            currentBattle = header.getCurrentBattle()
+            enemyClan = header.getEnemyClan()
+            if currentBattle is not None and enemyClan is not None:
+                index = currentBattle.getIndex()
+                attacker = currentBattle.getAttacker() != enemyClan.getId()
+            else:
+                index = None
+                attacker = None
+            self._header['direction'] = [vo_converters.makeDirectionVO(index, attacker, header.getBattleIdx()), entity.animationNotAvailable()]
+        self._header['readyDirections'] = not waitingForData
+
+    def _initSearchState(self, entity):
+        # StrongholdBattleRoomWindow.__initState
+        from gui.clans.clan_helpers import isLeaguesEnabled
+        pInfo = entity.getPlayerInfo()
+        if entity.isInQueue():
+            if pInfo.isInSlot and not entity.canShowMaintenance():
+                if isLeaguesEnabled():
+                    # WG's own queue screen (separate lobby view), the room window goes away
+                    from gui.prb_control.events_dispatcher import g_eventDispatcher
+                    g_eventDispatcher.showStrongholdsBattleQueue()
+                    BigWorld.callback(0.0, self.close)
+                else:
+                    self._setSearch(makeString(TOOLTIPS.STRONGHOLDS_TIMER_WAITINGFORDATA), 0, -1)
+        elif entity.inPlayersMatchingMode():
+            self._showPlayerSearch(entity)
+        else:
+            self._search = None
+
+    def _showPlayerSearch(self, entity):
+        # StrongholdBattleRoomWindow.__showPlayerSearchState
+        if not entity.getPlayerInfo().isInSlot:
+            return
+        self._setSearch(makeString(TOOLTIPS.STRONGHOLDS_TIMER_LEGIONARIESSEARCH), entity.getSecondsCountInPlayersMatching(), 1)
+
+    def _setSearch(self, label, seconds, direction):
+        self._search = {'label': _u(label), 'seconds': max(0, int(seconds or 0)), 'dir': direction}
+        self._searchRef = time.time() + direction * -1 * self._search['seconds']
+
+    # chat --------------------------------------------------------------------------------
+
+    def onChatController(self, controller):
+        # history of the channel so far (formatted by WG); getHistory replays the server history
+        # into the controller first, those lines would come to us twice
+        self._chatSeeding = True
+        try:
+            self._chatLines = [_u(line) for line in list(controller.getHistory() or ())[-_CHAT_LINES:]]
+        except Exception:
+            _logger.exception('chat history failed')
+        self._chatSeeding = False
+        self.mark()
+
+    def onChatLine(self, text):
+        if not self._chatSeeding:
+            self._addChatLine(_u(text))
+
+    def _addChatLine(self, text):
+        self._chatLines.append(text)
+        if len(self._chatLines) > _CHAT_LINES:
+            del self._chatLines[:-_CHAT_LINES]
+        self.mark()
+
+    def onChatCommand(self, command):
+        # MinimapGrid.addCommand: commander marking (unit chat ATTENTIONTOCELL)
+        try:
+            if command.isOnMinimap():
+                now = time.time()
+                self._grid = [p for p in self._grid if now - p['time'] < _GRID_POINT_LIFE]
+                self._grid.append({'x': command.getMapPosX(), 'y': command.getMapPosY(), 'time': now})
+                self._push(force=True)
+        except Exception:
+            _logger.exception('chat command failed')
+
+    def _packChat(self):
+        controller = self._chat.controller() if self._chat is not None else None
+        try:
+            joined = bool(controller.isJoined()) if controller is not None else False
+        except Exception:
+            joined = False
+        return {'joined': joined, 'lines': self._chatLines}
+
+    # building the data -----------------------------------------------------------------------
+
+    def mark(self):
+        # many callbacks arrive in a burst: rebuild once on the next tick
+        if self._dirty or self._finalized:
+            return
+        self._dirty = True
+        BigWorld.callback(0.0, self._flush)
+
+    def _flush(self):
+        self._dirty = False
+        if not self._finalized:
+            self._build()
+
+    def _build(self):
+        entity = roomEntity()
+        if entity is None:
+            return
+        from gui.Scaleform.daapi.view.lobby.fortifications.vo_converters import makeStrongholdsSlotsVOs, makeSortieVO
+        from gui.Scaleform.daapi.view.lobby.rally import vo_converters
+        p = dict(self._parts)
+
+        def part(name, fn):
+            try:
+                p[name] = fn()
+            except Exception:
+                _logger.exception('room data %s failed', name)
+
+        valid = entity.isStrongholdSettingsValid()
+        header = entity.getStrongholdSettings().getHeader() if valid else None
+        maxPlayers = header.getMaxPlayersCount() if header is not None else vo_converters.MAX_PLAYER_COUNT_ALL
+        perms = entity.getPermissions()
+        part('rally', lambda: makeSortieVO(entity, perms.canChangeUnitState(), unitMgrID=entity.getID(),
+                                           canInvite=perms.canSendInvite(), maxPlayerCount=maxPlayers))
+        if valid:
+            part('slots', lambda: list(makeStrongholdsSlotsVOs(entity, entity.getID(), maxPlayerCount=maxPlayers)[1]))
+            part('tableHeader', lambda: self._tableHeader(entity, maxPlayers, header.getMaxLegionariesCount()))
+            part('reserves', lambda: self._reserves(entity, p))
+            part('opened', lambda: list(vo_converters.makeOpenRoomButtonVO(entity.getStrongholdSettings().getState().getPublic())))
+        part('actionButton', lambda: self._actionButtonState(entity))
+        part('candidates', lambda: self._candidates(entity))
+        part('configure', lambda: self._configureState(entity))
+        part('comment', lambda: _u(entity.getCensoredComment() or u''))
+        part('me', lambda: _me(entity))
+        part('roleRights', lambda: _roleRights(entity, p.get('slots') or []))
+        part('readyCoolDown', lambda: self._readyCoolDown())
+        part('back', lambda: _backLink(entity))
+        part('gridEnabled', lambda: bool(perms.canChangeUnitState() and not (entity.isStrongholdUnitFreezed() or entity.isStrongholdUnitWaitingForData())))
+        part('battleMap', lambda: _battleMapPoints(entity))
+        part('divisionTip', _divisionTip)
+        part('directTips', lambda: bool(valid))
+        try:
+            self._inQueue = bool(entity.getFlags().isInQueue())
+            enemy = header.getEnemyClan() if header is not None else None
+            self._enemyReady = bool(enemy.getReadyStatus()) if enemy is not None else False
+        except Exception:
+            _logger.exception('ready status failed')
+        # WG's waiting animation while the stronghold data is not valid (showStrongholdWaiting)
+        if self._waitingShown is not None and self._waitingShown != (not valid):
+            self._updateUI()
+        self._waitingShown = not valid
+        self._parts = p
+        self._push()
+
+    @staticmethod
+    def _tableHeader(entity, maxPlayers, maxLegionaries):
+        # StrongholdBattleRoom._updateTableHeader
+        from gui.Scaleform.daapi.view.lobby.rally import vo_converters
+        pCount = lCount = 0
+        for slotInfo in entity.getUnitFullData().slotsIterator:
+            if slotInfo.player is not None:
+                pCount += 1
+                if slotInfo.player.isLegionary():
+                    lCount += 1
+        return vo_converters.makeTableHeaderVO(pCount, maxPlayers, lCount, maxLegionaries)
+
+    def _reserves(self, entity, parts):
+        # StrongholdBattleRoom._updateReserves / __updateReserve
+        from gui.Scaleform.daapi.view.lobby.rally import vo_converters
+        from gui.prb_control.items.stronghold_items import REQUISITION_TYPE
+        settings = entity.getStrongholdSettings()
+        reserveData = settings.getReserve()
+        selected = reserveData.getSelectedReserves()
+        havePermissions = entity.getPermissions().canChangeConsumables()
+        isInBattle = entity.getFlags().isInArena()
+        slots, enabled = [], []
+        for index, groupType in enumerate(settings.getReserveOrder()):
+            group = reserveData.getUniqueReservesByGroupType(groupType)
+            current = None
+            for reserve in group:
+                if reserve in selected:
+                    current = reserve
+                    break
+            disabledByRequisition = groupType == REQUISITION_TYPE and not entity.isFirstBattle()
+            empty = len(group) == 0
+            tooltip, tooltipType = vo_converters.makeReserveSlotTooltipVO(current, groupType, empty, havePermissions, isInBattle, disabledByRequisition)
+            slots.append(vo_converters.makeReserveSlotVO(current.getType() if current else None, groupType,
+                                                         current.getId() if current else 0, current.getLevel() if current else 0,
+                                                         index, tooltip, tooltipType))
+            enabled.append(bool(havePermissions and not empty and not isInBattle and not disabledByRequisition and not self._queueLock))
+        parts['reservesEnabled'] = enabled
+        return slots
+
+    def _configureState(self, entity):
+        # StrongholdBattleRoom._updateConfigureButtonState
+        from gui.Scaleform.daapi.view.lobby.rally import vo_converters
+        if not entity.isStrongholdSettingsValid():
+            return self._parts.get('configure')
+        flags = entity.getFlags()
+        readyEnabled = not entity.isStrongholdUnitFreezed() and not self._queueLock
+        isEnabled = readyEnabled and entity.isFirstBattle() and not flags.isInQueue() and not flags.isInArena()
+        return vo_converters.makeConfigureButtonVO(isEnabled, True)
+
+    @staticmethod
+    def _actionButtonState(entity):
+        # StrongholdBattleRoom._setActionButtonState (only while the unit is active)
+        from gui.Scaleform.daapi.view.lobby.prb_windows.stronghold_action_button_state_vo import StrongholdActionButtonStateVO
+        from gui.prb_control.settings import FUNCTIONAL_FLAG
+        flags = entity.getFunctionalFlags()
+        if not (flags & FUNCTIONAL_FLAG.UNIT and flags & FUNCTIONAL_FLAG.STRONGHOLD):
+            return None
+        return _actionButton(dict(StrongholdActionButtonStateVO(entity)))
+
+    def _candidates(self, entity):
+        # WG's waiting list data provider (SortieCandidatesLegionariesDP), without Flash
+        dp = self._candidatesDP
+        dp.buildList(entity.getCandidates())
+        return list(dp.collection)
+
+    @staticmethod
+    def _readyCoolDown():
+        from gui.prb_control.entities.base.cooldown import getPrbRequestCoolDown
+        from gui.prb_control.settings import REQUEST_TYPE
+        return max(0.0, float(getPrbRequestCoolDown(REQUEST_TYPE.SET_PLAYER_STATE) or 0))
+
+    def _packGrid(self, now):
+        points = [{'x': p['x'] / _GRID_SIZE, 'y': p['y'] / _GRID_SIZE, 'left': _GRID_POINT_LIFE - (now - p['time']), 't': p['time']}
+                  for p in self._grid if now - p['time'] < _GRID_POINT_LIFE]
+        return {'points': points, 'clickEnabled': bool(self._parts.get('gridEnabled')) and bool(self._gridMap)}
+
+    def _sessionInfo(self, room):
+        # session counter (battles, win rate, durations), skirmish rooms only (not Advances)
+        if room.get('isBattleType') is not False:
+            return None
+        session = self._state.get('session') or {}
+        battles = session.get('battles') or []
+        wins = len([b for b in battles if b['result'] > 0])
+        durations = [b['duration'] for b in battles if b.get('duration')]
+        return {'battles': len(battles), 'wins': wins,
+                'winrate': int(round(100.0 * wins / len(battles))) if battles else None,
+                'avg': int(round(sum(durations) / len(durations))) if durations else None,
+                'total': int(round(sum(durations))) if durations else None}
+
+    def _waitingText(self):
+        if not self._waitingShown:
+            return None
+        text = _u(makeString('#waiting:prebattle/change_settings'))
+        return text if text and not text.startswith(u'#') else u'…'
+
+    def _maintenanceInfo(self):
+        if not self._maintenance:
+            return None
+        from gui.Scaleform.locale.FORTIFICATIONS import FORTIFICATIONS
+        return {'header': _u(makeString(FORTIFICATIONS.MAINWINDOW_MAINTENANCE_HEADER)),
+                'body': _u(makeString(FORTIFICATIONS.MAINWINDOW_MAINTENANCE_BODY)),
+                'button': _u(makeString(FORTIFICATIONS.MAINWINDOW_MAINTENANCE_BUTTON))}
+
+    def _searchInfo(self):
+        search = self._search
+        if search is None:
+            return None
+        entity = roomEntity()
+        canCancel = False
+        try:
+            canCancel = bool(entity.getPermissions().canStopBattleQueue()) if entity is not None else False
+        except Exception:
+            _logger.exception('search permissions failed')
+        seconds = max(0, int(round((time.time() - self._searchRef) if search['dir'] > 0 else (self._searchRef - time.time()))))
+        return dict(search, seconds=seconds, canCancel=canCancel)
+
+    def _pack(self):
+        now = time.time()
+        p = self._parts
+        slots = p.get('slots') or []
+        candidates = p.get('candidates') or []
+        room = self._room or {}
+        settings = loadSettings()
+        data = {
+            'version': __version__,
+            'lang': _lang(),
+            'dev': bool(DEV),
+            'mode': self._mode,
+            'pos': settings.get('pos'),
+            'title': self._header.get('title', u''),
+            'back': p.get('back') or {},
+            'divisionTip': p.get('divisionTip', u''),
+            'configureTips': _configureTips(),
+            'frozenTips': _frozenTips(),
+            'directTips': p.get('directTips', False),
+            'battleMap': p.get('battleMap'),
+            'me': p.get('me') or {},
+            'room': room,
+            'mapIcon': _mapIcon(room.get('mapID')),
+            'minimapPoints': self._header.get('minimapPoints') or [],
+            'grid': self._packGrid(now),
+            'rally': p.get('rally') or {},
+            'slots': slots,
+            'candidates': candidates,
+            'speaking': _speaking(slots, candidates, self._speakEvents),
+            'roleRights': p.get('roleRights') or {},
+            'tableHeader': p.get('tableHeader') or [],
+            'timer': self._timer,
+            'timerAge': now - self._timerAt if self._timer else 0,
+            'readyStatus': [self._inQueue, self._enemyReady],
+            'readyDirections': self._header.get('readyDirections'),
+            'direction': self._header.get('direction'),
+            'reserves': p.get('reserves') or [],
+            'reservesEnabled': p.get('reservesEnabled') or [],
+            'opened': p.get('opened'),
+            'configure': p.get('configure'),
+            'actionButton': p.get('actionButton'),
+            'readyCoolDown': p.get('readyCoolDown', 0),
+            'comment': p.get('comment', u''),
+            'vehiclesTitle': None,
+            'highlight': self._highlight,
+            'chat': self._packChat(),
+            'waiting': self._waitingText(),
+            'maintenance': self._maintenanceInfo(),
+            'search': self._searchInfo(),
+            'notice': self._notice,
+            'passive': self._passive is not None,
+            'session': self._sessionInfo(room),
+            'reserveOptions': None,
+            'settings': settings,
+        }
+        if self._reserveSlot >= 0:
+            entity = roomEntity()
+            try:
+                data['reserveOptions'] = _packReserveOptions(entity, self._reserveSlot) if entity is not None else None
+            except Exception:
+                _logger.exception('reserve options failed')
+        if DEV:
+            data['raw'] = {'calls': dict(self._parts, header=self._header), 'slotCalls': {}}
+        return _clean(data)
+
+    def _push(self, force=False):
+        # sends the data to the web UI, only when it changed (the timer and the search seconds
+        # count in the UI itself; they only count as a change when they jump)
+        if self._finalized:
+            return
+        try:
+            data = self._pack()
+            keyData = dict(data, timer=bool(data['timer']), timerAge=None, readyCoolDown=None,
+                           search=dict(data['search'], seconds=None) if data['search'] else None,
+                           grid=dict(data['grid'], points=[(pt['x'], pt['y'], pt['t']) for pt in data['grid']['points']]))
+            key = json.dumps(keyData, sort_keys=True)
+            if key == self._lastKey and not force:
+                return
+            self._lastKey = key
             self.viewModel.setData(json.dumps(data))
         except Exception:
             _logger.exception('packing room data failed')
             return
-        if DEV and not self._snapshotPending:
+        if DEV and not getattr(self, '_snapshotPending', False):
             self._snapshotPending = True
             BigWorld.callback(2.0, self._writeSnapshot)
 
     def _writeSnapshot(self):
         # dev only: last room state as a file, used by the browser preview harness
         self._snapshotPending = False
+        if self._finalized:
+            return
         try:
             path = os.path.dirname(_SNAPSHOT_FILE)
             if not os.path.isdir(path):
                 os.makedirs(path)
             with open(_SNAPSHOT_FILE, 'wb') as f:
-                f.write(json.dumps(_pack(self._bridge, self._frame), indent=1, sort_keys=True).encode('utf-8'))
+                f.write(json.dumps(self._pack(), indent=1, sort_keys=True).encode('utf-8'))
         except Exception:
             _logger.exception('writing snapshot failed')
 
-    # WG's own Flash tooltips (same way WG's Gameface views do it: BackportTooltipWindow), used for the
-    # direction graphic (ConnectedDirects.as): buildings -> DIRECT_MODULE (index 0-5), swords -> complex
+    # battle timer (StrongholdEvent.STRONGHOLD_ON_TIMER, once per second) ---------------------
+
+    def __onTimer(self, event):
+        try:
+            self._onTimer(event.ctx)
+        except Exception:
+            _logger.exception('timer event failed')
+
+    def _onTimer(self, data):
+        # StrongholdBattleRoom._onMatchmakingTimerChanged + StrongholdBattleRoomWindow._onMatchmakingTimerChanged
+        from gui import GUI_SETTINGS, makeHtmlString
+        from gui.impl import backport
+        from gui.Scaleform.daapi.view.lobby.rally import vo_converters
+        from gui.Scaleform.locale.CYBERSPORT import CYBERSPORT
+        from gui.Scaleform.locale.FORTIFICATIONS import FORTIFICATIONS
+        from helpers import int2roman, time_utils
+        entity = roomEntity()
+        if entity is None:
+            return
+        now = time.time()
+        isBattleTimerVisible = False
+        wfbDescr = None
+        playerClanName = None
+        enemyClanName = None
+        currentBattle = data['currentBattle']
+        mapId = currentBattle.getMapId() if currentBattle else 0
+        enemyClanData = data['enemyClan']
+        enemyVisible = enemyClanData is not None
+        isInBattle = entity.getFlags().isInArena()
+        textid = data['textid']
+        level = int2roman(data['maxLevel'])
+        timer = None
+        if data['isSortie']:
+            headerDescr = makeString(FORTIFICATIONS.STRONGHOLDINFO_SORTIE) % {'level': level}
+            timetext = None
+            if textid in (FORTIFICATIONS.SORTIE_INTROVIEW_FORTBATTLES_ENDOFBATTLESOON, FORTIFICATIONS.SORTIE_INTROVIEW_FORTBATTLES_NEXTTIMEOFBATTLESOON):
+                timetext = makeHtmlString('html_templates:lobby/fortifications/introView', 'fortBattles', {'text': time_utils.getTimeLeftFormat(data['dtime'])})
+            elif textid in (FORTIFICATIONS.SORTIE_INTROVIEW_FORTBATTLES_NEXTTIMEOFBATTLETOMORROW, FORTIFICATIONS.SORTIE_INTROVIEW_FORTBATTLES_NEXTTIMEOFBATTLETODAY):
+                timetext = makeHtmlString('html_templates:lobby/fortifications/introView', 'fortBattles', {'text': backport.getShortTimeFormat(data['peripheryStartTimestamp'])})
+            wfbDescr = makeString(textid, nextDate=timetext)
+        else:
+            headerDescr = makeString(FORTIFICATIONS.STRONGHOLDINFO_STRONGHOLD) % {'direction': vo_converters.getDirection(data['direction'])}
+            if textid != FORTIFICATIONS.ROSTERINTROWINDOW_INTROVIEW_FORTBATTLES_NEXTTIMEOFBATTLESOON:
+                timetext = None
+                if textid in (FORTIFICATIONS.SORTIE_INTROVIEW_FORTBATTLES_NEXTTIMEOFBATTLETOMORROW, FORTIFICATIONS.SORTIE_INTROVIEW_FORTBATTLES_NEXTTIMEOFBATTLETODAY):
+                    timetext = makeHtmlString('html_templates:lobby/fortifications/introView', 'fortBattles', {'text': backport.getShortTimeFormat(data['matchmakerNextTick'])})
+                wfbDescr = makeString(textid, nextDate=timetext)
+            else:
+                isBattleTimerVisible = True
+                fontColors = GUI_SETTINGS.lookup('StrongholdsTimerColors') or {}
+                colorRegular = fontColors.get('regular', '#FFDD99')
+                colorAlarm = fontColors.get('alarm', '#ff7f00')
+                enemyClanName = '?'
+                if enemyVisible:
+                    clColor = enemyClanData.getColor()
+                    clColor = '#%06x' % clColor if clColor else '#ffffff'
+                    enemyClanName = "<b><font face='$FieldFont' color='{0}'>[{1}]</font></b>".format(clColor, enemyClanData.getTag())
+                clan = data['clan']
+                if clan:
+                    clColor = clan.getColor()
+                    clColor = '#%06x' % clColor if clColor else '#ffffff'
+                    playerClanName = "<b><font face='$FieldFont' color='{0}'>[{1}]</font></b>".format(clColor, clan.getTag())
+                dtime = data['dtime'] if not isInBattle else 0
+                timer = vo_converters.makeClanBattleTimerVO(dtime, "<font face='$FieldFont' size='18' color='{0}'>###</font>".format(colorRegular),
+                                                            "<font face='$FieldFont' size='18' color='{0}'>###</font>".format(colorAlarm),
+                                                            0xBB6200, 0xBB2B00, '00', 0 if data['isFirstBattle'] else 1)
+                # WG's alarm sound (FortClanBattleRoom.onTimerAlert): every second of the last 10
+                if 0 < dtime <= 10:
+                    try:
+                        from gui.Scaleform.daapi.view.lobby.strongholds.sound_controller import g_strongholdSoundController
+                        g_strongholdSoundController.playBattleRoomTimerAlert()
+                    except Exception:
+                        _logger.exception('timer alert sound failed')
+        room = self._makeRoomVO(entity, mapId, headerDescr, playerClanName, enemyClanName, wfbDescr, enemyVisible, isBattleTimerVisible, data['isSortie'])
+        if data['forceUpdateBuildings']:
+            self._updateBuildings(entity)
+        # search panel time (window): count down while the squad waits in the queue, else up
+        if self._search is not None and entity.isInQueue() and entity.getPlayerInfo().isInSlot:
+            if data['dtime'] > 0 and textid == TOOLTIPS.STRONGHOLDS_TIMER_SQUADINQUEUE:
+                self._setSearch(makeString(CYBERSPORT.WINDOW_AUTOSEARCH_SEARCHENEMY_MAINTEXT), data['dtime'], -1)
+            else:
+                startTimer = 0
+                _, unit = entity.getUnit()
+                timestamp = unit.getModalTimestamp() if unit else 0
+                if timestamp:
+                    startTimer = max(0, int(time_utils.getCurrentTimestamp() - time_utils.makeLocalServerTime(timestamp)))
+                label = TOOLTIPS.STRONGHOLDS_TIMER_SEARCHENEMY if data['isSortie'] or data['isFirstBattle'] else CYBERSPORT.WINDOW_AUTOSEARCH_SEARCHENEMY_MAINTEXT
+                self._setSearch(makeString(label), startTimer, 1)
+        timerEnd = (now + timer['deltaTime']) if timer is not None else None
+        jumped = (timerEnd is None) != (self._timerEnd is None) or (timerEnd is not None and abs(timerEnd - self._timerEnd) >= 1.0)
+        self._room = room
+        self._timer = timer
+        if jumped:
+            self._timerAt = now
+            self._timerEnd = timerEnd
+        elif timer is not None:
+            # keep the reference the UI counts from; deltaTime matching it
+            timer['deltaTime'] = max(0, self._timerEnd - self._timerAt)
+        self._push(force=jumped)
+
+    # actions ---------------------------------------------------------------------------------
+
+    def __onAction(self, args=None):
+        args = args or {}
+        action = args.get('action')
+        try:
+            self._action(action, args)
+        except Exception:
+            _logger.exception('action %r failed', args)
+
+    def _action(self, action, args):
+        entity = roomEntity()
+        from gui.prb_control.entities.base.unit.ctx import AssignUnitCtx, KickPlayerUnitCtx, ChangeOpenedUnitCtx
+        if action == 'uiReady':
+            if not self._uiReady:
+                self._uiReady = True
+                _logger.info('room UI ready (%s mode)', self._mode)
+            self._placeWindow()
+            self._push(force=True)
+        elif action == 'log':
+            _logger.info('ui: %s', args.get('msg'))
+        elif action == 'minimize':
+            self.minimize()
+        elif action == 'close':
+            if self._search is None:
+                _leave(True)
+        elif action == 'back':
+            _leave(False)
+        elif action == 'wgRoom':
+            # fallback on purpose: WG's own room for this room (the mods list brings EZ ROOM back)
+            self._fallback('user')
+        elif action == 'savePos':
+            settings = loadSettings()
+            settings['pos'] = [int(args.get('x') or 0), int(args.get('y') or 0)]
+            saveSettings(settings)
+        elif action == 'moveTo':
+            # panel mode only: our small window follows the mouse while the title bar is dragged
+            window = self.getParentWindow()
+            if window is not None:
+                window.move(int(args.get('x') or 0), int(args.get('y') or 0))
+        elif action == 'wgTip':
+            self._showWgTip(args.get('kind'), int(args.get('index') or 0))
+        elif action == 'wgTipHide':
+            self._hideWgTip()
+        elif action == 'sort':
+            settings = loadSettings()
+            name = 'candSort' if args.get('target') == 'cand' else 'sort'
+            settings[name] = {'key': args.get('key') or u'', 'dir': int(args.get('dir') or 0)}
+            saveSettings(settings)
+        elif action == 'copyLink':
+            url = args.get('url') or u''
+            if url:
+                BigWorld.wg_copyToClipboard(url if isinstance(url, unicode) else unicode(url, 'utf-8', errors='ignore'))
+        elif action == 'devReload' and DEV:
+            reload_ = self._state.get('devReload')
+            if reload_ is not None:
+                reload_()
+        elif entity is None:
+            _logger.warning('no room, action %r ignored', args)
+        elif action == 'takeSlot':
+            # BaseRallyRoomView.assignSlotRequest(slot, -1)
+            if entity.isCommander():
+                return
+            import account_helpers
+            _sendRequest(AssignUnitCtx(account_helpers.getAccountDatabaseID(), int(args.get('slot')), 'prebattle/assign'))
+        elif action == 'assign':
+            dbID = int(args.get('dbID'))
+            if dbID in entity.getPlayers():
+                _sendRequest(AssignUnitCtx(dbID, int(args.get('slot')), 'prebattle/assign'))
+        elif action == 'assignNext':
+            self._assignNext(entity, int(args.get('dbID')))
+        elif action == 'leaveSlot':
+            # BaseRallyRoomView.leaveSlotRequest
+            from UnitBase import UNIT_SLOT
+            dbID = int(args.get('dbID'))
+            if entity.getPlayerInfo(dbID=dbID).isInSlot:
+                _sendRequest(AssignUnitCtx(dbID, UNIT_SLOT.REMOVE, 'prebattle/assign'))
+        elif action == 'highlight':
+            # BaseRallyRoomView.onSlotsHighlihgtingNeed (as_highlightSlotsS)
+            self._highlight = list(entity.getPlayerInfo(int(args.get('dbID'))).getAvailableSlots(True))
+            self._push()
+        elif action == 'kick':
+            if entity.getPlayerInfo().isCommander():
+                _sendRequest(KickPlayerUnitCtx(int(args.get('dbID')), 'prebattle/kick'))
+        elif action == 'ready':
+            # BaseRallyRoomView.toggleReadyStateRequest
+            entity.doAction()
+        elif action == 'toggleOpen':
+            isOpened = entity.getStrongholdSettings().getState().getPublic()
+            _sendRequest(ChangeOpenedUnitCtx(not isOpened, 'prebattle/change_settings'))
+        elif action == 'reserveOpen':
+            self._reserveSlot = int(args.get('slot', -1))
+            self._push()
+        elif action == 'reserveSelect':
+            # StrongholdBattleRoom._selectReserve
+            from gui.prb_control.entities.stronghold.unit.ctx import SetReserveUnitCtx, UnsetReserveUnitCtx
+            self._reserveSlot = -1
+            reserveID = int(args.get('id'))
+            if args.get('remove'):
+                _sendRequest(UnsetReserveUnitCtx(reserveID, waitingID='prebattle/change_settings', isRemove=True))
+            else:
+                _sendRequest(SetReserveUnitCtx(reserveID, waitingID='prebattle/change_settings', isRemove=False))
+            self._push()
+        elif action == 'chatSend':
+            text = (args.get('text') or u'').strip()
+            controller = self._chat.controller() if self._chat is not None else None
+            if text and controller is not None:
+                controller.sendMessage(text.encode('utf-8') if isinstance(text, unicode) else text)
+        elif action == 'contextMenuName':
+            self._contextMenuByName(args.get('name') or u'')
+        elif action == 'contextMenu':
+            self._contextMenu(int(args.get('dbID')))
+        elif action == 'chooseVehicle':
+            self._chooseVehicle(entity, int(args.get('cd') or 0))
+        elif action == 'role':
+            give = bool(args.get('give'))
+            _setEquipmentCommander(int(args.get('dbID')) if give else None, args.get('kind'))
+        elif action == 'gridClick':
+            # MinimapGrid.setClick: unit chat command in WG's 207 px grid
+            controller = self._chat.controller() if self._chat is not None else None
+            if controller is not None and self._packGrid(time.time())['clickEnabled']:
+                controller.sendCommand(controller.proto.unitChat.createByMapPos(float(args.get('x')) * _GRID_SIZE, float(args.get('y')) * _GRID_SIZE))
+        elif action == 'unfreeze':
+            # StrongholdBattleRoom.onUnfrozenVehicleSlotClick -> WG's "back in service" dialog
+            entity.onUnfreezeVehicleInSlot(int(args.get('slot')), parent=None)
+        elif action == 'invite':
+            self._whileWgWindow(self._openInvites)
+        elif action == 'configure':
+            self._whileWgWindow(self._openConfigure)
+        elif action == 'searchCancel':
+            # StrongholdBattleRoomWindow.autoSearchCancel
+            if self._search is not None and entity.inPlayersMatchingMode():
+                entity.exitFromPlayersMatchingMode()
+            else:
+                entity.exitFromQueue()
+        elif action == 'maintenanceRefresh':
+            # StrongholdBattleRoomWindow.refresh
+            entity.requestMaintenanceUpdate()
+        else:
+            _logger.warning('unknown action %r', args)
+
+    def _assignNext(self, entity, dbID):
+        # commander clicked a volunteer: lowest free slot WG allows for him (same list as WG's
+        # green slot highlighting)
+        slots = self._parts.get('slots') or []
+        free = lambda i: 0 <= i < len(slots) and isinstance(slots[i], dict) and not slots[i].get('player') \
+            and not slots[i].get('isClosed') and not slots[i].get('isLocked')
+        from gui.prb_control.entities.base.unit.ctx import AssignUnitCtx
+        for slotIdx in sorted(entity.getPlayerInfo(dbID).getAvailableSlots(True)):
+            if free(slotIdx):
+                _sendRequest(AssignUnitCtx(dbID, slotIdx, 'prebattle/assign'))
+                return
+        _logger.info('no free slot for %s', dbID)
+
+    def _playerVO(self, dbID):
+        for slot in self._parts.get('slots') or ():
+            player = slot.get('player') if isinstance(slot, dict) else None
+            if player and player.get('dbID') == dbID:
+                return player
+        for item in self._parts.get('candidates') or ():
+            if isinstance(item, dict) and item.get('dbID') == dbID:
+                return item
+        return None
+
+    def _contextMenu(self, dbID):
+        # WG's player menu (UNIT_USER), opened the way WG's Gameface platoon view does it
+        vo = self._playerVO(dbID)
+        if vo is None:
+            _logger.warning('context menu: player %s not found', dbID)
+            return
+        if 'currentPlayer' in (vo.get('tags') or ()):
+            return
+        from gui.impl.backport import BackportContextMenuWindow
+        from gui.impl.backport.backport_context_menu import createContextMenuData
+        from gui.Scaleform.genConsts.CONTEXT_MENU_HANDLER_TYPE import CONTEXT_MENU_HANDLER_TYPE
+        BackportContextMenuWindow(createContextMenuData(CONTEXT_MENU_HANDLER_TYPE.UNIT_USER, vo), self.getParentWindow()).load()
+
+    def _contextMenuByName(self, name):
+        # chat author: a player in the room gets the room menu (UNIT_USER), anyone else WG's normal
+        # player menu (BASE_USER) with the dbID from the messenger's user storage
+        if not name:
+            return
+        players = [slot.get('player') for slot in self._parts.get('slots') or () if isinstance(slot, dict)]
+        players += [item for item in self._parts.get('candidates') or () if isinstance(item, dict)]
+        for player in players:
+            if player and _u(player.get('userName') or u'') == name and player.get('dbID'):
+                self._contextMenu(player['dbID'])
+                return
+        from messenger.storage import MessengerStorageDescriptor, UsersStorage
+        users = MessengerStorageDescriptor(UsersStorage).get()
+        user = next((u for u in users.all() if _u(u.getName() or u'') == name), None)
+        if user is None or user.isCurrentPlayer():
+            return
+        from gui.impl.backport import BackportContextMenuWindow
+        from gui.impl.backport.backport_context_menu import createContextMenuData
+        from gui.Scaleform.genConsts.CONTEXT_MENU_HANDLER_TYPE import CONTEXT_MENU_HANDLER_TYPE
+        vo = {'dbID': user.getID(), 'userName': user.getName()}
+        BackportContextMenuWindow(createContextMenuData(CONTEXT_MENU_HANDLER_TYPE.BASE_USER, vo), self.getParentWindow()).load()
+
+    def _chooseVehicle(self, entity, currentCD=0):
+        # EZ TANK PICKER if installed (its loader handles its dev mode), else WG's own selector
+        # (BaseRallyRoomView._chooseVehicleRequest); both answer with CSVehicleSelectEvent
+        levelsRange = entity.getRosterSettings().getLevelsRange()
+        try:
+            import sys
+            pickerLoader = sys.modules.get('gui.mods.mod_advances_picker')
+            if pickerLoader is not None:
+                from advances_picker import impl as picker
+                pickerLoader._reopen(levelsRange, picker._frozenCDs(_PopoverShim(entity)), currentCD)
+                return
+        except Exception:
+            _logger.exception('opening EZ TANK PICKER failed, using WG selector')
+        from gui.Scaleform.framework.managers.loaders import SFViewLoadParams
+        from gui.Scaleform.genConsts.CYBER_SPORT_ALIASES import CYBER_SPORT_ALIASES
+        from gui.Scaleform.locale.CYBERSPORT import CYBERSPORT
+        from gui.Scaleform.locale.FORTIFICATIONS import FORTIFICATIONS
+        from gui.shared import events, g_eventBus
+        from gui.shared.event_bus import EVENT_BUS_SCOPE
+        from gui.shared.utils.requesters import REQ_CRITERIA
+        from skeletons.gui.shared import IItemsCache
+        playerInfo = entity.getPlayerInfo()
+        vehicles = playerInfo.getSlotsToVehicles(True).get(playerInfo.slotIdx)
+        if vehicles is not None:
+            vehicles = dependency.instance(IItemsCache).items.getVehicles(REQ_CRITERIA.VEHICLE.SPECIFIC_BY_CD(vehicles))
+        g_eventBus.handleEvent(events.LoadViewEvent(SFViewLoadParams(CYBER_SPORT_ALIASES.VEHICLE_SELECTOR_POPUP_PY), ctx={
+            'isMultiSelect': False,
+            'vehicles': vehicles,
+            'titleText': CYBERSPORT.WINDOW_VEHICLESELECTOR_TITLE,
+            'selectButton': CYBERSPORT.WINDOW_VEHICLESELECTOR_BUTTONS_SELECT,
+            'cancelButton': CYBERSPORT.WINDOW_VEHICLESELECTOR_BUTTONS_CANCEL,
+            'infoText': FORTIFICATIONS.SORTIE_VEHICLESELECTOR_DESCRIPTION,
+            'compatibleOnlyLabel': CYBERSPORT.WINDOW_VEHICLESELECTOR_FILTERS_MATCHES,
+            'selectedVehicles': self._selectedVehicles(entity),
+            'section': 'cs_unit_view_vehicle',
+            'levelsRange': levelsRange}), scope=EVENT_BUS_SCOPE.LOBBY)
+
+    def _openInvites(self):
+        # StrongholdBattleRoom.inviteFriendRequest
+        from constants import PREBATTLE_TYPE, PREBATTLE_TYPE_NAMES
+        from gui.Scaleform.framework.managers.loaders import SFViewLoadParams
+        from gui.Scaleform.genConsts.FORTIFICATION_ALIASES import FORTIFICATION_ALIASES
+        from gui.prb_control.settings import CTRL_ENTITY_TYPE
+        from gui.shared import events, g_eventBus
+        from gui.shared.event_bus import EVENT_BUS_SCOPE
+        g_eventBus.handleEvent(events.LoadViewEvent(SFViewLoadParams(FORTIFICATION_ALIASES.STRONGHOLD_SEND_INVITES_WINDOW_PY), ctx={
+            'prbName': PREBATTLE_TYPE_NAMES[PREBATTLE_TYPE.STRONGHOLD],
+            'ctrlType': CTRL_ENTITY_TYPE.UNIT,
+            'showClanOnly': False}), scope=EVENT_BUS_SCOPE.LOBBY)
+
+    @adisp_process
+    def _openConfigure(self):
+        # StrongholdBattleRoom.openConfigureWindow (WG's modal browser with the change-mode page)
+        from gui import GUI_SETTINGS
+        from gui.clans.clan_helpers import getStrongholdChangeModeUrl
+        from gui.Scaleform.daapi.view.lobby.strongholds.web_handlers import createStrongholdsWebHandlers
+        from skeletons.gui.game_control import IBrowserController
+        browserCtrl = dependency.instance(IBrowserController)
+        windowSize = GUI_SETTINGS.lookup('StrongholdsPopupWebWindowSize') or {}
+        browserSize = (windowSize.get('width', 800), windowSize.get('height', 600))
+        self._configureBrowserId = yield browserCtrl.load(url=getStrongholdChangeModeUrl(), title=makeString(TOOLTIPS.CYBERSPORT_MODECHANGEFROZEN_HEADER),
+                                                          browserSize=browserSize, isModal=True, showCreateWaiting=True,
+                                                          handlers=createStrongholdsWebHandlers(), showActionBtn=False)
+        browser = browserCtrl.getBrowser(self._configureBrowserId)
+        if browser:
+            browser.ignoreKeyEvents = True
+        else:
+            self._configureBrowserId = 0
+
+    def _destroyConfigureWindow(self):
+        # StrongholdBattleRoom.__destroyChangeModeWindow
+        if not self._configureBrowserId:
+            return
+        from gui.Scaleform.daapi.settings.views import VIEW_ALIAS
+        from gui.shared.utils.functions import getViewName
+        self._destroyFlashWindow(getViewName(VIEW_ALIAS.BROWSER_WINDOW_MODAL, self._configureBrowserId), alias=False)
+        self._configureBrowserId = 0
+
+    @staticmethod
+    def _destroyFlashWindow(name, alias=True):
+        from gui.Scaleform.framework.managers.containers import POP_UP_CRITERIA
+        from skeletons.gui.app_loader import IAppLoader
+        app = dependency.instance(IAppLoader).getApp()
+        if app is None or app.containerManager is None:
+            return
+        criteria = {POP_UP_CRITERIA.VIEW_ALIAS: name} if alias else {POP_UP_CRITERIA.UNIQUE_NAME: name}
+        view = app.containerManager.getView(WindowLayer.WINDOW, criteria=criteria)
+        if view is not None:
+            view.destroy()
+
+    def _whileWgWindow(self, opener):
+        # WG's Flash windows (invites, configure) open on the same layer as the room: the panel is
+        # hidden while one is up and comes back when it closes (window status events, no polling)
+        try:
+            baseline = _wgWindowCount(self._ownWindowID())
+        except Exception:
+            _logger.exception('counting windows failed')
+            opener()
+            return
+        self._passive = {'baseline': baseline, 'seen': False}
+        self._push(force=True)
+        opener()
+
+        def timeout():
+            # the window never showed up (e.g. WG refused it): panel back
+            if self._passive is not None and not self._passive['seen'] and not self._finalized:
+                self._passive = None
+                self._push(force=True)
+
+        BigWorld.callback(3.0, timeout)
+
+    # WG's own Flash tooltips (BackportTooltipWindow), used for the direction graphic
     def _showWgTip(self, kind, index):
         self._hideWgTip()
         from gui.impl.backport.backport_tooltip import BackportTooltipWindow, createTooltipData
@@ -962,309 +1905,40 @@ class EzRoomView(ViewImpl):
             except Exception:
                 _logger.exception('hiding WG tooltip failed')
 
-    def __onAction(self, args=None):
-        args = args or {}
-        action = args.get('action')
-        try:
-            bridge = self._bridge
-            if action == 'hide':
-                # "Original" / Esc: WG's room, with the small EZ ROOM button to come back
-                if hasattr(bridge, 'showOriginal'):
-                    bridge.showOriginal()
-                else:
-                    bridge.close(hide=True)
-            elif action == 'minimize':
-                # same as WG's minimize button: room into the channel carousel, unit is kept
-                windowView = bridge.roomWindowView()
-                if windowView is not None:
-                    windowView.onWindowMinimize()
-            elif action == 'close':
-                # same as WG's X: AbstractWindowView.handleWindowClose -> leave dialog, then leave
-                windowView = bridge.roomWindowView()
-                if windowView is not None and windowView.onTryClosing():
-                    windowView.onWindowClose()
-            elif action == 'wgTip':
-                self._showWgTip(args.get('kind'), int(args.get('index') or 0))
-            elif action == 'wgTipHide':
-                self._hideWgTip()
-            elif action == 'dragStart':
-                self._dragStart()
-            elif action == 'dragEnd':
-                if self._drag is not None:
-                    self._dragEnd()
-            elif action == 'restore':
-                # the small EZ ROOM button: overlay back (next tick: opening closes this button's own window)
-                BigWorld.callback(0.0, lambda: bridge.open(manual=True))
-            elif action == 'takeSlot':
-                bridge.call('assignSlotRequest', int(args.get('slot')), -1)
-            elif action == 'assign':
-                bridge.call('assignSlotRequest', int(args.get('slot')), int(args.get('dbID')))
-            elif action == 'leaveSlot':
-                bridge.call('leaveSlotRequest', int(args.get('dbID')))
-            elif action == 'assignNext':
-                self._assignNext(int(args.get('dbID')))
-            elif action == 'highlight':
-                # fills data.highlight with the slots this player may go to (as_highlightSlotsS)
-                bridge.call('onSlotsHighlihgtingNeed', int(args.get('dbID')))
-            elif action == 'kick':
-                bridge.call('requestToKickUser', int(args.get('dbID')))
-            elif action == 'ready':
-                bridge.call('toggleReadyStateRequest')
-            elif action == 'toggleOpen':
-                bridge.call('toggleRoomStatus')
-            elif action == 'reserveOpen':
-                self._reserveSlot = int(args.get('slot', -1))
-                self.onRoomChanged()
-            elif action == 'reserveSelect':
-                self._reserveSlot = -1
-                view = bridge.view
-                if view is not None:
-                    view._selectReserve({'newId': int(args.get('id')), 'oldId': None, 'isRemove': bool(args.get('remove'))})
-                self.onRoomChanged()
-            elif action == 'sort':
-                settings = _loadSettings()
-                name = 'candSort' if args.get('target') == 'cand' else 'sort'
-                settings[name] = {'key': args.get('key') or u'', 'dir': int(args.get('dir') or 0)}
-                _saveSettings(settings)
-            elif action == 'chatSend':
-                text = (args.get('text') or u'').strip()
-                component = _chatComponent(bridge)
-                if text and component is not None:
-                    component.sendMessage(text.encode('utf-8') if isinstance(text, unicode) else text)
-            elif action == 'copyLink':
-                # own extension: chat link to the clipboard (WG's own copy helper does the same call)
-                url = args.get('url') or u''
-                if url:
-                    BigWorld.wg_copyToClipboard(url if isinstance(url, unicode) else unicode(url, 'utf-8', errors='ignore'))
-            elif action == 'contextMenuName':
-                self._contextMenuByName(args.get('name') or u'')
-            elif action == 'contextMenu':
-                self._contextMenu(int(args.get('dbID')))
-            elif action == 'chooseVehicle':
-                self._chooseVehicle(int(args.get('cd') or 0))
-            elif action == 'role':
-                # commander's role buttons in the team rows (Artillerieschlag / Inspiration)
-                give = bool(args.get('give'))
-                _setEquipmentCommander(int(args.get('dbID')) if give else None, args.get('kind'))
-            elif action == 'gridClick':
-                # same as a click on WG's minimap grid: MinimapGrid.setClick(x, y) in its 207 px space
-                view = bridge.view
-                grid = getattr(view, '_StrongholdBattleRoom__minimapGrid', None) if view is not None else None
-                if grid is not None and bridge.grid.get('clickEnabled'):
-                    grid.setClick(float(args.get('x')) * _GRID_SIZE, float(args.get('y')) * _GRID_SIZE)
-            elif action == 'back':
-                # same as WG's back link: StrongholdBattleRoomWindow.onBackClick -> leaves the unit
-                windowView = bridge.roomWindowView()
-                if windowView is not None:
-                    windowView.onBackClick()
-            elif action == 'unfreeze':
-                # same as WG's gear button in the slot: StrongholdBattleRoom.onUnfrozenVehicleSlotClick
-                # -> WG's "In Dienst stellen?" dialog with the spare parts price
-                slot = int(args.get('slot'))
-                _whileWgWindow(bridge, lambda: bridge.call('onUnfrozenVehicleSlotClick', slot))
-            elif action == 'invite':
-                _whileWgWindow(bridge, lambda: bridge.call('inviteFriendRequest'))
-            elif action == 'configure':
-                _whileWgWindow(bridge, lambda: bridge.call('openConfigureWindow'))
-            elif action == 'devReload' and DEV:
-                self._bridge.reopen()
-            elif action == 'log':
-                _logger.info('ui: %s', args.get('msg'))
-                if self._frame:
-                    _logger.info('overlay window rect %r, frame %r', _rect(self.getParentWindow()), self._frame)
-            else:
-                _logger.warning('unknown action %r', args)
-        except Exception:
-            _logger.exception('action %r failed', args)
 
-    def _assignNext(self, dbID):
-        # commander clicked a volunteer: lowest free slot WG allows for him (same list as WG's
-        # green slot highlighting, BaseRallyRoomView.getAvailableSlots)
-        bridge = self._bridge
-        view = bridge.view
-        if view is None:
-            return
-        members = bridge.calls.get('as_setMembersS')
-        slots = list(members[1]) if members and len(members) > 1 else []
-        free = lambda i: 0 <= i < len(slots) and isinstance(slots[i], dict) and not slots[i].get('player') \
-            and not slots[i].get('isClosed') and not slots[i].get('isLocked')
-        for slotIdx in sorted(view.getAvailableSlots(dbID)):
-            if free(slotIdx):
-                bridge.call('assignSlotRequest', slotIdx, dbID)
-                return
-        _logger.info('no free slot for %s', dbID)
-
-    def _contextMenuByName(self, name):
-        # chat author: a player in the room gets the room menu (UNIT_USER), anyone else WG's normal
-        # player menu (BASE_USER) with the dbID from the messenger's user storage
-        if not name:
-            return
-        bridge = self._bridge
-        view = bridge.view
-        if view is None:
-            return
-        members = bridge.calls.get('as_setMembersS')
-        players = [slot.get('player') for slot in (members[1] if members and len(members) > 1 else ()) if isinstance(slot, dict)]
-        dp = getattr(view, '_candidatesDP', None)
-        players += [item for item in (dp.collection if dp is not None else ()) if isinstance(item, dict)]
-        for player in players:
-            if player and _u(player.get('userName') or u'') == name and player.get('dbID'):
-                self._contextMenu(player['dbID'])
-                return
-        try:
-            from messenger.storage import MessengerStorageDescriptor, UsersStorage
-            users = MessengerStorageDescriptor(UsersStorage).get()
-            user = next((u for u in users.all() if _u(u.getName() or u'') == name), None)
-            if user is None:
-                _logger.info('chat menu: %s not found', name)
-                return
-            if user.isCurrentPlayer():
-                return
-            from gui.impl.backport import BackportContextMenuWindow
-            from gui.impl.backport.backport_context_menu import createContextMenuData
-            from gui.Scaleform.genConsts.CONTEXT_MENU_HANDLER_TYPE import CONTEXT_MENU_HANDLER_TYPE
-            vo = {'dbID': user.getID(), 'userName': user.getName()}
-            window = BackportContextMenuWindow(createContextMenuData(CONTEXT_MENU_HANDLER_TYPE.BASE_USER, vo), self.getParentWindow())
-            window.load()
-        except Exception:
-            _logger.exception('chat menu failed')
-
-    def _contextMenu(self, dbID):
-        # WG's player menu (UNIT_USER), opened the way WG's Gameface platoon view does it, with
-        # the same player VO the Flash room would pass
-        bridge = self._bridge
-        view = bridge.view
-        if view is None:
-            return
-        vo = None
-        members = bridge.calls.get('as_setMembersS')
-        for slot in (members[1] if members and len(members) > 1 else ()):
-            player = slot.get('player') if isinstance(slot, dict) else None
-            if player and player.get('dbID') == dbID:
-                vo = player
-                break
-        if vo is None:
-            dp = getattr(view, '_candidatesDP', None)
-            for item in (dp.collection if dp is not None else ()):
-                if isinstance(item, dict) and item.get('dbID') == dbID:
-                    vo = item
-                    break
-        if vo is None:
-            _logger.warning('context menu: player %s not found', dbID)
-            return
-        if 'currentPlayer' in (vo.get('tags') or ()):
-            return
-        from gui.impl.backport import BackportContextMenuWindow
-        from gui.impl.backport.backport_context_menu import createContextMenuData
-        from gui.Scaleform.genConsts.CONTEXT_MENU_HANDLER_TYPE import CONTEXT_MENU_HANDLER_TYPE
-        window = BackportContextMenuWindow(createContextMenuData(CONTEXT_MENU_HANDLER_TYPE.UNIT_USER, vo), self.getParentWindow())
-        window.load()
-
-    def _chooseVehicle(self, currentCD=0):
-        # EZ TANK PICKER if installed (its loader handles its dev mode), else WG's own selector
-        bridge = self._bridge
-        view = bridge.view
-        if view is None:
-            return
-        try:
-            import sys
-            pickerLoader = sys.modules.get('gui.mods.mod_advances_picker')
-            if pickerLoader is not None:
-                from advances_picker import impl as picker
-                entity = view.prbEntity
-                levelsRange = entity.getRosterSettings().getLevelsRange()
-                frozen = picker._frozenCDs(view)
-                # the picker is a FULLSCREEN_WINDOW too: hide the overlay ourselves, back after it closes
-                _whileWgWindow(bridge, lambda: pickerLoader._reopen(levelsRange, frozen, currentCD))
-                return
-        except Exception:
-            _logger.exception('opening EZ TANK PICKER failed, using WG selector')
-        _whileWgWindow(bridge, lambda: bridge.call('chooseVehicleRequest'))
-
-
-# --- WG windows opened from the overlay ---------------------------------------------
-# Flash windows (invites, configure, WG's vehicle selector) open on layer WINDOW, below the
-# overlay: hide the overlay until the extra window is closed again.
-_WATCH_LAYERS = (WindowLayer.WINDOW, WindowLayer.TOP_WINDOW, WindowLayer.FULLSCREEN_WINDOW)
-_WATCH_TIMEOUT = 3.0  # s to wait for the WG window to appear
+_WATCH_LAYERS = (WindowLayer.WINDOW, WindowLayer.TOP_WINDOW)
 
 
 def _wgWindowCount(ignoreID):
-    # our own overlay window is ignored (it may still be listed for a moment while destroyed)
     gui = dependency.instance(IGuiLoader)
     return len(gui.windowsManager.findWindows(lambda w: w.layer in _WATCH_LAYERS and w.uniqueID != ignoreID))
 
 
-def _whileWgWindow(bridge, opener):
-    own = bridge.window
-    ownID = own.uniqueID if own is not None else -1
-    try:
-        baseline = _wgWindowCount(ownID)
-    except Exception:
-        _logger.exception('counting windows failed')
-        opener()
-        return
-    bridge.close(hide=True)
-    opener()
-    state = {'seen': False, 'waited': 0.0}
-
-    def poll():
-        if bridge.view is None or bridge.window is not None:
-            return  # room gone, or overlay reopened by hand
-        try:
-            count = _wgWindowCount(ownID)
-        except Exception:
-            _logger.exception('counting windows failed')
-            count = baseline
-        if count > baseline:
-            state['seen'] = True
-        state['waited'] += 0.25
-        if (state['seen'] and count <= baseline) or (not state['seen'] and state['waited'] >= _WATCH_TIMEOUT):
-            bridge.open(manual=True)
-            return
-        BigWorld.callback(0.25, poll)
-
-    BigWorld.callback(0.25, poll)
-
-
-def _reopenAfterExternalClose(bridge, ownID):
-    # reopen once the window that pushed us out is gone (window count drops below its peak)
-    try:
-        state = {'max': _wgWindowCount(ownID)}
-    except Exception:
-        _logger.exception('counting windows failed')
-        return
-    _logger.info('overlay closed by the game, waiting to reopen it')
-
-    def poll():
-        if bridge.view is None or bridge.window is not None or bridge.hidden:
-            return  # room gone, reopened by hand, or hidden on purpose
-        try:
-            count = _wgWindowCount(ownID)
-        except Exception:
-            _logger.exception('counting windows failed')
-            return
-        if count < state['max']:
-            bridge.open(manual=True)
-            return
-        state['max'] = max(state['max'], count)
-        BigWorld.callback(0.25, poll)
-
-    BigWorld.callback(0.25, poll)
-
-
 class EzRoomWindow(WindowImpl):
-    # plain window (no decorator) laid exactly over the content of WG's room window
-    # (same setup as WG's OfferBannerWindow: no parent, default area, moved after load)
+    # panel mode: plain window as big as the room panel, moved by Python
     __slots__ = ()
 
-    def __init__(self, layoutID, bridge, layer, config):
+    def __init__(self, layoutID, state):
         super(EzRoomWindow, self).__init__(
             WindowFlags.WINDOW,
-            content=EzRoomView(layoutID, bridge, config),
+            content=EzRoomView(layoutID, state),
             parent=None,
-            layer=layer,
+            layer=WindowLayer.WINDOW,
             areaID=R.areas.default())
+
+
+def _makeFullWindow(layoutID, state):
+    # full mode: screen-sized window on WG's room layer (WINDOW_FULLSCREEN: the game sizes it, so
+    # Gameface does not have to measure it; 0.8.0-0.8.3 sized it from JS and Gameface sometimes
+    # reset it after "Size calculation timeout"); transparent, only the room panel takes mouse
+    # input (Gameface hit test), so the garage stays usable around it
+    from gui.impl.pub.lobby_window import LobbyWindow
+
+    class EzRoomFullWindow(LobbyWindow):
+        __slots__ = ()
+
+    return EzRoomFullWindow(wndFlags=WindowFlags.WINDOW | WindowFlags.WINDOW_FULLSCREEN,
+                            content=EzRoomView(layoutID, state), layer=WindowLayer.WINDOW)
 
 
 def _layoutID():
@@ -1279,54 +1953,146 @@ def _layoutID():
     return resID
 
 
-def openMini(bridge, devConfig=None):
-    # small EZ ROOM button over WG's title bar while the original room is shown
-    layoutID = _layoutID()
-    if layoutID is None or _roomWindowView(bridge) is None:
-        return None
-    config = dict(devConfig or {}, mini=True)
-    config.pop('offset', None)
-    window = EzRoomWindow(layoutID, bridge, WindowLayer.FULLSCREEN_WINDOW, config)
-    window.load()
-    _logger.info('EZ ROOM button shown')
-    return window
+# --- called by the loader -------------------------------------------------------------------
+
+def showRoom(state, toggle=False):
+    # WG wants to show its room window: ours instead. True = handled (WG's window stays closed).
+    if roomEntity() is None:
+        return False
+    window = state.get('window')
+    if window is not None:
+        if toggle and window.content is not None:
+            window.content.minimize()
+        return True
+    destroyWgRoomWindow()
+    if not state.get('opening'):
+        state['opening'] = True
+        BigWorld.callback(0.0, lambda: _openWindow(state))
+    return True
 
 
-def openOverlay(bridge, devConfig=None):
+def _openWindow(state):
+    state['opening'] = False
+    try:
+        _loadWindow(state)
+    except Exception:
+        _logger.exception('opening the room window failed')
+        state['window'] = None
+        fallback = state.get('fallback')
+        if fallback is not None:
+            fallback('open failed')
+
+
+def _loadWindow(state):
+    if state.get('window') is not None or roomEntity() is None:
+        return
     layoutID = _layoutID()
     if layoutID is None:
-        return None
-    # FULLSCREEN_WINDOW: above WG's Flash windows (WINDOW), same layer as the tank picker,
-    # which therefore still opens on top
-    layerName = (devConfig or {}).get('layer') or 'FULLSCREEN_WINDOW'
-    layer = getattr(WindowLayer, layerName, WindowLayer.FULLSCREEN_WINDOW)
-    if _roomWindowView(bridge) is None:
-        _logger.warning('room window not found, overlay not opened')
-        return None
-    try:
-        _installChatHook()
-    except Exception:
-        _logger.exception('installing chat hook failed')
-    try:
-        _installSearchHooks()
-        _installWaitingHook()
-    except Exception:
-        _logger.exception('installing search hooks failed')
-    if _searchActive(bridge):
-        # WG's search form is up: it stays visible, the overlay comes back when it ends
-        bridge.searchHid = True
-        _logger.info('enemy search running, overlay stays hidden')
-        return None
-    window = EzRoomWindow(layoutID, bridge, layer, devConfig)
+        raise RuntimeError('EZ ROOM layout missing')
+    if loadSettings().get('windowMode') == 'panel':
+        window = EzRoomWindow(layoutID, state)
+    else:
+        window = _makeFullWindow(layoutID, state)
+    state['window'] = window
     window.load()
-    _logger.info('overlay opened (layer %s, room window %r)', layerName, _roomRect(bridge))
-    return window
+    _logger.info('room window opened')
 
 
-# hooks as early as possible (the packaged impl is imported when the client starts), so a search
-# that starts before the overlay opens is seen too
-try:
-    _installSearchHooks()
-    _installWaitingHook()
-except Exception:
-    _logger.exception('installing search hooks failed')
+# --- session counter ------------------------------------------------------------------------------
+# Battles started from the current room: the start / end of the battle from the arena periods
+# (BATTLE / AFTERBATTLE), the result from WG's battle results message (it arrives at the end of
+# the battle, also when the player went back to the garage earlier; end = its arrival then).
+
+def _isStrongholdBattle(bonusType):
+    from constants import ARENA_BONUS_TYPE
+    return bonusType in (ARENA_BONUS_TYPE.SORTIE_2, ARENA_BONUS_TYPE.FORT_BATTLE_2)
+
+
+def _sessionPeriod(session, period, periodEndTime, periodLength):
+    from constants import ARENA_PERIOD
+    battle = session['pending'].get(session.get('current'))
+    if battle is None:
+        return
+    if period == ARENA_PERIOD.BATTLE and battle['start'] is None:
+        left = max(0.0, periodEndTime - BigWorld.serverTime()) if periodEndTime else periodLength
+        battle['start'] = time.time() - max(0.0, periodLength - left)
+    elif period == ARENA_PERIOD.AFTERBATTLE and battle['end'] is None:
+        battle['end'] = time.time()
+
+
+def onAvatarReady(state):
+    session = state.get('session')
+    player = BigWorld.player()
+    arena = getattr(player, 'arena', None)
+    if session is None or arena is None or not _isStrongholdBattle(arena.bonusType):
+        return
+    arenaUniqueID = player.arenaUniqueID
+    if len(session['pending']) > 20:
+        session['pending'].clear()
+    session['pending'].setdefault(arenaUniqueID, {'start': None, 'end': None})
+    session['current'] = arenaUniqueID
+    _sessionPeriod(session, arena.period, arena.periodEndTime, arena.periodLength)
+
+
+def onArenaPeriodChange(state, period, periodEndTime, periodLength, *args):
+    session = state.get('session')
+    if session is not None:
+        _sessionPeriod(session, period, periodEndTime, periodLength)
+
+
+def onServiceMessage(state, message):
+    from chat_shared import SYS_MESSAGE_TYPE
+    if message.type != SYS_MESSAGE_TYPE.battleResults.index():
+        return
+    session = state.get('session')
+    data = message.data or {}
+    battle = session['pending'].pop(data.get('arenaUniqueID'), None) if session is not None else None
+    if battle is None:
+        return
+    duration = None
+    if battle['start'] is not None:
+        duration = (battle['end'] or time.time()) - battle['start']
+        if not 0 < duration < 1800:
+            duration = None
+    session['battles'].append({'result': int(data.get('isWinner', 0) or 0), 'duration': duration})
+    _logger.info('session: battle %s, result %s, %s s', len(session['battles']), data.get('isWinner'), duration)
+    window = state.get('window')
+    if window is not None and window.content is not None:
+        window.content.mark()
+
+
+def closeRoom(state):
+    window = state.get('window')
+    state['window'] = None
+    state['reopen'] = False
+    if window is not None:
+        state['closing'] = True
+        try:
+            window.destroy()
+        except Exception:
+            _logger.exception('closing the room window failed')
+        state['closing'] = False
+
+
+def armReopen(state):
+    # the game closed the room window (e.g. for the vehicle hub): open it again when a garage
+    # window loads (window status event, no polling)
+    state['reopen'] = True
+    if state.get('reopenHook'):
+        return
+    wm = dependency.instance(IGuiLoader).windowsManager
+
+    def onStatus(uniqueID, newStatus):
+        from frameworks.wulf import WindowStatus
+        if newStatus != WindowStatus.LOADED or not state.get('reopen'):
+            return
+        window = wm.getWindow(uniqueID)
+        if window is None or window.layer != WindowLayer.SUB_VIEW or 'Hangar' not in type(window).__name__:
+            return
+        state['reopen'] = False
+        if state.get('window') is None and roomEntity() is not None and not state.get('bypass'):
+            _logger.info('garage is back: room window again')
+            BigWorld.callback(0.3, lambda: showRoom(state))
+
+    wm.onWindowStatusChanged += onStatus
+    state['reopenHook'] = onStatus
