@@ -426,16 +426,20 @@ function renderRoomActions() {
                 ? `<div class="btn wide" data-act="configure" data-tip="${esc(ctips.on || "")}">${L("Konfigurieren", "Configure")}</div>`
                 : `<div class="btn wide disabled" data-tip="${esc(ctips.off || "")}">${L("Konfigurieren", "Configure")}</div>`
         );
-    // WG's event page (Clan -> Manoeuvres): "reset progress", only for the roles WG allows
+    // WG's event page (Clan -> Manoeuvres): "reset progress", only for the roles WG allows;
+    // own box with WG's page title and the current stage, button = WG's "Reset" (no icon)
     const er = data.eventReset;
     if (er && er.visible) {
         const t = er.texts || {};
-        const label = `<img class="reseticon" src="img://gui/maps/icons/ez_room/reset.png">${esc(t["battle_control_buttons.reset_progress"] || "")}`;
-        btns.push(
-            er.active
-                ? `<div class="btn wide resetbtn" data-act="eventResetAsk" data-tip="${esc(t["battle_control_buttons.reset_progress_text"] || "")}">${label}</div>`
-                : `<div class="btn wide resetbtn disabled" data-tip="${esc(t["battle_control_buttons.is_disabled"] || "")}">${label}</div>`
-        );
+        const label = esc(t["reset_progress_overlay_content.button_confirm"] || "");
+        const button = er.active
+            ? `<div class="btn wide" data-act="eventResetAsk" data-tip="${esc(t["battle_control_buttons.reset_progress_text"] || "")}">${label}</div>`
+            : `<div class="btn wide disabled" data-tip="${esc(t["battle_control_buttons.is_disabled"] || "")}">${label}</div>`;
+        btns.push(`
+            <div class="resetwrap">
+                <div class="resethead"><span>${esc(t["main_page.header_title"] || "")}</span><span class="rstage">${esc(t["step_table.step"] || "")} ${esc(String(er.stage))}</span></div>
+                ${button}
+            </div>`);
     }
     const status = txt(opened[1]);
     if (!btns.length && !status) return "";

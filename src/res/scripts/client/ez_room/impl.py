@@ -27,7 +27,7 @@ from helpers.i18n import makeString
 from adisp import adisp_process
 from skeletons.gui.impl import IGuiLoader
 
-__version__ = '0.8.9'
+__version__ = '0.8.11'
 _logger = logging.getLogger('EZ_ROOM')
 _logger.setLevel(logging.INFO)
 _LAYOUT_PATH = ('ez_room', 'views', 'EzRoomView')
@@ -306,6 +306,8 @@ def _divisionTip():
 # host and the session cookie, so the room uses it the same way. Texts are WG's web locale.
 _RESET_TEXTS = {
     'de': {
+        "main_page.header_title": "MAN\u00d6VER",
+        "step_table.step": "Abschnitt",
         "battle_control_buttons.is_disabled": "Bis zum Start der Man\u00f6ver nicht verf\u00fcgbar.",
         "battle_control_buttons.reset_progress": "FORTSCHRITT ZUR\u00dcCKSETZEN",
         "battle_control_buttons.reset_progress_text": "Setzt den Fortschritt zum ersten Abschnitt zur\u00fcck, stellt alle Fahrzeuge der Clanmitglieder auf dienstbereit zur\u00fcck und liefert Reparaturteile. Vor dem Zur\u00fccksetzen angesammelte Reparaturteile verfallen.",
@@ -321,6 +323,8 @@ _RESET_TEXTS = {
         "reset_progress_overlay_content.unknown_notification": "Fehler: Vorgang kann nicht abgeschlossen werden.",
     },
     'en': {
+        "main_page.header_title": "MANEUVERS",
+        "step_table.step": "Stage",
         "battle_control_buttons.is_disabled": "Unavailable until the start of Maneuvers.",
         "battle_control_buttons.reset_progress": "RESET PROGRESS",
         "battle_control_buttons.reset_progress_text": "Reset progress to return to the first Stage, restore all clan members' vehicles to duty, and receive Repair Parts. Repair Parts accumulated before the reset will be lost.",
@@ -336,6 +340,8 @@ _RESET_TEXTS = {
         "reset_progress_overlay_content.unknown_notification": "Error: Unable to complete action.",
     },
     'pl': {
+        "main_page.header_title": "MANEWRY",
+        "step_table.step": "Etap",
         "battle_control_buttons.is_disabled": "Niedost\u0119pne do rozpocz\u0119cia manewr\u00f3w.",
         "battle_control_buttons.reset_progress": "WYZERUJ POST\u0118PY",
         "battle_control_buttons.reset_progress_text": "Wyzeruj post\u0119py, aby powr\u00f3ci\u0107 do pierwszego etapu, przywr\u00f3ci\u0107 pojazdy wszystkich cz\u0142onk\u00f3w klanu do s\u0142u\u017cby i otrzyma\u0107 cz\u0119\u015bci naprawcze. Cz\u0119\u015bci naprawcze zgromadzone przed wyzerowaniem zostan\u0105 utracone.",
@@ -351,6 +357,8 @@ _RESET_TEXTS = {
         "reset_progress_overlay_content.unknown_notification": "B\u0142\u0105d: nie mo\u017cna doko\u0144czy\u0107 operacji.",
     },
     'cs': {
+        "main_page.header_title": "MAN\u00c9VRY",
+        "step_table.step": "F\u00e1ze",
         "battle_control_buttons.is_disabled": "Nedostupn\u00e9 do za\u010d\u00e1tku Man\u00e9vr\u016f.",
         "battle_control_buttons.reset_progress": "VYNULOVAT POSTUP",
         "battle_control_buttons.reset_progress_text": "Vynulujte postup pro n\u00e1vrat k\u00a0prvn\u00ed f\u00e1zi, obnovte v\u0161echna vozidla \u010dlen\u016f klanu do slu\u017eby a\u00a0z\u00edskejte sou\u010d\u00e1sti na opravu. Sou\u010d\u00e1sti na opravu nahromad\u011bn\u00e9 p\u0159ed vynulov\u00e1n\u00edm budou ztraceny.",
@@ -366,6 +374,8 @@ _RESET_TEXTS = {
         "reset_progress_overlay_content.unknown_notification": "Chyba: Akci nelze dokon\u010dit.",
     },
     'fr': {
+        "main_page.header_title": "MAN\u0152UVRES",
+        "step_table.step": "\u00c9tape",
         "battle_control_buttons.is_disabled": "Indisponible jusqu'au lancement de Man\u0153uvres.",
         "battle_control_buttons.reset_progress": "R\u00c9INITIALISER LA PROGRESSION",
         "battle_control_buttons.reset_progress_text": "R\u00e9initialiser la progression pour revenir \u00e0 la premi\u00e8re \u00c9tape, restaurer en service tous les v\u00e9hicules des membres du clan et recevoir des Pi\u00e8ces de r\u00e9paration. Les Pi\u00e8ces de r\u00e9paration accumul\u00e9es avant la r\u00e9initialisation seront perdues.",
@@ -381,6 +391,8 @@ _RESET_TEXTS = {
         "reset_progress_overlay_content.unknown_notification": "Erreur\u00a0: impossible de terminer cette action.",
     },
     'es': {
+        "main_page.header_title": "MANIOBRAS",
+        "step_table.step": "Etapa",
         "battle_control_buttons.is_disabled": "No disponible hasta el inicio de Maniobras",
         "battle_control_buttons.reset_progress": "REINICIAR PROGRESO",
         "battle_control_buttons.reset_progress_text": "Reiniciar progreso para regresar a la primera etapa, volver a poner en servicio todos los veh\u00edculos de los miembros del clan y recibir piezas de repuesto. Las piezas de repuesto acumuladas antes del reinicio se perder\u00e1n.",
@@ -396,6 +408,8 @@ _RESET_TEXTS = {
         "reset_progress_overlay_content.unknown_notification": "Error: no es posible completar la acci\u00f3n.",
     },
     'it': {
+        "main_page.header_title": "MANOVRE MILITARI",
+        "step_table.step": "Fase",
         "battle_control_buttons.is_disabled": "Non disponibile fino all'inizio di Manovre militari.",
         "battle_control_buttons.reset_progress": "AZZERA PROGRESSI",
         "battle_control_buttons.reset_progress_text": "Azzera i progressi per tornare alla prima Fase, riportare in funzione tutti i veicoli dei membri del Clan e ricevere Pezzi di ricambio. I Pezzi di ricambio accumulati prima dell'azzeramento andranno perduti.",
@@ -411,6 +425,8 @@ _RESET_TEXTS = {
         "reset_progress_overlay_content.unknown_notification": "Errore: impossibile completare l'azione.",
     },
     'tr': {
+        "main_page.header_title": "TATB\u0130KAT",
+        "step_table.step": "A\u015fama",
         "battle_control_buttons.is_disabled": "Tatbikat ba\u015flayana kadar ge\u00e7erli de\u011fildir.",
         "battle_control_buttons.reset_progress": "GEL\u0130\u015e\u0130M\u0130 SIFIRLA",
         "battle_control_buttons.reset_progress_text": "Geli\u015fimi s\u0131f\u0131rlayarak ilk A\u015famaya d\u00f6n\u00fcn, t\u00fcm klan \u00fcyelerinin ara\u00e7lar\u0131n\u0131 g\u00f6reve haz\u0131r hale getirin ve Tamir Par\u00e7alar\u0131 al\u0131n. S\u0131f\u0131rlamadan \u00f6nce biriktirilen Tamir Par\u00e7alar\u0131 kaybolacak.",
@@ -426,6 +442,8 @@ _RESET_TEXTS = {
         "reset_progress_overlay_content.unknown_notification": "Hata: \u0130\u015flem tamamlanam\u0131yor.",
     },
     'ru': {
+        "main_page.header_title": "\u041c\u0410\u041d\u0401\u0412\u0420\u042b",
+        "step_table.step": "\u042d\u0442\u0430\u043f",
         "battle_control_buttons.is_disabled": "\u041d\u0435\u0434\u043e\u0441\u0442\u0443\u043f\u043d\u043e \u0434\u043e \u043d\u0430\u0447\u0430\u043b\u0430 \u0441\u043e\u0431\u044b\u0442\u0438\u044f \u00ab\u041c\u0430\u043d\u0451\u0432\u0440\u044b\u00bb.",
         "battle_control_buttons.reset_progress": "\u0421\u0411\u0420\u041e\u0421\u0418\u0422\u042c \u041f\u0420\u041e\u0413\u0420\u0415\u0421\u0421",
         "battle_control_buttons.reset_progress_text": "\u0421\u0431\u0440\u043e\u0441\u0438\u0442\u044c \u043f\u0440\u043e\u0433\u0440\u0435\u0441\u0441 \u0434\u043e \u043f\u0435\u0440\u0432\u043e\u0433\u043e \u044d\u0442\u0430\u043f\u0430, \u0447\u0442\u043e\u0431\u044b \u0432\u0435\u0440\u043d\u0443\u0442\u044c \u0432 \u0441\u0442\u0440\u043e\u0439 \u0442\u0435\u0445\u043d\u0438\u043a\u0443 \u0432\u0441\u0435\u0445 \u0438\u0433\u0440\u043e\u043a\u043e\u0432 \u043a\u043b\u0430\u043d\u0430 \u0438 \u043f\u043e\u043b\u0443\u0447\u0438\u0442\u044c \u0440\u0435\u043c\u0440\u0435\u0441\u0443\u0440\u0441. \u041d\u0435\u0438\u0441\u043f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u043d\u043d\u044b\u0439 \u0434\u043e \u0441\u0431\u0440\u043e\u0441\u0430 \u0440\u0435\u043c\u0440\u0435\u0441\u0443\u0440\u0441 \u0431\u0443\u0434\u0435\u0442 \u0441\u043f\u0438\u0441\u0430\u043d.",

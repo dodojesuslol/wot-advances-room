@@ -623,8 +623,11 @@ body {
 .frzbtn.disabled:hover { border-color: #595950; background-color: transparent; }
 
 /* event progress reset (WG's Manoeuvres page button + its confirmation) */
-.resetbtn { display: flex; flex-direction: row; align-items: center; justify-content: center; }
-.reseticon { width: 16rem; height: 16rem; margin-right: 6rem; }
+.resetwrap { margin: 2rem 0 6rem 0; padding: 6rem 8rem 8rem 8rem; border: 1rem solid rgba(238, 112, 0, 0.5); background-color: rgba(238, 112, 0, 0.06); }
+.resethead { display: flex; flex-direction: row; justify-content: space-between; margin-bottom: 6rem; font-size: 11rem; letter-spacing: 1rem; color: #8c8c7e; }
+.resethead .rstage { color: #ffdd99; font-weight: bold; }
+.resetwrap .btn.wide { margin: 0; border-color: #ee7000; color: #ffdd99; }
+.resetwrap .btn.wide.disabled { border-color: #595950; color: #8c8c7e; }
 .resetbox { max-width: 520rem; }
 .resetbox .waitbody { line-height: 18rem; }
 .resetbox .hl { color: #ffdd99; font-weight: bold; }
