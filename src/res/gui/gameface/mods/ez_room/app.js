@@ -17,6 +17,7 @@ const ui = {
     hoverRow: "", // data-user of the row under the mouse (its buttons are shown, see markHover)
     sort: null, // team table sort {key: "clan"|"name"|"rating"|"tank", dir: 1|-1}; null = slot order
     foldTanks: {}, // sorted by tank: tank id -> true = only its first row is shown
+    resetConfirm: false, // event progress reset: WG's confirmation is open
 };
 
 // own texts: German / English in the code, other client languages from TR (key = the English
@@ -425,6 +426,17 @@ function renderRoomActions() {
                 ? `<div class="btn wide" data-act="configure" data-tip="${esc(ctips.on || "")}">${L("Konfigurieren", "Configure")}</div>`
                 : `<div class="btn wide disabled" data-tip="${esc(ctips.off || "")}">${L("Konfigurieren", "Configure")}</div>`
         );
+    // WG's event page (Clan -> Manoeuvres): "reset progress", only for the roles WG allows
+    const er = data.eventReset;
+    if (er && er.visible) {
+        const t = er.texts || {};
+        const label = `<img class="reseticon" src="img://gui/maps/icons/ez_room/reset.png">${esc(t["battle_control_buttons.reset_progress"] || "")}`;
+        btns.push(
+            er.active
+                ? `<div class="btn wide resetbtn" data-act="eventResetAsk" data-tip="${esc(t["battle_control_buttons.reset_progress_text"] || "")}">${label}</div>`
+                : `<div class="btn wide resetbtn disabled" data-tip="${esc(t["battle_control_buttons.is_disabled"] || "")}">${label}</div>`
+        );
+    }
     const status = txt(opened[1]);
     if (!btns.length && !status) return "";
     return `<div class="pfoot">${btns.join("")}${status ? `<div class="pnote">${esc(status)}</div>` : ""}</div>`;
@@ -922,7 +934,36 @@ function renderFooter() {
 // covers over the room body, like WG's room window showed them over its content:
 // maintenance (as_setInfoS + "retry"), enemy / legionnaire search (auto search form with its
 // timer and "cancel"), WG's waiting animation ("loading data") and the leadership notice
+// WG's text with its <xxxHighlight> tags and {placeholders} (react-intl format of the event page)
+function wgshText(text, values) {
+    let out = esc(text || "");
+    out = out.replace(/\{lineBreak\}/g, "<br>");
+    for (const k in values) out = out.split("{" + k + "}").join(esc(String(values[k])));
+    return out.replace(/&lt;(\w+)Highlight&gt;/g, '<span class="hl $1">').replace(/&lt;\/\w+Highlight&gt;/g, "</span>");
+}
+
+function renderResetConfirm() {
+    const er = data.eventReset;
+    if (!ui.resetConfirm || !er) return "";
+    const t = er.texts || {};
+    const P = "reset_progress_overlay_content.";
+    return `
+        <div class="waitcover">
+            <div class="waitbox resetbox">
+                <div class="waittext">${esc(t[P + "title"] || "")}</div>
+                <div class="waitbody" cohinline="true">${wgshText(t[P + "description_1"], { progressStage: er.stage, spareParts: er.spareParts })}</div>
+                <div class="waitbody" cohinline="true">${wgshText(t[P + "description_2"], { spareParts: er.reward })}</div>
+                <div class="resetbtns">
+                    <div class="btn accent" data-act="eventResetCancel">${esc(t[P + "button_cancel"] || "")}</div>
+                    <div class="btn accent${er.busy ? " disabled" : ""}" data-act="eventResetConfirm">${esc(t[P + "button_confirm"] || "")}</div>
+                </div>
+            </div>
+        </div>`;
+}
+
 function renderWaiting() {
+    const reset = renderResetConfirm();
+    if (reset) return reset;
     const m = data.maintenance;
     if (m) {
         return `
@@ -1499,6 +1540,11 @@ document.addEventListener("click", (e) => {
     } else if (act === "chatSend") sendChat();
     else if (act === "chooseVehicle") send({ action: "chooseVehicle", cd: Number(el.getAttribute("data-cd")) || 0 });
     else if (act === "ready" || act === "invite" || act === "toggleOpen" || act === "configure" || act === "back") send({ action: act });
+    else if (act === "eventResetAsk" || act === "eventResetCancel" || act === "eventResetConfirm") {
+        ui.resetConfirm = act === "eventResetAsk";
+        if (act === "eventResetConfirm") send({ action: "eventReset" });
+        render();
+    }
 });
 
 // commander: click a volunteer = WG puts him into the next free allowed slot (Python picks it),

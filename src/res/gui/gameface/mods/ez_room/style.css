@@ -621,3 +621,12 @@ body {
 .frzbtn:hover { border-color: #ee7000; background-color: rgba(238, 112, 0, 0.12); }
 .frzbtn.disabled { opacity: 0.4; cursor: default; }
 .frzbtn.disabled:hover { border-color: #595950; background-color: transparent; }
+
+/* event progress reset (WG's Manoeuvres page button + its confirmation) */
+.resetbtn { display: flex; flex-direction: row; align-items: center; justify-content: center; }
+.reseticon { width: 16rem; height: 16rem; margin-right: 6rem; }
+.resetbox { max-width: 520rem; }
+.resetbox .waitbody { line-height: 18rem; }
+.resetbox .hl { color: #ffdd99; font-weight: bold; }
+.resetbtns { display: flex; flex-direction: row; }
+.resetbtns .btn.accent { margin: 14rem 6rem 0 6rem; }

@@ -27,7 +27,7 @@ from helpers.i18n import makeString
 from adisp import adisp_process
 from skeletons.gui.impl import IGuiLoader
 
-__version__ = '0.8.7'
+__version__ = '0.8.8'
 _logger = logging.getLogger('EZ_ROOM')
 _logger.setLevel(logging.INFO)
 _LAYOUT_PATH = ('ez_room', 'views', 'EzRoomView')
@@ -297,6 +297,267 @@ def _divisionTip():
     except Exception:
         _logger.exception('division tooltip failed')
         return u''
+
+
+# --- event progress reset (Clan -> Manoeuvres, "Fortschritt zuruecksetzen") ---------------------
+# WG's event page (web_cache/wgshevents) sends PATCH /wgshevents/clan/reset_progress
+# {"progress_stage": <current stage>} to the WGCG gateway. The client's own gateway accessor
+# (IWebController.getWebRequester().data_source, used for wgsh_event_unfreeze_vehicle) carries the
+# host and the session cookie, so the room uses it the same way. Texts are WG's web locale.
+_RESET_TEXTS = {
+    'de': {
+        "battle_control_buttons.is_disabled": "Bis zum Start der Man\u00f6ver nicht verf\u00fcgbar.",
+        "battle_control_buttons.reset_progress": "FORTSCHRITT ZUR\u00dcCKSETZEN",
+        "battle_control_buttons.reset_progress_text": "Setzt den Fortschritt zum ersten Abschnitt zur\u00fcck, stellt alle Fahrzeuge der Clanmitglieder auf dienstbereit zur\u00fcck und liefert Reparaturteile. Vor dem Zur\u00fccksetzen angesammelte Reparaturteile verfallen.",
+        "reset_progress_overlay_content.button_cancel": "Abbrechen",
+        "reset_progress_overlay_content.button_confirm": "Zur\u00fccksetzen",
+        "reset_progress_overlay_content.description_1": "Aktueller Abschnitt: <progressStageHighlight>{progressStage}</progressStageHighlight>{lineBreak}Wenn Sie den Fortschritt f\u00fcr das Event zur\u00fccksetzen, kehrt Ihr Clan zum ersten Abschnitt zur\u00fcck und die Fahrzeuge aller Clanmitglieder sind wieder dienstbereit. <sparePartsHighlight>{spareParts}</sparePartsHighlight> Alle Reparaturteile verfallen dabei.",
+        "reset_progress_overlay_content.description_2": "Ihr Clan erh\u00e4lt Reparaturteile: <sparePartsHighlight>{spareParts}</sparePartsHighlight>",
+        "reset_progress_overlay_content.mismatch_progress_notification": "Fehler: Clanfortschritt f\u00fcr das Event wurde zur\u00fcckgesetzt.",
+        "reset_progress_overlay_content.no_rights_notification": "Aktion nicht m\u00f6glich. Unzureichende Befugnisse.",
+        "reset_progress_overlay_content.not_in_clan_notification": "Aktion nicht m\u00f6glich. Sie sind kein Clanmitglied.",
+        "reset_progress_overlay_content.successful_notification": "Clanfortschritt wurde f\u00fcr das Event zur\u00fcckgesetzt.",
+        "reset_progress_overlay_content.title": "Fortschritt zur\u00fccksetzen?",
+        "reset_progress_overlay_content.unknown_notification": "Fehler: Vorgang kann nicht abgeschlossen werden.",
+    },
+    'en': {
+        "battle_control_buttons.is_disabled": "Unavailable until the start of Maneuvers.",
+        "battle_control_buttons.reset_progress": "RESET PROGRESS",
+        "battle_control_buttons.reset_progress_text": "Reset progress to return to the first Stage, restore all clan members' vehicles to duty, and receive Repair Parts. Repair Parts accumulated before the reset will be lost.",
+        "reset_progress_overlay_content.button_cancel": "Cancel",
+        "reset_progress_overlay_content.button_confirm": "Reset",
+        "reset_progress_overlay_content.description_1": "Current stage: <progressStageHighlight>{progressStage}</progressStageHighlight>{lineBreak}Once you reset progress in the event, your clan will return to the first stage, while all clan members' vehicles will be restored to duty. <sparePartsHighlight>{spareParts}</sparePartsHighlight> Repair Parts will be lost.",
+        "reset_progress_overlay_content.description_2": "Your clan will receive Repair Parts: <sparePartsHighlight>{spareParts}</sparePartsHighlight>",
+        "reset_progress_overlay_content.mismatch_progress_notification": "Error: Clan progress in the event has been reset.",
+        "reset_progress_overlay_content.no_rights_notification": "Action unavailable. Insufficient permissions.",
+        "reset_progress_overlay_content.not_in_clan_notification": "Action unavailable. You are not a member of any clan.",
+        "reset_progress_overlay_content.successful_notification": "Clan progress in the event has been reset.",
+        "reset_progress_overlay_content.title": "Reset progress?",
+        "reset_progress_overlay_content.unknown_notification": "Error: Unable to complete action.",
+    },
+    'pl': {
+        "battle_control_buttons.is_disabled": "Niedost\u0119pne do rozpocz\u0119cia manewr\u00f3w.",
+        "battle_control_buttons.reset_progress": "WYZERUJ POST\u0118PY",
+        "battle_control_buttons.reset_progress_text": "Wyzeruj post\u0119py, aby powr\u00f3ci\u0107 do pierwszego etapu, przywr\u00f3ci\u0107 pojazdy wszystkich cz\u0142onk\u00f3w klanu do s\u0142u\u017cby i otrzyma\u0107 cz\u0119\u015bci naprawcze. Cz\u0119\u015bci naprawcze zgromadzone przed wyzerowaniem zostan\u0105 utracone.",
+        "reset_progress_overlay_content.button_cancel": "Anuluj",
+        "reset_progress_overlay_content.button_confirm": "Wyzeruj",
+        "reset_progress_overlay_content.description_1": "Aktualny etap: <progressStageHighlight>{progressStage}</progressStageHighlight>{lineBreak}Po wyzerowaniu post\u0119p\u00f3w wydarzenia Tw\u00f3j klan powr\u00f3ci do pierwszego etapu, a pojazdy wszystkich cz\u0142onk\u00f3w klanu zostan\u0105 przywr\u00f3cone do s\u0142u\u017cby. <sparePartsHighlight>{spareParts}</sparePartsHighlight> Cz\u0119\u015bci naprawcze zostan\u0105 utracone.",
+        "reset_progress_overlay_content.description_2": "Tw\u00f3j klan otrzyma cz\u0119\u015bci naprawcze: <sparePartsHighlight>{spareParts}</sparePartsHighlight>",
+        "reset_progress_overlay_content.mismatch_progress_notification": "B\u0142\u0105d: post\u0119py klanu w\u00a0wydarzeniu zosta\u0142y wyzerowane.",
+        "reset_progress_overlay_content.no_rights_notification": "Operacja niedost\u0119pna. Niewystarczaj\u0105ce uprawnienia.",
+        "reset_progress_overlay_content.not_in_clan_notification": "Operacja niedost\u0119pna. Nie jeste\u015b cz\u0142onkiem \u017cadnego klanu.",
+        "reset_progress_overlay_content.successful_notification": "Post\u0119py klanu w wydarzeniu zosta\u0142y wyzerowane.",
+        "reset_progress_overlay_content.title": "Wyzerowa\u0107 post\u0119py?",
+        "reset_progress_overlay_content.unknown_notification": "B\u0142\u0105d: nie mo\u017cna doko\u0144czy\u0107 operacji.",
+    },
+    'cs': {
+        "battle_control_buttons.is_disabled": "Nedostupn\u00e9 do za\u010d\u00e1tku Man\u00e9vr\u016f.",
+        "battle_control_buttons.reset_progress": "VYNULOVAT POSTUP",
+        "battle_control_buttons.reset_progress_text": "Vynulujte postup pro n\u00e1vrat k\u00a0prvn\u00ed f\u00e1zi, obnovte v\u0161echna vozidla \u010dlen\u016f klanu do slu\u017eby a\u00a0z\u00edskejte sou\u010d\u00e1sti na opravu. Sou\u010d\u00e1sti na opravu nahromad\u011bn\u00e9 p\u0159ed vynulov\u00e1n\u00edm budou ztraceny.",
+        "reset_progress_overlay_content.button_cancel": "Zru\u0161it",
+        "reset_progress_overlay_content.button_confirm": "Vynulovat",
+        "reset_progress_overlay_content.description_1": "Sou\u010dasn\u00e1 f\u00e1ze: <progressStageHighlight>{progressStage}</progressStageHighlight>{lineBreak}Jakmile vynulujete postup akc\u00ed, v\u00e1\u0161 klan se vr\u00e1t\u00ed do prvn\u00ed f\u00e1ze a z\u00e1rove\u0148 budou v\u0161echna vozidla \u010dlen\u016f klanu obnovena do slu\u017eby. Bude ztraceno <sparePartsHighlight>{spareParts}</sparePartsHighlight> sou\u010d\u00e1st\u00ed na opravu.",
+        "reset_progress_overlay_content.description_2": "V\u00e1\u0161 klan z\u00edsk\u00e1 sou\u010d\u00e1sti na opravu: <sparePartsHighlight>{spareParts}</sparePartsHighlight>",
+        "reset_progress_overlay_content.mismatch_progress_notification": "Chyba: Postup klanu akc\u00ed byl vynulov\u00e1n.",
+        "reset_progress_overlay_content.no_rights_notification": "Akce nen\u00ed k dispozici. Nedostate\u010dn\u00e1 opr\u00e1vn\u011bn\u00ed.",
+        "reset_progress_overlay_content.not_in_clan_notification": "Akce nen\u00ed k dispozici. Nejste \u010dleny \u017e\u00e1dn\u00e9ho klanu.",
+        "reset_progress_overlay_content.successful_notification": "Postup klanu akc\u00ed byl vynulov\u00e1n.",
+        "reset_progress_overlay_content.title": "Vynulovat postup?",
+        "reset_progress_overlay_content.unknown_notification": "Chyba: Akci nelze dokon\u010dit.",
+    },
+    'fr': {
+        "battle_control_buttons.is_disabled": "Indisponible jusqu'au lancement de Man\u0153uvres.",
+        "battle_control_buttons.reset_progress": "R\u00c9INITIALISER LA PROGRESSION",
+        "battle_control_buttons.reset_progress_text": "R\u00e9initialiser la progression pour revenir \u00e0 la premi\u00e8re \u00c9tape, restaurer en service tous les v\u00e9hicules des membres du clan et recevoir des Pi\u00e8ces de r\u00e9paration. Les Pi\u00e8ces de r\u00e9paration accumul\u00e9es avant la r\u00e9initialisation seront perdues.",
+        "reset_progress_overlay_content.button_cancel": "Annuler",
+        "reset_progress_overlay_content.button_confirm": "R\u00e9initialiser",
+        "reset_progress_overlay_content.description_1": "\u00c9tape actuelle\u00a0: <progressStageHighlight>{progressStage}</progressStageHighlight>{lineBreak}Apr\u00e8s avoir r\u00e9initialis\u00e9 votre progression lors de l'\u00e9v\u00e8nement, votre clan retournera \u00e0 la premi\u00e8re \u00e9tape et tous les v\u00e9hicules des membres du clan seront restaur\u00e9s en service. <sparePartsHighlight>{spareParts}</sparePartsHighlight> Pi\u00e8ces de r\u00e9paration seront perdues.",
+        "reset_progress_overlay_content.description_2": "Votre clan recevra des Pi\u00e8ces de r\u00e9paration\u00a0: <sparePartsHighlight>{spareParts}</sparePartsHighlight>",
+        "reset_progress_overlay_content.mismatch_progress_notification": "Erreur\u00a0: la progression du clan dans l'\u00e9v\u00e8nement a \u00e9t\u00e9 r\u00e9initialis\u00e9e.",
+        "reset_progress_overlay_content.no_rights_notification": "Action indisponible. Droits insuffisants.",
+        "reset_progress_overlay_content.not_in_clan_notification": "Action indisponible. Vous n'\u00eates pas membre d'un clan.",
+        "reset_progress_overlay_content.successful_notification": "La progression du clan lors de l'\u00e9v\u00e8nement a \u00e9t\u00e9 r\u00e9initialis\u00e9e.",
+        "reset_progress_overlay_content.title": "R\u00e9initialiser la progression\u00a0?",
+        "reset_progress_overlay_content.unknown_notification": "Erreur\u00a0: impossible de terminer cette action.",
+    },
+    'es': {
+        "battle_control_buttons.is_disabled": "No disponible hasta el inicio de Maniobras",
+        "battle_control_buttons.reset_progress": "REINICIAR PROGRESO",
+        "battle_control_buttons.reset_progress_text": "Reiniciar progreso para regresar a la primera etapa, volver a poner en servicio todos los veh\u00edculos de los miembros del clan y recibir piezas de repuesto. Las piezas de repuesto acumuladas antes del reinicio se perder\u00e1n.",
+        "reset_progress_overlay_content.button_cancel": "Cancelar",
+        "reset_progress_overlay_content.button_confirm": "Reiniciar",
+        "reset_progress_overlay_content.description_1": "Etapa actual: <progressStageHighlight>{progressStage}</progressStageHighlight>{lineBreak}Cuando reinicies el progreso del evento, tu clan regresar\u00e1 a la primera etapa y todos los veh\u00edculos de los miembros del clan se volver\u00e1n a poner en servicio. Se perder\u00e1n <sparePartsHighlight>{spareParts}</sparePartsHighlight>\u00a0piezas de repuesto.",
+        "reset_progress_overlay_content.description_2": "Tu clan recibir\u00e1 piezas de repuesto: <sparePartsHighlight>{spareParts}</sparePartsHighlight>",
+        "reset_progress_overlay_content.mismatch_progress_notification": "Error: Se ha reiniciado el progreso del clan en el evento.",
+        "reset_progress_overlay_content.no_rights_notification": "Acci\u00f3n no disponible. Permisos insuficientes.",
+        "reset_progress_overlay_content.not_in_clan_notification": "Acci\u00f3n no disponible. No eres miembro de ning\u00fan clan.",
+        "reset_progress_overlay_content.successful_notification": "Se ha reiniciado el progreso del clan en el evento.",
+        "reset_progress_overlay_content.title": "\u00bfReiniciar progreso?",
+        "reset_progress_overlay_content.unknown_notification": "Error: no es posible completar la acci\u00f3n.",
+    },
+    'it': {
+        "battle_control_buttons.is_disabled": "Non disponibile fino all'inizio di Manovre militari.",
+        "battle_control_buttons.reset_progress": "AZZERA PROGRESSI",
+        "battle_control_buttons.reset_progress_text": "Azzera i progressi per tornare alla prima Fase, riportare in funzione tutti i veicoli dei membri del Clan e ricevere Pezzi di ricambio. I Pezzi di ricambio accumulati prima dell'azzeramento andranno perduti.",
+        "reset_progress_overlay_content.button_cancel": "Annulla",
+        "reset_progress_overlay_content.button_confirm": "Azzera",
+        "reset_progress_overlay_content.description_1": "Fase attuale: <progressStageHighlight>{progressStage}</progressStageHighlight>{lineBreak}Azzerando i progressi nell'evento, il tuo Clan torner\u00e0 alla prima fase, mentre tutti i veicoli dei membri del Clan saranno nuovamente rimessi in servizio. <sparePartsHighlight>{spareParts}</sparePartsHighlight> I Pezzi di ricambio andranno perduti.",
+        "reset_progress_overlay_content.description_2": "Il tuo Clan ricever\u00e0 Pezzi di ricambio: <sparePartsHighlight>{spareParts}</sparePartsHighlight>",
+        "reset_progress_overlay_content.mismatch_progress_notification": "Errore: i progressi di Clan nell'evento sono stati azzerati.",
+        "reset_progress_overlay_content.no_rights_notification": "Azione non disponibile. Permessi non sufficienti.",
+        "reset_progress_overlay_content.not_in_clan_notification": "Azione non disponibile. Non fai parte di un Clan.",
+        "reset_progress_overlay_content.successful_notification": "I progressi di Clan nell'evento saranno azzerati.",
+        "reset_progress_overlay_content.title": "Vuoi azzerare i progressi?",
+        "reset_progress_overlay_content.unknown_notification": "Errore: impossibile completare l'azione.",
+    },
+    'tr': {
+        "battle_control_buttons.is_disabled": "Tatbikat ba\u015flayana kadar ge\u00e7erli de\u011fildir.",
+        "battle_control_buttons.reset_progress": "GEL\u0130\u015e\u0130M\u0130 SIFIRLA",
+        "battle_control_buttons.reset_progress_text": "Geli\u015fimi s\u0131f\u0131rlayarak ilk A\u015famaya d\u00f6n\u00fcn, t\u00fcm klan \u00fcyelerinin ara\u00e7lar\u0131n\u0131 g\u00f6reve haz\u0131r hale getirin ve Tamir Par\u00e7alar\u0131 al\u0131n. S\u0131f\u0131rlamadan \u00f6nce biriktirilen Tamir Par\u00e7alar\u0131 kaybolacak.",
+        "reset_progress_overlay_content.button_cancel": "\u0130ptal",
+        "reset_progress_overlay_content.button_confirm": "S\u0131f\u0131rla",
+        "reset_progress_overlay_content.description_1": "Mevcut a\u015fama: <progressStageHighlight>{progressStage}</progressStageHighlight>{lineBreak}Etkinlikte geli\u015fimi s\u0131f\u0131rlad\u0131\u011f\u0131n\u0131zda klan\u0131n\u0131z ilk a\u015famaya d\u00f6necek, t\u00fcm klan \u00fcyelerinin ara\u00e7lar\u0131 g\u00f6reve haz\u0131r hale gelecek. <sparePartsHighlight>{spareParts}</sparePartsHighlight> Tamir Par\u00e7as\u0131 kaybolacak.",
+        "reset_progress_overlay_content.description_2": "Klan\u0131n\u0131z \u015fu Tamir Par\u00e7alar\u0131n\u0131 alacak: <sparePartsHighlight>{spareParts}</sparePartsHighlight>",
+        "reset_progress_overlay_content.mismatch_progress_notification": "Hata: Klan\u0131n etkinlikteki geli\u015fimi s\u0131f\u0131rland\u0131.",
+        "reset_progress_overlay_content.no_rights_notification": "\u0130\u015flem ge\u00e7ersiz. Yetersiz yetki.",
+        "reset_progress_overlay_content.not_in_clan_notification": "\u0130\u015flem ge\u00e7ersiz. Herhangi bir klan \u00fcyesi de\u011filsiniz.",
+        "reset_progress_overlay_content.successful_notification": "Klan\u0131n etkinlikteki geli\u015fimi s\u0131f\u0131rland\u0131.",
+        "reset_progress_overlay_content.title": "Geli\u015fim s\u0131f\u0131rlans\u0131n m\u0131?",
+        "reset_progress_overlay_content.unknown_notification": "Hata: \u0130\u015flem tamamlanam\u0131yor.",
+    },
+    'ru': {
+        "battle_control_buttons.is_disabled": "\u041d\u0435\u0434\u043e\u0441\u0442\u0443\u043f\u043d\u043e \u0434\u043e \u043d\u0430\u0447\u0430\u043b\u0430 \u0441\u043e\u0431\u044b\u0442\u0438\u044f \u00ab\u041c\u0430\u043d\u0451\u0432\u0440\u044b\u00bb.",
+        "battle_control_buttons.reset_progress": "\u0421\u0411\u0420\u041e\u0421\u0418\u0422\u042c \u041f\u0420\u041e\u0413\u0420\u0415\u0421\u0421",
+        "battle_control_buttons.reset_progress_text": "\u0421\u0431\u0440\u043e\u0441\u0438\u0442\u044c \u043f\u0440\u043e\u0433\u0440\u0435\u0441\u0441 \u0434\u043e \u043f\u0435\u0440\u0432\u043e\u0433\u043e \u044d\u0442\u0430\u043f\u0430, \u0447\u0442\u043e\u0431\u044b \u0432\u0435\u0440\u043d\u0443\u0442\u044c \u0432 \u0441\u0442\u0440\u043e\u0439 \u0442\u0435\u0445\u043d\u0438\u043a\u0443 \u0432\u0441\u0435\u0445 \u0438\u0433\u0440\u043e\u043a\u043e\u0432 \u043a\u043b\u0430\u043d\u0430 \u0438 \u043f\u043e\u043b\u0443\u0447\u0438\u0442\u044c \u0440\u0435\u043c\u0440\u0435\u0441\u0443\u0440\u0441. \u041d\u0435\u0438\u0441\u043f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u043d\u043d\u044b\u0439 \u0434\u043e \u0441\u0431\u0440\u043e\u0441\u0430 \u0440\u0435\u043c\u0440\u0435\u0441\u0443\u0440\u0441 \u0431\u0443\u0434\u0435\u0442 \u0441\u043f\u0438\u0441\u0430\u043d.",
+        "reset_progress_overlay_content.button_cancel": "\u041e\u0442\u043c\u0435\u043d\u0438\u0442\u044c",
+        "reset_progress_overlay_content.button_confirm": "\u0421\u0431\u0440\u043e\u0441\u0438\u0442\u044c",
+        "reset_progress_overlay_content.description_1": "\u0422\u0435\u043a\u0443\u0449\u0438\u0439 \u044d\u0442\u0430\u043f: <progressStageHighlight>{progressStage}</progressStageHighlight>{lineBreak}\u041f\u043e\u0441\u043b\u0435 \u0441\u0431\u0440\u043e\u0441\u0430 \u043f\u0440\u043e\u0433\u0440\u0435\u0441\u0441\u0430 \u0432 \u0441\u043e\u0431\u044b\u0442\u0438\u0438 \u043a\u043b\u0430\u043d \u043f\u0435\u0440\u0435\u0439\u0434\u0451\u0442 \u043a \u043f\u0435\u0440\u0432\u043e\u043c\u0443 \u044d\u0442\u0430\u043f\u0443, \u0430 \u0442\u0435\u0445\u043d\u0438\u043a\u0430 \u0432\u0441\u0435\u0445 \u0438\u0433\u0440\u043e\u043a\u043e\u0432 \u043a\u043b\u0430\u043d\u0430 \u0432\u0435\u0440\u043d\u0451\u0442\u0441\u044f \u0432 \u0441\u0442\u0440\u043e\u0439. <sparePartsHighlight>{spareParts}</sparePartsHighlight> \u0435\u0434. \u043d\u0435\u0438\u0441\u043f\u043e\u043b\u044c\u0437\u043e\u0432\u0430\u043d\u043d\u043e\u0433\u043e \u0440\u0435\u043c\u0440\u0435\u0441\u0443\u0440\u0441\u0430 \u0431\u0443\u0434\u0435\u0442 \u0441\u043f\u0438\u0441\u0430\u043d\u043e.",
+        "reset_progress_overlay_content.description_2": "\u041a\u043b\u0430\u043d \u043f\u043e\u043b\u0443\u0447\u0438\u0442 \u0440\u0435\u043c\u0440\u0435\u0441\u0443\u0440\u0441: <sparePartsHighlight>{spareParts}</sparePartsHighlight>",
+        "reset_progress_overlay_content.mismatch_progress_notification": "\u041e\u0448\u0438\u0431\u043a\u0430: \u043f\u0440\u043e\u0433\u0440\u0435\u0441\u0441 \u043a\u043b\u0430\u043d\u0430 \u0432 \u0441\u043e\u0431\u044b\u0442\u0438\u0438 \u0443\u0436\u0435 \u0441\u0431\u0440\u043e\u0448\u0435\u043d.",
+        "reset_progress_overlay_content.no_rights_notification": "\u0414\u0435\u0439\u0441\u0442\u0432\u0438\u0435 \u043d\u0435\u0434\u043e\u0441\u0442\u0443\u043f\u043d\u043e. \u041d\u0435\u0434\u043e\u0441\u0442\u0430\u0442\u043e\u0447\u043d\u043e \u043f\u043e\u043b\u043d\u043e\u043c\u043e\u0447\u0438\u0439.",
+        "reset_progress_overlay_content.not_in_clan_notification": "\u0414\u0435\u0439\u0441\u0442\u0432\u0438\u0435 \u043d\u0435\u0434\u043e\u0441\u0442\u0443\u043f\u043d\u043e. \u0412\u044b \u043d\u0435 \u0441\u043e\u0441\u0442\u043e\u0438\u0442\u0435 \u0432 \u043a\u043b\u0430\u043d\u0435.",
+        "reset_progress_overlay_content.successful_notification": "\u041f\u0440\u043e\u0433\u0440\u0435\u0441\u0441 \u043a\u043b\u0430\u043d\u0430 \u0432 \u0441\u043e\u0431\u044b\u0442\u0438\u0438 \u0441\u0431\u0440\u043e\u0448\u0435\u043d.",
+        "reset_progress_overlay_content.title": "\u0421\u0431\u0440\u043e\u0441\u0438\u0442\u044c \u043f\u0440\u043e\u0433\u0440\u0435\u0441\u0441?",
+        "reset_progress_overlay_content.unknown_notification": "\u041e\u0448\u0438\u0431\u043a\u0430: \u043d\u0435 \u0443\u0434\u0430\u043b\u043e\u0441\u044c \u0441\u043e\u0432\u0435\u0440\u0448\u0438\u0442\u044c \u0434\u0435\u0439\u0441\u0442\u0432\u0438\u0435.",
+    },
+}
+
+_RESET_SEND = False   # step 1: the confirm button only logs, nothing is sent to the server
+
+
+def _resetTexts():
+    return _RESET_TEXTS.get(_lang()) or _RESET_TEXTS['en']
+
+
+def _gateway():
+    from skeletons.gui.web import IWebController
+    webCtrl = dependency.instance(IWebController)
+    requester = webCtrl.getWebRequester()
+    source = getattr(requester, 'data_source', None)
+    if source is None or not hasattr(source, '_request_data'):
+        raise RuntimeError('no WGCG gateway (web controller state %r)' % (webCtrl.getStateID(),))
+    return source
+
+
+def _gatewayRequest(url, callback, method='GET', postData=None):
+    # callback(ok, data): data = JSON answer, or WG's error data ({'title': ..., 'description': ...})
+    def done(data, status, code, headers=None):
+        ok = code is not None and 200 <= int(code) < 300
+        try:
+            callback(ok, data if data is not None else {}, code)
+        except Exception:
+            _logger.exception('gateway callback %s failed', url)
+    kwargs = {'method': method}
+    if postData is not None:
+        kwargs['post_data'] = postData
+    _gateway()._request_data(done, url, **kwargs)
+
+
+class _EventReset(object):
+    # loads what WG's event page shows for its reset button: settings (roles, event dates),
+    # the player's clan role, the clan's stage / repair parts / reward for the reset
+
+    def __init__(self, onChanged):
+        self._onChanged = onChanged
+        self._raw = {}
+        self._loading = 0
+        self.info = None
+        self.busy = False
+
+    def load(self):
+        self._raw = {}
+        self._loading = 3
+        for key, url in (('settings', '/wgshevents/settings'), ('account', '/wgshevents/account/info'),
+                         ('clan', '/wgshevents/clan/info')):
+            try:
+                _gatewayRequest(url, self.__answer(key))
+            except Exception:
+                _logger.exception('event reset: request %s failed', url)
+                self._loading -= 1
+
+    def __answer(self, key):
+        def answer(ok, data, code):
+            self._raw[key] = data if ok else None
+            if DEV:
+                _logger.info('event reset: %s -> %s %s', key, code, json.dumps(data)[:1500])
+            self._loading -= 1
+            if self._loading <= 0:
+                self.info = self.__build()
+                _logger.info('event reset: %s', self.info and dict((k, v) for k, v in self.info.items() if k != 'texts'))
+                self._onChanged()
+        return answer
+
+    def __build(self):
+        settings = self._raw.get('settings') or {}
+        account = self._raw.get('account') or {}
+        clan = self._raw.get('clan') or {}
+        config = settings.get('event_config') or {}
+        if not config or not clan:
+            return None
+        roles = config.get('reset_progress_roles') or []
+        role = account.get('role')
+        now = time.time()
+        start, end = config.get('event_start_date') or 0, config.get('event_end_date') or 0
+        texts = _resetTexts()
+        return {
+            'visible': bool(account.get('clan_id')) and role is not None and role in roles,
+            'active': bool(start and end and start <= now < end),
+            'role': role,
+            'stage': clan.get('progress_stage') or 0,
+            'spareParts': clan.get('spare_parts') or 0,
+            'reward': (clan.get('current_stage') or {}).get('spare_parts_reward_for_reset') or 0,
+            'busy': self.busy,
+            'texts': texts,
+        }
+
+    def reset(self, done):
+        # done(textKey): WG's notification text for the answer
+        info = self.info
+        if info is None or self.busy:
+            return
+        stage = info['stage']
+        if not _RESET_SEND:
+            _logger.info('event reset: TEST, would send PATCH /wgshevents/clan/reset_progress progress_stage=%s', stage)
+            done(None)
+            return
+        self.busy = True
+
+        def answer(ok, data, code):
+            self.busy = False
+            _logger.info('event reset: answer %s %s', code, json.dumps(data)[:500])
+            title = (data or {}).get('title') if not ok else None
+            if ok:
+                done('reset_progress_overlay_content.successful_notification')
+            elif title == 'AccountNotInClan':
+                done('reset_progress_overlay_content.not_in_clan_notification')
+            elif title == 'AccountDoesNotHavePermissions':
+                done('reset_progress_overlay_content.no_rights_notification')
+            elif title == 'ClanProgressStageMismatch':
+                done('reset_progress_overlay_content.mismatch_progress_notification')
+            else:
+                done('reset_progress_overlay_content.unknown_notification')
+            self.load()
+        _gatewayRequest('/wgshevents/clan/reset_progress', answer, method='PATCH', postData={'progress_stage': stage})
 
 
 def _configureTips():
@@ -604,6 +865,7 @@ class EzRoomView(ViewImpl):
         self._vehiclesInSlotFilters = {}
         self._candidatesDP = None
         self._finalized = False
+        self._eventReset = _EventReset(self.__onEventResetChanged)
 
     @property
     def viewModel(self):
@@ -633,6 +895,25 @@ class EzRoomView(ViewImpl):
     def _onLoaded(self, *args, **kwargs):
         super(EzRoomView, self)._onLoaded(*args, **kwargs)
         self._placeWindow()
+        try:
+            self._eventReset.load()
+        except Exception:
+            _logger.exception('event reset: loading failed')
+
+    def __onEventResetChanged(self):
+        if not self._finalized:
+            self._push()
+
+    def __onEventResetDone(self, key):
+        from gui import SystemMessages
+        if key is None:
+            SystemMessages.pushMessage(u'EZ ROOM Test: Fortschritt NICHT zur\xfcckgesetzt (nichts gesendet).',
+                                       type=SystemMessages.SM_TYPE.Information)
+            return
+        text = _resetTexts().get(key, key)
+        ok = key.endswith('successful_notification')
+        # WG's page: success = WARNING notification, errors = ERRORSIMPLE
+        SystemMessages.pushMessage(text, type=SystemMessages.SM_TYPE.Warning if ok else SystemMessages.SM_TYPE.Error)
 
     def _start(self):
         entity = roomEntity()
@@ -1426,6 +1707,7 @@ class EzRoomView(ViewImpl):
             'passive': self._passive is not None,
             'session': self._sessionInfo(room),
             'reserveOptions': None,
+            'eventReset': self._eventReset.info,
             'settings': settings,
         }
         if self._reserveSlot >= 0:
@@ -1703,6 +1985,8 @@ class EzRoomView(ViewImpl):
             self._whileWgWindow(self._openInvites)
         elif action == 'configure':
             self._whileWgWindow(self._openConfigure)
+        elif action == 'eventReset':
+            self._eventReset.reset(self.__onEventResetDone)
         elif action == 'searchCancel':
             # StrongholdBattleRoomWindow.autoSearchCancel
             if self._search is not None and entity.inPlayersMatchingMode():
