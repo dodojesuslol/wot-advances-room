@@ -27,7 +27,7 @@ from helpers.i18n import makeString
 from adisp import adisp_process
 from skeletons.gui.impl import IGuiLoader
 
-__version__ = '0.8.8'
+__version__ = '0.8.9'
 _logger = logging.getLogger('EZ_ROOM')
 _logger.setLevel(logging.INFO)
 _LAYOUT_PATH = ('ez_room', 'views', 'EzRoomView')
@@ -442,9 +442,6 @@ _RESET_TEXTS = {
     },
 }
 
-_RESET_SEND = False   # step 1: the confirm button only logs, nothing is sent to the server
-
-
 def _resetTexts():
     return _RESET_TEXTS.get(_lang()) or _RESET_TEXTS['en']
 
@@ -462,7 +459,8 @@ def _gateway():
 def _gatewayRequest(url, callback, method='GET', postData=None):
     # callback(ok, data): data = JSON answer, or WG's error data ({'title': ..., 'description': ...})
     def done(data, status, code, headers=None):
-        ok = code is not None and 200 <= int(code) < 300
+        # success: (data, http status, ResponseCodes.NO_ERRORS = 0); error: (error data, http, http)
+        ok = code == 0 or (code is not None and 200 <= int(code) < 300)
         try:
             callback(ok, data if data is not None else {}, code)
         except Exception:
@@ -536,11 +534,10 @@ class _EventReset(object):
         if info is None or self.busy:
             return
         stage = info['stage']
-        if not _RESET_SEND:
-            _logger.info('event reset: TEST, would send PATCH /wgshevents/clan/reset_progress progress_stage=%s', stage)
-            done(None)
-            return
+        _logger.info('event reset: PATCH /wgshevents/clan/reset_progress progress_stage=%s', stage)
         self.busy = True
+        info['busy'] = True
+        self._onChanged()
 
         def answer(ok, data, code):
             self.busy = False
@@ -906,10 +903,6 @@ class EzRoomView(ViewImpl):
 
     def __onEventResetDone(self, key):
         from gui import SystemMessages
-        if key is None:
-            SystemMessages.pushMessage(u'EZ ROOM Test: Fortschritt NICHT zur\xfcckgesetzt (nichts gesendet).',
-                                       type=SystemMessages.SM_TYPE.Information)
-            return
         text = _resetTexts().get(key, key)
         ok = key.endswith('successful_notification')
         # WG's page: success = WARNING notification, errors = ERRORSIMPLE

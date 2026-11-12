@@ -129,6 +129,7 @@ Legende: ✅ vorhanden · 🟡 teilweise · ❌ fehlt · 🚫 bewusst weggelasse
 | G4 | README / Release auf GitHub (Konto dodojesuslol, kein Klarname!) | ❌ |
 | G5 | Dev-Modus vor Release aus (`mods/configs/ez_room/dev.json` löschen) | ❌ |
 | G6 | Zurück zu EZ ROOM ohne Mods-Liste | 🚫 | v0.8.0: kleiner „EZ ROOM“-Knopf über WGs Fenster entfällt (brauchte Abfrage der Fensterposition); zurück über die Mods-Liste |
+| G7 | Fortschritt des Manövers zurücksetzen (Clan → Manöver, unten rechts) | 🟡 | v0.8.9 (im Spiel noch nicht ausgelöst): Knopf unter „Konfigurieren“ nur für `reset_progress_roles` (commander, executive_officer, personnel_officer, combat_officer); WGs Rückfrage-Texte aus dem Web-Cache; `PATCH /wgshevents/clan/reset_progress {"progress_stage": n}` über `IWebController.getWebRequester().data_source._request_data` |
 
 ## Empfohlene Reihenfolge
 
