@@ -42,6 +42,15 @@ _PANEL_W, _PANEL_H = 1038, 707  # size of the room panel (same as WG's whole roo
 # set by the loader in dev mode: contents of dev.json ({'src': 'X:/.../src', ...})
 DEV = None
 
+
+def _devFlag(name):
+    # dev.json is read fresh here, so flags can be switched without a restart
+    try:
+        with open(os.path.join('mods', 'configs', 'ez_room', 'dev.json')) as f:
+            return bool(json.load(f).get(name))
+    except Exception:
+        return False
+
 _settings = None  # cache of settings.json (read once, then only written)
 
 
@@ -912,6 +921,10 @@ class EzRoomView(ViewImpl):
     def _onLoaded(self, *args, **kwargs):
         super(EzRoomView, self)._onLoaded(*args, **kwargs)
         self._placeWindow()
+        if DEV and _devFlag('simulateAutoReady'):
+            # dev test: behave as if the player just came back from a stronghold battle
+            _logger.info('auto ready: DEV simulation, acting as back from a battle')
+            self._state['autoReady'] = {'since': None, 'tried': 0.0}
         try:
             self._eventReset.load()
         except Exception:
@@ -1774,6 +1787,10 @@ class EzRoomView(ViewImpl):
                 return
             result = entity.canPlayerDoAction()
             if not getattr(result, 'isValid', result):
+                reason = getattr(result, 'restriction', result)
+                if pending.get('reason') != reason:
+                    pending['reason'] = reason
+                    _logger.info('auto ready: waiting, WG says %r', reason)
                 return
             pending['tried'] = now
             _logger.info('auto ready: setting the player ready after the battle')
