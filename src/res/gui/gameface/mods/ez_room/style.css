@@ -418,6 +418,15 @@ body {
 }
 .readybar .state { max-width: 100%; margin-bottom: 4rem; color: #ff2717; font-size: 12rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .readybar .state.hint { color: #80d43a; }
+.readybar { position: relative; }
+.autoready { position: absolute; right: 10rem; bottom: 9rem; display: flex; flex-direction: row; align-items: center; color: #8c8c7e; font-size: 11rem; cursor: pointer; }
+.autoready:hover { color: #e9e2bf; }
+.autoready .chk { box-sizing: border-box; width: 12rem; height: 12rem; margin-right: 5rem; padding: 2rem; border: 1rem solid #595950; background-color: rgba(18, 17, 13, 0.55); }
+.autoready .chk .dot { width: 6rem; height: 6rem; }
+.autoready.on .chk .dot { background-color: #ee7000; }
+.autoready.on { color: #ffdd99; }
+.autoready.on .chk { border-color: #ee7000; }
+
 .btn.readybtn {
     margin-left: 0;
     min-width: 150rem;

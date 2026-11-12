@@ -27,7 +27,7 @@ from helpers.i18n import makeString
 from adisp import adisp_process
 from skeletons.gui.impl import IGuiLoader
 
-__version__ = '0.8.11'
+__version__ = '0.8.12'
 _logger = logging.getLogger('EZ_ROOM')
 _logger.setLevel(logging.INFO)
 _LAYOUT_PATH = ('ez_room', 'views', 'EzRoomView')
@@ -304,6 +304,8 @@ def _divisionTip():
 # {"progress_stage": <current stage>} to the WGCG gateway. The client's own gateway accessor
 # (IWebController.getWebRequester().data_source, used for wgsh_event_unfreeze_vehicle) carries the
 # host and the session cookie, so the room uses it the same way. Texts are WG's web locale.
+_AUTO_READY_WINDOW = 90.0  # s after coming back from the battle
+
 _RESET_TEXTS = {
     'de': {
         "main_page.header_title": "MAN\u00d6VER",
@@ -1719,6 +1721,7 @@ class EzRoomView(ViewImpl):
             'session': self._sessionInfo(room),
             'reserveOptions': None,
             'eventReset': self._eventReset.info,
+            'autoReady': bool(settings.get('autoReady', True)),
             'settings': settings,
         }
         if self._reserveSlot >= 0:
@@ -1731,11 +1734,51 @@ class EzRoomView(ViewImpl):
             data['raw'] = {'calls': dict(self._parts, header=self._header), 'slotCalls': {}}
         return _clean(data)
 
+    def _autoReady(self):
+        # own extension: back from a stronghold battle, set the player ready once, like his own
+        # click on "Ready" (WG's togglePlayerReadyAction, only own slot - WG has no ready for others)
+        pending = self._state.get('autoReady')
+        if not pending or self._finalized:
+            return
+        if not loadSettings().get('autoReady', True):
+            self._state['autoReady'] = None
+            return
+        entity = roomEntity()
+        if entity is None:
+            return
+        try:
+            now = time.time()
+            if entity.getFlags().isInArena() or entity.getPlayerInfo().isInArena():
+                return
+            if pending['since'] is None:
+                pending['since'] = now
+            if now - pending['since'] > _AUTO_READY_WINDOW:
+                _logger.info('auto ready: gave up (%s s)', _AUTO_READY_WINDOW)
+                self._state['autoReady'] = None
+                return
+            info = entity.getPlayerInfo()
+            if info.isReady or info.isCommander():
+                # the commander presses his button himself (reset, then into the battle)
+                self._state['autoReady'] = None
+                return
+            if now - pending['tried'] < 2.0 or self._readyCoolDown() > 0:
+                return
+            result = entity.canPlayerDoAction()
+            if not getattr(result, 'isValid', result):
+                return
+            pending['tried'] = now
+            _logger.info('auto ready: setting the player ready after the battle')
+            entity.togglePlayerReadyAction(False)
+        except Exception:
+            _logger.exception('auto ready failed')
+            self._state['autoReady'] = None
+
     def _push(self, force=False):
         # sends the data to the web UI, only when it changed (the timer and the search seconds
         # count in the UI itself; they only count as a change when they jump)
         if self._finalized:
             return
+        self._autoReady()
         try:
             data = self._pack()
             keyData = dict(data, timer=bool(data['timer']), timerAge=None, readyCoolDown=None,
@@ -1774,6 +1817,7 @@ class EzRoomView(ViewImpl):
             self._onTimer(event.ctx)
         except Exception:
             _logger.exception('timer event failed')
+        self._autoReady()
 
     def _onTimer(self, data):
         # StrongholdBattleRoom._onMatchmakingTimerChanged + StrongholdBattleRoomWindow._onMatchmakingTimerChanged
@@ -1898,6 +1942,11 @@ class EzRoomView(ViewImpl):
         elif action == 'wgRoom':
             # fallback on purpose: WG's own room for this room (the mods list brings EZ ROOM back)
             self._fallback('user')
+        elif action == 'autoReady':
+            settings = loadSettings()
+            settings['autoReady'] = not settings.get('autoReady', True)
+            saveSettings(settings)
+            self._push(force=True)
         elif action == 'savePos':
             settings = loadSettings()
             settings['pos'] = [int(args.get('x') or 0), int(args.get('y') or 0)]
@@ -2319,6 +2368,9 @@ def onAvatarReady(state):
     session = state.get('session')
     player = BigWorld.player()
     arena = getattr(player, 'arena', None)
+    if arena is not None and _isStrongholdBattle(arena.bonusType):
+        # "ready after the battle": back in the room the player is set ready once (EzRoomView._autoReady)
+        state['autoReady'] = {'since': None, 'tried': 0.0}
     if session is None or arena is None or not _isStrongholdBattle(arena.bonusType):
         return
     arenaUniqueID = player.arenaUniqueID
