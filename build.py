@@ -1,11 +1,11 @@
-# Build: python3 build.py  -> dist/ez.advances_room_<ver>.wotmod
+# Build: python3 build.py  -> dist/EZ_ROOM_<ver>.wotmod
 # .py files under src/res are compiled with python2.7 and shipped as .pyc only.
 import os, re, subprocess, zipfile
 root = os.path.dirname(os.path.abspath(__file__))
 src = os.path.join(root, 'src')
 ver = re.search(r'<version>(.*?)</version>', open(os.path.join(src, 'meta.xml')).read()).group(1)
 os.makedirs(os.path.join(root, 'dist'), exist_ok=True)
-out = os.path.join(root, 'dist', 'ez.advances_room_%s.wotmod' % ver)
+out = os.path.join(root, 'dist', 'EZ_ROOM_%s.wotmod' % ver)
 files, dirs = [], set()
 for base, _, names in os.walk(os.path.join(src, 'res')):
     for name in sorted(names):

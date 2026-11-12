@@ -13,9 +13,9 @@ Languages: English, Deutsch, Polski, Čeština, Français, Español, Italiano, T
 ## Install
 
 1. Download `EZ_ROOM_<version>.zip` from [Releases](../../releases) and unzip it.
-2. Put `ez.advances_room_<version>.wotmod` into `<WoT folder>\mods\<game version>\`
+2. Put `EZ_ROOM_<version>.wotmod` into `<WoT folder>\mods\<game version>\`
    (e.g. `C:\Games\World_of_Tanks_EU\mods\2.4.1.1\`).
-3. Delete any older `ez.advances_room_*.wotmod` there (two versions make the client hang on start).
+3. Delete any older `EZ_ROOM_*.wotmod` and `ez.advances_room_*.wotmod` files there (two versions make the client hang on start).
 4. Start the game. The zip contains the same guide as `README.txt` (EN) and `LIESMICH.txt` (DE).
 
 `EZ_ROOM_<version>_DEV.zip` is the same mod plus dev mode: also copy its `mods\configs\ez_room\`
@@ -55,7 +55,7 @@ folder into the WoT folder (raw data view, F5 reload of the UI from `mods\config
 
 ## Development
 
-- Build: `python3 build.py` -> `dist/ez.advances_room_<ver>.wotmod` (needs `python2.7` for the .pyc files)
+- Build: `python3 build.py` -> `dist/EZ_ROOM_<ver>.wotmod` (needs `python2.7` for the .pyc files)
 - Dev mode: `<game>/mods/configs/ez_room/dev.json` = `{"src": "X:/path/to/wot-advances-room/src"}`;
   impl.py / app.js / style.css are reloaded on every open, F5 in the room reopens it, and the
   last room state is written to `mods/configs/ez_room/last_room.json`.

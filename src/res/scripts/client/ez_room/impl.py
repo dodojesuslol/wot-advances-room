@@ -27,7 +27,7 @@ from helpers.i18n import makeString
 from adisp import adisp_process
 from skeletons.gui.impl import IGuiLoader
 
-__version__ = '0.8.13'
+__version__ = '0.8.14'
 _logger = logging.getLogger('EZ_ROOM')
 _logger.setLevel(logging.INFO)
 _LAYOUT_PATH = ('ez_room', 'views', 'EzRoomView')
@@ -971,6 +971,7 @@ class EzRoomView(ViewImpl):
         self._build()
 
     def _listenAll(self, on):
+        # every (un)subscription is its own step: an error in one does not skip the others
         from CurrentVehicle import g_currentVehicle
         from gui.shared import events, g_eventBus
         from gui.shared.event_bus import EVENT_BUS_SCOPE
@@ -978,35 +979,43 @@ class EzRoomView(ViewImpl):
         from skeletons.gui.shared import IItemsCache
         from skeletons.account_helpers.settings_core import ISettingsCore
         bus = (g_eventBus.addListener if on else g_eventBus.removeListener)
-        bus(events.StrongholdEvent.STRONGHOLD_ON_TIMER, self.__onTimer, scope=EVENT_BUS_SCOPE.STRONGHOLD)
-        bus(events.CoolDownEvent.PREBATTLE, self.__onCoolDown, scope=EVENT_BUS_SCOPE.LOBBY)
-        bus(events.FightButtonEvent.FIGHT_BUTTON_UPDATE, self.__onAnyChange, scope=EVENT_BUS_SCOPE.LOBBY)
-        bus(events.HideWindowEvent.HIDE_UNIT_WINDOW, self.__onHideUnitWindow, scope=EVENT_BUS_SCOPE.LOBBY)
-        # vehicle chosen in WG's selector or EZ TANK PICKER (both fire this, DEFAULT scope)
-        bus(events.CSVehicleSelectEvent.VEHICLE_SELECTED, self.__onVehicleSelected)
+        steps = [
+            (bus, events.StrongholdEvent.STRONGHOLD_ON_TIMER, self.__onTimer, EVENT_BUS_SCOPE.STRONGHOLD),
+            (bus, events.CoolDownEvent.PREBATTLE, self.__onCoolDown, EVENT_BUS_SCOPE.LOBBY),
+            (bus, events.FightButtonEvent.FIGHT_BUTTON_UPDATE, self.__onAnyChange, EVENT_BUS_SCOPE.LOBBY),
+            (bus, events.HideWindowEvent.HIDE_UNIT_WINDOW, self.__onHideUnitWindow, EVENT_BUS_SCOPE.LOBBY),
+            # vehicle chosen in WG's selector or EZ TANK PICKER (both fire this, DEFAULT scope)
+            (bus, events.CSVehicleSelectEvent.VEHICLE_SELECTED, self.__onVehicleSelected, None),
+        ]
+        for fn, name, handler, scope in steps:
+            try:
+                if scope is None:
+                    fn(name, handler)
+                else:
+                    fn(name, handler, scope=scope)
+            except Exception:
+                _logger.exception('event bus %s %s failed', 'add' if on else 'remove', name)
         users = g_messengerEvents.users
         voip = g_messengerEvents.voip
         itemsCache = dependency.instance(IItemsCache)
         settingsCore = dependency.instance(ISettingsCore)
         wm = dependency.instance(IGuiLoader).windowsManager
-        if on:
-            g_currentVehicle.onChanged += self.__onAnyChange
-            itemsCache.onSyncCompleted += self.__onCacheResync
-            users.onUsersListReceived += self.__onAnyChange
-            users.onUserActionReceived += self.__onUserChange
-            users.onUserStatusUpdated += self.__onAnyChange
-            voip.onPlayerSpeaking += self.__onPlayerSpeaking
-            settingsCore.onSettingsChanged += self.__onAnyChange
-            wm.onWindowStatusChanged += self.__onWindowStatus
-        else:
-            g_currentVehicle.onChanged -= self.__onAnyChange
-            itemsCache.onSyncCompleted -= self.__onCacheResync
-            users.onUsersListReceived -= self.__onAnyChange
-            users.onUserActionReceived -= self.__onUserChange
-            users.onUserStatusUpdated -= self.__onAnyChange
-            voip.onPlayerSpeaking -= self.__onPlayerSpeaking
-            settingsCore.onSettingsChanged -= self.__onAnyChange
-            wm.onWindowStatusChanged -= self.__onWindowStatus
+        for owner, attr, handler in ((g_currentVehicle, 'onChanged', self.__onAnyChange),
+                                     (itemsCache, 'onSyncCompleted', self.__onCacheResync),
+                                     (users, 'onUsersListReceived', self.__onAnyChange),
+                                     (users, 'onUserActionReceived', self.__onUserChange),
+                                     (users, 'onUserStatusUpdated', self.__onAnyChange),
+                                     (voip, 'onPlayerSpeaking', self.__onPlayerSpeaking),
+                                     (settingsCore, 'onSettingsChanged', self.__onAnyChange),
+                                     (wm, 'onWindowStatusChanged', self.__onWindowStatus)):
+            try:
+                event = getattr(owner, attr)
+                if on:
+                    event += handler
+                else:
+                    event -= handler
+            except Exception:
+                _logger.exception('%s %s failed', 'subscribing' if on else 'unsubscribing', attr)
 
     def _finalize(self):
         self._finalized = True
@@ -1016,9 +1025,9 @@ class EzRoomView(ViewImpl):
                 dispatcher = _dispatcher()
                 if dispatcher is not None:
                     dispatcher.removeListener(self._listener)
-            self._listenAll(False)
         except Exception:
-            _logger.exception('unsubscribing failed')
+            _logger.exception('removing the prb listener failed')
+        self._listenAll(False)
         try:
             if self._chat is not None:
                 self._chat.alive = False
@@ -2321,6 +2330,13 @@ def _openWindow(state):
         _loadWindow(state)
     except Exception:
         _logger.exception('opening the room window failed')
+        window = state.get('window')
+        if window is not None:
+            # a partially opened window is destroyed before it is forgotten
+            try:
+                window.destroy()
+            except Exception:
+                _logger.exception('destroying the failed room window failed')
         state['window'] = None
         fallback = state.get('fallback')
         if fallback is not None:
