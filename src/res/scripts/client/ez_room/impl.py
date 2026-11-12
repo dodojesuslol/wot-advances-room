@@ -27,7 +27,7 @@ from helpers.i18n import makeString
 from adisp import adisp_process
 from skeletons.gui.impl import IGuiLoader
 
-__version__ = '0.8.12'
+__version__ = '0.8.13'
 _logger = logging.getLogger('EZ_ROOM')
 _logger.setLevel(logging.INFO)
 _LAYOUT_PATH = ('ez_room', 'views', 'EzRoomView')
@@ -1721,7 +1721,7 @@ class EzRoomView(ViewImpl):
             'session': self._sessionInfo(room),
             'reserveOptions': None,
             'eventReset': self._eventReset.info,
-            'autoReady': bool(settings.get('autoReady', True)),
+            'autoReady': bool(settings.get('autoReady', False)),
             'settings': settings,
         }
         if self._reserveSlot >= 0:
@@ -1740,7 +1740,7 @@ class EzRoomView(ViewImpl):
         pending = self._state.get('autoReady')
         if not pending or self._finalized:
             return
-        if not loadSettings().get('autoReady', True):
+        if not loadSettings().get('autoReady', False):
             self._state['autoReady'] = None
             return
         entity = roomEntity()
@@ -1944,7 +1944,7 @@ class EzRoomView(ViewImpl):
             self._fallback('user')
         elif action == 'autoReady':
             settings = loadSettings()
-            settings['autoReady'] = not settings.get('autoReady', True)
+            settings['autoReady'] = not settings.get('autoReady', False)
             saveSettings(settings)
             self._push(force=True)
         elif action == 'savePos':
