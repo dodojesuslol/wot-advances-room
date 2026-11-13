@@ -251,7 +251,7 @@ function renderHeader() {
             <div class="center">${center}</div>
             ${showDir ? `<div class="hcenter"><div class="timer" id="timer">${esc(timerText())}</div></div>` : ""}
             ${renderReserves()}
-            ${data.dev ? `<div class="tools"><div class="btn ghost" data-act="raw">${ui.raw ? L("Raum", "Room") : L("Rohdaten", "Raw data")}</div></div>` : ""}
+            ${data.dev ? `<div class="tools">${data.testRoom ? `<div class="btn ghost" data-act="testBack">${L("Zurück aus Gefecht", "Back from battle")}</div>` : ""}<div class="btn ghost" data-act="raw">${ui.raw ? L("Raum", "Room") : L("Rohdaten", "Raw data")}</div></div>` : ""}
         </div>
         ${showDir ? `
         <div class="dirrow">
@@ -733,7 +733,7 @@ function renderReadyBar() {
         <div class="readybar">
             <div class="state ${ui.selCand ? "hint" : ""}">${esc(hint)}</div>
             <div class="btn readybtn ${ab.isEnabled ? "" : "off"} ${ab.isReady ? "unready" : "ready"}" ${ab.isEnabled ? `data-act="ready"` : ""} data-tip="${esc(ab.toolTipData || "")}">${esc(label)}</div>
-            ${isCommander() ? "" : `<div class="autoready ${data.autoReady ? "on" : ""}" data-act="autoReady" data-tip="${esc(L("Kommst du aus einem Gefecht zurück, drückt EZ ROOM für dich auf „Bereit“ (nur dein eigener Platz).", "When you come back from a battle, EZ ROOM presses \u201cReady\u201d for you (only your own slot)."))}">
+            ${isCommander() ? "" : `<div class="autoready ${data.autoReady ? "on" : ""}" data-act="autoReady" data-tip="${esc(L("Kommst du aus einem Gefecht zurück, versucht EZ ROOM bis zu 30 Sekunden lang alle 2 Sekunden, dich auf „Bereit“ zu setzen, bis das Spiel „Bereit“ meldet (nur dein eigener Platz).", "When you come back from a battle, EZ ROOM tries every 2 seconds for up to 30 seconds to set you \u201cReady\u201d until the game reports Ready (only your own slot)."))}">
                 <div class="chk"><div class="dot"></div></div><div>${L("Nach dem Gefecht bereit", "Ready after battle")}</div>
             </div>`}
         </div>`;
@@ -1554,7 +1554,7 @@ document.addEventListener("click", (e) => {
     } else if (act === "chatSend") sendChat();
     else if (act === "chooseVehicle") send({ action: "chooseVehicle", cd: Number(el.getAttribute("data-cd")) || 0 });
     else if (act === "ready" || act === "invite" || act === "toggleOpen" || act === "configure" || act === "back") send({ action: act });
-    else if (act === "autoReady") send({ action: "autoReady" });
+    else if (act === "autoReady" || act === "testBack") send({ action: act });
     else if (act === "eventResetAsk" || act === "eventResetCancel" || act === "eventResetConfirm") {
         ui.resetConfirm = act === "eventResetAsk";
         if (act === "eventResetConfirm") send({ action: "eventReset" });

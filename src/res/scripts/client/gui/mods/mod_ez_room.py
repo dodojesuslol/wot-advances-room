@@ -257,6 +257,29 @@ def _registerModsList():
             callback=_toggle)
     except Exception:
         _logger.exception('mods list entry failed')
+    if _devConfig() is None:
+        return
+    try:
+        # dev mode only: the room window with test data (no clan battle needed)
+        from gui.modsListApi import g_modsListApi
+        g_modsListApi.addModification(
+            id='ez_advances_room_test',
+            name='EZ ROOM Testraum',
+            description='DEV: EZ-ROOM-Fenster mit Testdaten, ohne Clan-Gefecht',
+            icon='gui/maps/icons/ez_room/modslist.png',
+            enabled=True,
+            login=False,
+            lobby=True,
+            callback=_openTestRoom)
+    except Exception:
+        _logger.exception('test room mods list entry failed')
+
+
+def _openTestRoom():
+    try:
+        _impl(fresh=True).showTestRoom(_state)
+    except Exception:
+        _logger.exception('opening the test room failed')
 
 
 def _install():

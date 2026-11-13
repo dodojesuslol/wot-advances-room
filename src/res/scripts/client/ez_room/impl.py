@@ -2301,16 +2301,16 @@ class EzRoomWindow(WindowImpl):
     # panel mode: plain window as big as the room panel, moved by Python
     __slots__ = ()
 
-    def __init__(self, layoutID, state):
+    def __init__(self, layoutID, state, viewClass=None):
         super(EzRoomWindow, self).__init__(
             WindowFlags.WINDOW,
-            content=EzRoomView(layoutID, state),
+            content=(viewClass or EzRoomView)(layoutID, state),
             parent=None,
             layer=WindowLayer.WINDOW,
             areaID=R.areas.default())
 
 
-def _makeFullWindow(layoutID, state):
+def _makeFullWindow(layoutID, state, viewClass=None):
     # full mode: screen-sized window on WG's room layer (WINDOW_FULLSCREEN: the game sizes it, so
     # Gameface does not have to measure it; 0.8.0-0.8.3 sized it from JS and Gameface sometimes
     # reset it after "Size calculation timeout"); transparent, only the room panel takes mouse
@@ -2321,7 +2321,7 @@ def _makeFullWindow(layoutID, state):
         __slots__ = ()
 
     return EzRoomFullWindow(wndFlags=WindowFlags.WINDOW | WindowFlags.WINDOW_FULLSCREEN,
-                            content=EzRoomView(layoutID, state), layer=WindowLayer.WINDOW)
+                            content=(viewClass or EzRoomView)(layoutID, state), layer=WindowLayer.WINDOW)
 
 
 def _layoutID():
@@ -2489,3 +2489,214 @@ def armReopen(state):
 
     wm.onWindowStatusChanged += onStatus
     state['reopenHook'] = onStatus
+
+
+# --- dev test room ----------------------------------------------------------------------------
+# Dev mode only (mods list entry "EZ ROOM Testraum"): the room window without a stronghold unit,
+# for testing when no clan battles run. Data = the last real room (last_room.json, written by the
+# dev snapshot) or a small built-in example. Nothing goes to the server: "Ready" only changes the
+# own slot here, "Reset" only shows WG's message, other room actions are only logged.
+
+_STATUS_NOT_READY, _STATUS_READY = 0, 2
+
+
+def _testExample():
+    slots = []
+    names = [u'Kommandant', u'Spieler_2', None, u'Spieler_4', None, None, u'Spieler_7']
+    for i in range(15):
+        name = names[i] if i < len(names) else None
+        player = None
+        if name:
+            player = {'clanAbbrev': u'TEST', 'dbID': 1000 + i, 'userName': name, 'fullName': name,
+                      'colors': [13347959, 8483688], 'isCommander': i == 0, 'isOffline': False,
+                      'readyState': i == 0, 'rating': u'%d' % (5000 + 97 * i)}
+        slots.append({'player': player, 'selectedVehicle': None,
+                      'playerStatus': _STATUS_READY if player and player['readyState'] else _STATUS_NOT_READY,
+                      'rating': player['rating'] if player else u'', 'isLegionaries': False, 'isClosed': False,
+                      'isLocked': False, 'slotLabel': u'', 'canBeTaken': not player})
+    return {'title': u'Vorstoß', 'slots': slots, 'candidates': [], 'chat': {'joined': True, 'lines': []},
+            'room': {'mapID': 0, 'mapName': u'', 'headerDescr': u'', 'mineClanName': u'[TEST]',
+                     'enemyClanName': u'', 'waitForBattleDescr': u''},
+            'me': {}, 'rally': {}, 'actionButton': {}}
+
+
+class EzTestRoomView(EzRoomView):
+
+    def _onLoading(self, *args, **kwargs):
+        ViewImpl._onLoading(self, *args, **kwargs)
+        self.viewModel.setDev(_devUI())
+        self._start()
+
+    def _onLoaded(self, *args, **kwargs):
+        ViewImpl._onLoaded(self, *args, **kwargs)
+        self._placeWindow()
+        try:
+            self._eventReset.load()  # read only (GET): the real stage and texts
+        except Exception:
+            _logger.exception('test room: event reset loading failed')
+
+    def _start(self):
+        data = None
+        try:
+            if os.path.isfile(_SNAPSHOT_FILE):
+                with open(_SNAPSHOT_FILE, 'rb') as f:
+                    data = json.loads(f.read().decode('utf-8'))
+                _logger.info('test room: data from %s', _SNAPSHOT_FILE)
+        except Exception:
+            _logger.exception('test room: reading %s failed, example data', _SNAPSHOT_FILE)
+            data = None
+        if not isinstance(data, dict) or not data.get('slots'):
+            data = _testExample()
+        for key in ('raw', 'timer', 'search', 'waiting', 'maintenance', 'notice', 'reserveOptions', 'eventReset'):
+            data.pop(key, None)
+        data['passive'] = False
+        # the player sits in a slot and is not the commander (so "ready after battle" can be tested)
+        slots = data['slots']
+        me = data.get('me') or {}
+        idx = me.get('slotIdx')
+        if not isinstance(idx, int) or not (0 <= idx < len(slots)) or me.get('isCommander') or not (slots[idx] or {}).get('player'):
+            idx = next((i for i, sl in enumerate(slots) if sl and sl.get('player') and not sl['player'].get('isCommander')), 1)
+            if not (slots[idx] or {}).get('player'):
+                slots[idx] = dict(slots[idx] or {}, player={'clanAbbrev': u'TEST', 'dbID': 1, 'userName': u'Ich',
+                                                         'fullName': u'Ich', 'colors': [13347959, 8483688],
+                                                         'isCommander': False, 'readyState': False}, canBeTaken=False)
+        player = slots[idx]['player']
+        player['isCommander'] = False
+        data['me'] = dict(me, dbID=player.get('dbID'), slotIdx=idx, isInSlot=True, isCommander=False, canChangeRoles=False)
+        data['rally'] = dict(data.get('rally') or {}, isCommander=False)
+        self._test = data
+        self._setReady(bool(player.get('readyState')) or slots[idx].get('playerStatus') == _STATUS_READY)
+
+    def _setReady(self, ready):
+        data = self._test
+        idx = data['me']['slotIdx']
+        slot = data['slots'][idx]
+        slot['playerStatus'] = _STATUS_READY if ready else _STATUS_NOT_READY
+        slot['player']['readyState'] = ready
+        data['me']['isReady'] = ready
+        label = makeString('#cyberSport:window/unit/notReady' if ready else '#cyberSport:window/unit/ready')
+        data['actionButton'] = dict(data.get('actionButton') or {}, isEnabled=True, isReady=ready,
+                                    label=_u(label) if not label.startswith('#') else (u'Nicht bereit' if ready else u'Bereit!'),
+                                    toolTipData=u'')
+
+    def _pack(self):
+        settings = loadSettings()
+        data = dict(self._test)
+        data.update({
+            'version': __version__,
+            'lang': _lang(),
+            'dev': True,
+            'testRoom': True,
+            'title': u'TESTRAUM · %s' % _u(self._test.get('title') or u''),
+            'mode': self._mode,
+            'pos': settings.get('pos'),
+            'settings': settings,
+            'autoReady': bool(settings.get('autoReady', False)),
+            'eventReset': self._eventReset.info,
+            'grid': self._packGrid(time.time()),
+            'highlight': [],
+            'readyCoolDown': 0,
+            'timer': None,
+            'timerAge': 0,
+            'search': None,
+            'reserveOptions': None,
+        })
+        return _clean(data)
+
+    def _autoReady(self):
+        # same steps as EzRoomView._autoReady, against the test slot
+        pending = self._state.get('testAutoReady')
+        if not pending or self._finalized:
+            return
+        if not loadSettings().get('autoReady', False):
+            self._state['testAutoReady'] = None
+            return
+        now = time.time()
+        if pending['since'] is None:
+            pending['since'] = now
+        if now - pending['since'] > _AUTO_READY_WINDOW:
+            _logger.info('test room: auto ready gave up (%s s)', _AUTO_READY_WINDOW)
+            self._state['testAutoReady'] = None
+            return
+        if self._test['me'].get('isReady'):
+            self._state['testAutoReady'] = None
+            return
+        if now - pending['tried'] < 2.0:
+            return
+        pending['tried'] = now
+        _logger.info('test room: auto ready, setting the player ready')
+        self._setReady(True)
+        self._push()
+
+    def _writeSnapshot(self):
+        self._snapshotPending = False  # the test room never overwrites the real room's snapshot
+
+    def _action(self, action, args):
+        if action in ('uiReady', 'log', 'autoReady', 'savePos', 'moveTo', 'sort', 'copyLink', 'wgTipHide'):
+            return super(EzTestRoomView, self)._action(action, args)
+        if action in ('minimize', 'close', 'back', 'wgRoom'):
+            self.close()
+        elif action == 'devReload':
+            closeTestRoom(self._state)
+            BigWorld.callback(0.1, lambda: showTestRoom(self._state))
+        elif action == 'ready':
+            self._setReady(not self._test['me'].get('isReady'))
+            self._push()
+        elif action == 'testBack':
+            # as if the player just came back from a battle: not ready, "ready after battle" starts
+            _logger.info('test room: back from a battle (autoReady %s)', bool(loadSettings().get('autoReady')))
+            self._setReady(False)
+            self._state['testAutoReady'] = {'since': None, 'tried': 0.0}
+            self._push()
+            self._autoReady()
+        elif action == 'eventReset':
+            _logger.info('test room: reset, no request')
+            self._EzRoomView__onEventResetDone('reset_progress_overlay_content.no_rights_notification')
+        else:
+            _logger.info('test room: %r only logged', args)
+
+    def close(self):
+        self._closing = True
+        window = self.getParentWindow()
+        if window is not None:
+            window.destroy()
+
+    minimize = close
+
+    def _fallback(self, reason):
+        _logger.warning('test room: %s', reason)
+
+    def _finalize(self):
+        self._finalized = True
+        self._hideWgTip()
+        if self._state.get('testWindow') is not None and self._state['testWindow'].content in (None, self):
+            self._state['testWindow'] = None
+        self._state['testAutoReady'] = None
+        _logger.info('test room closed')
+        ViewImpl._finalize(self)
+
+
+def showTestRoom(state):
+    if not DEV:
+        return
+    if state.get('testWindow') is not None:
+        return
+    layoutID = _layoutID()
+    if layoutID is None:
+        return
+    if loadSettings().get('windowMode') == 'panel':
+        window = EzRoomWindow(layoutID, state, viewClass=EzTestRoomView)
+    else:
+        window = _makeFullWindow(layoutID, state, viewClass=EzTestRoomView)
+    state['testWindow'] = window
+    window.load()
+    _logger.info('test room opened')
+
+
+def closeTestRoom(state):
+    window, state['testWindow'] = state.get('testWindow'), None
+    if window is not None:
+        try:
+            window.destroy()
+        except Exception:
+            _logger.exception('closing the test room failed')
