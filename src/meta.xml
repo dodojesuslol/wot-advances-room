@@ -1,6 +1,6 @@
 <root>
     <id>ez.advances_room</id>
-    <version>0.8.14</version>
+    <version>0.8.15</version>
     <name>EZ ROOM for ADV</name>
     <description>Own Gameface room for Stronghold / Advances battles. Replaces WG's Flash room (talks to WG's Python API directly), WG room as fallback.</description>
 </root>
