@@ -1786,6 +1786,37 @@ class EzRoomView(ViewImpl):
             data['raw'] = {'calls': dict(self._parts, header=self._header), 'slotCalls': {}}
         return _clean(data)
 
+    def _autoReadyBlocked(self, pending, now, prefix):
+        # a WG notification window (elite level reward, awards, ...) or a dialog is up: wait
+        # until it is closed, else the player goes into the battle with it open (0.8.17).
+        # Then 2 s without such a window (WG opens the next queued notification a moment
+        # after the last one closed); the 30 s only count from then. True = wait.
+        blocker = _blockingWindow(self._ownWindowID())
+        if blocker is not None:
+            if pending.get('blocker') != blocker:
+                pending['blocker'] = blocker
+                _logger.info('%s: waiting, window open: %s', prefix, blocker)
+            pending['since'] = None
+            pending['clear'] = None
+        else:
+            if pending.get('blocker'):
+                pending['blocker'] = None
+                _logger.info('%s: window closed', prefix)
+            if pending.get('clear') is None:
+                pending['clear'] = now
+            if now - pending['clear'] >= _AUTO_READY_GRACE:
+                return False
+        # check again by itself (room updates may not come while waiting)
+        if not pending.get('recheck'):
+            pending['recheck'] = True
+
+            def again():
+                pending['recheck'] = False
+                self._autoReady()
+
+            BigWorld.callback(1.0, again)
+        return True
+
     def _autoReady(self):
         # own extension: back from a stronghold battle, set the player ready once, like his own
         # click on "Ready" (WG's togglePlayerReadyAction, only own slot - WG has no ready for others)
@@ -1802,32 +1833,7 @@ class EzRoomView(ViewImpl):
             now = time.time()
             if entity.getFlags().isInArena() or entity.getPlayerInfo().isInArena():
                 return
-            # a WG notification window (elite level reward, awards, ...) or a dialog is up: wait
-            # until it is closed, else the player goes into the battle with it open (0.8.17).
-            # The 30 s only count from the moment no such window is open any more
-            blocker = _blockingWindow(self._ownWindowID())
-            if blocker is not None:
-                if pending.get('blocker') != blocker:
-                    pending['blocker'] = blocker
-                    _logger.info('auto ready: waiting, window open: %s', blocker)
-                pending['since'] = None
-                pending['clear'] = None
-                return
-            if pending.get('blocker'):
-                pending['blocker'] = None
-                _logger.info('auto ready: window closed')
-            if pending.get('clear') is None:
-                pending['clear'] = now
-            if now - pending['clear'] < _AUTO_READY_GRACE:
-                # WG opens the next queued notification a moment after the last one closed
-                if not pending.get('graceCb'):
-                    pending['graceCb'] = True
-
-                    def again():
-                        pending['graceCb'] = False
-                        self._autoReady()
-
-                    BigWorld.callback(_AUTO_READY_GRACE, again)
+            if self._autoReadyBlocked(pending, now, 'auto ready'):
                 return
             if pending['since'] is None:
                 pending['since'] = now
@@ -2696,6 +2702,8 @@ class EzTestRoomView(EzRoomView):
             self._state['testAutoReady'] = None
             return
         now = time.time()
+        if self._autoReadyBlocked(pending, now, 'test room: auto ready'):
+            return
         if pending['since'] is None:
             pending['since'] = now
         if now - pending['since'] > _AUTO_READY_WINDOW:
@@ -2733,6 +2741,18 @@ class EzTestRoomView(EzRoomView):
             self._state['testAutoReady'] = {'since': None, 'tried': 0.0}
             self._push()
             self._autoReady()
+        elif action == 'testPrestige':
+            # dev: WG's elite level reward window through WG's notification queue (only shown,
+            # nothing is sent), then back from a battle: auto ready has to wait for the window
+            from CurrentVehicle import g_currentVehicle
+            from gui.prestige.prestige_helpers import showPrestigeRewardWindow
+            vehIntCD = g_currentVehicle.item.intCD if g_currentVehicle.isPresent() else None
+            if vehIntCD is None:
+                _logger.info('test room: no vehicle selected for the elite level window')
+                return
+            _logger.info('test room: elite level reward window + back from a battle')
+            showPrestigeRewardWindow(vehIntCD, 10)
+            self._action('testBack', args)
         elif action == 'eventReset':
             _logger.info('test room: reset, no request')
             self._EzRoomView__onEventResetDone('reset_progress_overlay_content.no_rights_notification')

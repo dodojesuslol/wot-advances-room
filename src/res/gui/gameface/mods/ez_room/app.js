@@ -251,7 +251,7 @@ function renderHeader() {
             <div class="center">${center}</div>
             ${showDir ? `<div class="hcenter"><div class="timer" id="timer">${esc(timerText())}</div></div>` : ""}
             ${renderReserves()}
-            ${data.dev ? `<div class="tools">${data.testRoom ? `<div class="btn ghost" data-act="testBack">${L("Zurück aus Gefecht", "Back from battle")}</div>` : ""}<div class="btn ghost" data-act="raw">${ui.raw ? L("Raum", "Room") : L("Rohdaten", "Raw data")}</div></div>` : ""}
+            ${data.dev ? `<div class="tools">${data.testRoom ? `<div class="btn ghost" data-act="testBack">${L("Zurück aus Gefecht", "Back from battle")}</div><div class="btn ghost" data-act="testPrestige">${L("Elitestufe + zurück", "Elite level + back")}</div>` : ""}<div class="btn ghost" data-act="raw">${ui.raw ? L("Raum", "Room") : L("Rohdaten", "Raw data")}</div></div>` : ""}
         </div>
         ${showDir ? `
         <div class="dirrow">
@@ -1560,7 +1560,7 @@ document.addEventListener("click", (e) => {
     } else if (act === "chatSend") sendChat();
     else if (act === "chooseVehicle") send({ action: "chooseVehicle", cd: Number(el.getAttribute("data-cd")) || 0 });
     else if (act === "ready" || act === "invite" || act === "toggleOpen" || act === "configure" || act === "back") send({ action: act });
-    else if (act === "autoReady" || act === "testBack") send({ action: act });
+    else if (act === "autoReady" || act === "testBack" || act === "testPrestige") send({ action: act });
     else if (act === "eventResetAsk" || act === "eventResetCancel" || act === "eventResetConfirm") {
         ui.resetConfirm = act === "eventResetAsk";
         if (act === "eventResetConfirm") send({ action: "eventReset" });
