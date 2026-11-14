@@ -2320,11 +2320,19 @@ _WATCH_LAYERS = (WindowLayer.WINDOW, WindowLayer.TOP_WINDOW)
 _GONE = (WindowStatus.DESTROYING, WindowStatus.DESTROYED)
 
 
+def _windowStatus(window):
+    # a window that just came up has no status yet (windowStatus raises AttributeError)
+    try:
+        return window.windowStatus
+    except AttributeError:
+        return WindowStatus.UNDEFINED
+
+
 def _wgWindowIDs(ignoreID):
     # IDs of the open WG windows on the room's layers; closing ones are already left out
     gui = dependency.instance(IGuiLoader)
     return set(w.uniqueID for w in gui.windowsManager.findWindows(
-        lambda w: w.layer in _WATCH_LAYERS and w.uniqueID != ignoreID and w.windowStatus not in _GONE))
+        lambda w: w.layer in _WATCH_LAYERS and w.uniqueID != ignoreID and _windowStatus(w) not in _GONE))
 
 
 class EzRoomWindow(WindowImpl):

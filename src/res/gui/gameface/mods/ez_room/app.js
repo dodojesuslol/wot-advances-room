@@ -1273,8 +1273,14 @@ function updateInputArea() {
             w = c.width; h = c.height;
         } else if (!data.passive) {
             const r = panel.getBoundingClientRect();
-            if (r.width < 1 || r.height < 1) return; // mid re-render: keep the last area
-            x = r.left * s; y = r.top * s; w = r.width * s; h = r.height * s;
+            if (r.width >= 1 && r.height >= 1) {
+                x = r.left * s; y = r.top * s; w = r.width * s; h = r.height * s;
+            } else if (pos) {
+                // not laid out yet (right after a re-render, e.g. when a WG window closed): the
+                // panel sits at pos with its fixed size. Never keep the last area here, that can
+                // be the 1x1 of the passive mode (0.8.16: room dead after invites)
+                x = pos.x * s; y = pos.y * s; w = PANEL_W * s; h = PANEL_H * s;
+            } else return;
         }
         const key = [x, y, w, h].map(Math.round).join(",");
         if (key === inputAreaKey) return;
