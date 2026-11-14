@@ -24,7 +24,7 @@ const ui = {
 // text, "{0}" = a value filled in by F). Missing entries fall back to English.
 const TR = {
     pl: {
-        "Ready after battle": "Gotowy po bitwie", "When you come back from a battle, EZ ROOM presses \u201cReady\u201d for you (only your own slot).": "Gdy wrócisz z bitwy, EZ ROOM kliknie za ciebie „Gotowy” (tylko twoje miejsce).",
+        "Ready after battle": "Gotowy po bitwie", "When you come back from a battle, EZ ROOM tries every 2 seconds for up to 30 seconds to set you \u201cReady\u201d until the game reports Ready (only your own slot).": "Gdy wrócisz z bitwy, EZ ROOM co 2 sekundy przez maksymalnie 30 sekund próbuje ustawić cię na „Gotowy”, aż gra potwierdzi gotowość (tylko twoje miejsce).",
         "Battles": "Bitwy", "Wins": "Wygrane", "Victories": "Zwycięstwa", "Total": "Łącznie", "Session in this room": "Sesja w tym pokoju", "Avg. battle time": "Śr. czas bitwy",
         "Cancel": "Anuluj", "WG room": "Pokój WG",
         "Take {0} away": "Odbierz: {0}", "Give {0}": "Przydziel: {0}", "{0} players with this tank": "{0} graczy z tym czołgiem",
@@ -40,7 +40,7 @@ const TR = {
         "Rating": "Ocena", "Fold": "Zwiń", "Back to the volunteers": "Z powrotem do ochotników", "Back to the EZ ROOM view": "Powrót do widoku EZ ROOM", "Minimize": "Minimalizuj", "Close": "Zamknij",
     },
     cs: {
-        "Ready after battle": "Připraven po bitvě", "When you come back from a battle, EZ ROOM presses \u201cReady\u201d for you (only your own slot).": "Když se vrátíš z bitvy, EZ ROOM za tebe stiskne „Připraven“ (jen tvé místo).",
+        "Ready after battle": "Připraven po bitvě", "When you come back from a battle, EZ ROOM tries every 2 seconds for up to 30 seconds to set you \u201cReady\u201d until the game reports Ready (only your own slot).": "Když se vrátíš z bitvy, EZ ROOM se každé 2 sekundy po dobu až 30 sekund pokouší nastavit tě na „Připraven“, dokud hra nepotvrdí připravenost (jen tvé místo).",
         "Battles": "Bitvy", "Wins": "Výhry", "Victories": "Vítězství", "Total": "Celkem", "Session in this room": "Relace v této místnosti", "Avg. battle time": "Prům. délka bitvy",
         "Cancel": "Zrušit", "WG room": "Místnost WG",
         "Take {0} away": "Odebrat: {0}", "Give {0}": "Přidělit: {0}", "{0} players with this tank": "{0} hráčů s tímto tankem",
@@ -56,7 +56,7 @@ const TR = {
         "Rating": "Hodnocení", "Fold": "Sbalit", "Back to the volunteers": "Zpět k dobrovolníkům", "Back to the EZ ROOM view": "Zpět do zobrazení EZ ROOM", "Minimize": "Minimalizovat", "Close": "Zavřít",
     },
     fr: {
-        "Ready after battle": "Prêt après la bataille", "When you come back from a battle, EZ ROOM presses \u201cReady\u201d for you (only your own slot).": "Au retour d'une bataille, EZ ROOM clique « Prêt » pour toi (seulement ta place).",
+        "Ready after battle": "Prêt après la bataille", "When you come back from a battle, EZ ROOM tries every 2 seconds for up to 30 seconds to set you \u201cReady\u201d until the game reports Ready (only your own slot).": "Au retour d'une bataille, EZ ROOM essaie toutes les 2 secondes, pendant 30 secondes au maximum, de te mettre « Prêt » jusqu'à ce que le jeu indique Prêt (seulement ta place).",
         "Battles": "Batailles", "Wins": "Victoires", "Victories": "Victoires", "Total": "Total", "Session in this room": "Session dans ce salon", "Avg. battle time": "Durée moy. de bataille",
         "Cancel": "Annuler", "WG room": "Salon WG",
         "Take {0} away": "Retirer : {0}", "Give {0}": "Attribuer : {0}", "{0} players with this tank": "{0} joueurs avec ce char",
@@ -72,7 +72,7 @@ const TR = {
         "Rating": "Cote", "Fold": "Replier", "Back to the volunteers": "Retour aux volontaires", "Back to the EZ ROOM view": "Retour à la vue EZ ROOM", "Minimize": "Réduire", "Close": "Fermer",
     },
     es: {
-        "Ready after battle": "Listo tras la batalla", "When you come back from a battle, EZ ROOM presses \u201cReady\u201d for you (only your own slot).": "Al volver de una batalla, EZ ROOM pulsa «Listo» por ti (solo tu puesto).",
+        "Ready after battle": "Listo tras la batalla", "When you come back from a battle, EZ ROOM tries every 2 seconds for up to 30 seconds to set you \u201cReady\u201d until the game reports Ready (only your own slot).": "Al volver de una batalla, EZ ROOM intenta cada 2 segundos, durante un máximo de 30 segundos, ponerte en «Listo» hasta que el juego indique Listo (solo tu puesto).",
         "Battles": "Batallas", "Wins": "Victorias", "Victories": "Victorias", "Total": "Total", "Session in this room": "Sesión en esta sala", "Avg. battle time": "Duración media",
         "Cancel": "Cancelar", "WG room": "Sala WG",
         "Take {0} away": "Quitar: {0}", "Give {0}": "Asignar: {0}", "{0} players with this tank": "{0} jugadores con este tanque",
@@ -88,7 +88,7 @@ const TR = {
         "Rating": "Índice", "Fold": "Contraer", "Back to the volunteers": "Volver a los voluntarios", "Back to the EZ ROOM view": "Volver a la vista EZ ROOM", "Minimize": "Minimizar", "Close": "Cerrar",
     },
     it: {
-        "Ready after battle": "Pronto dopo la battaglia", "When you come back from a battle, EZ ROOM presses \u201cReady\u201d for you (only your own slot).": "Quando torni da una battaglia, EZ ROOM preme «Pronto» per te (solo il tuo posto).",
+        "Ready after battle": "Pronto dopo la battaglia", "When you come back from a battle, EZ ROOM tries every 2 seconds for up to 30 seconds to set you \u201cReady\u201d until the game reports Ready (only your own slot).": "Quando torni da una battaglia, EZ ROOM prova ogni 2 secondi, per un massimo di 30 secondi, a impostarti su «Pronto» finché il gioco non segnala Pronto (solo il tuo posto).",
         "Battles": "Battaglie", "Wins": "Vittorie", "Victories": "Vittorie", "Total": "Totale", "Session in this room": "Sessione in questa stanza", "Avg. battle time": "Durata media",
         "Cancel": "Annulla", "WG room": "Stanza WG",
         "Take {0} away": "Revoca: {0}", "Give {0}": "Assegna: {0}", "{0} players with this tank": "{0} giocatori con questo carro",
@@ -104,7 +104,7 @@ const TR = {
         "Rating": "Valutazione", "Fold": "Comprimi", "Back to the volunteers": "Torna ai volontari", "Back to the EZ ROOM view": "Torna alla vista EZ ROOM", "Minimize": "Riduci a icona", "Close": "Chiudi",
     },
     tr: {
-        "Ready after battle": "Savaştan sonra hazır", "When you come back from a battle, EZ ROOM presses \u201cReady\u201d for you (only your own slot).": "Bir savaştan döndüğünde EZ ROOM senin için “Hazır”a basar (sadece kendi yerin).",
+        "Ready after battle": "Savaştan sonra hazır", "When you come back from a battle, EZ ROOM tries every 2 seconds for up to 30 seconds to set you \u201cReady\u201d until the game reports Ready (only your own slot).": "Bir savaştan döndüğünde EZ ROOM, oyun Hazır durumunu bildirene kadar en fazla 30 saniye boyunca her 2 saniyede bir seni “Hazır” yapmayı dener (sadece kendi yerin).",
         "Battles": "Savaşlar", "Wins": "Galibiyet", "Victories": "Zaferler", "Total": "Toplam", "Session in this room": "Bu odadaki oturum", "Avg. battle time": "Ort. savaş süresi",
         "Cancel": "İptal", "WG room": "WG odası",
         "Take {0} away": "Geri al: {0}", "Give {0}": "Ver: {0}", "{0} players with this tank": "Bu tankla {0} oyuncu",
@@ -120,7 +120,7 @@ const TR = {
         "Rating": "Derece", "Fold": "Daralt", "Back to the volunteers": "Gönüllülere geri", "Back to the EZ ROOM view": "EZ ROOM görünümüne dön", "Minimize": "Simge durumuna küçült", "Close": "Kapat",
     },
     ru: {
-        "Ready after battle": "Готов после боя", "When you come back from a battle, EZ ROOM presses \u201cReady\u201d for you (only your own slot).": "Когда ты вернёшься из боя, EZ ROOM нажмёт за тебя «Готов» (только твоё место).",
+        "Ready after battle": "Готов после боя", "When you come back from a battle, EZ ROOM tries every 2 seconds for up to 30 seconds to set you \u201cReady\u201d until the game reports Ready (only your own slot).": "Когда ты вернёшься из боя, EZ ROOM каждые 2 секунды в течение до 30 секунд пытается поставить тебя в «Готов», пока игра не подтвердит готовность (только твоё место).",
         "Battles": "Бои", "Wins": "Победы", "Victories": "Победы", "Total": "Всего", "Session in this room": "Сессия в этой комнате", "Avg. battle time": "Ср. длительность боя",
         "Cancel": "Отмена", "WG room": "Комната WG",
         "Take {0} away": "Забрать: {0}", "Give {0}": "Назначить: {0}", "{0} players with this tank": "Игроков с этим танком: {0}",
