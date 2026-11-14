@@ -15,7 +15,7 @@ import weakref
 
 import BigWorld
 import Event
-from frameworks.wulf import ViewFlags, ViewModel, ViewSettings, WindowFlags, WindowLayer
+from frameworks.wulf import ViewFlags, ViewModel, ViewSettings, WindowFlags, WindowLayer, WindowStatus
 from gui.impl.gen import R
 from gui.impl.pub import ViewImpl
 from gui.impl.pub.window_impl import WindowImpl
@@ -1285,20 +1285,36 @@ class EzRoomView(ViewImpl):
             _logger.exception('cache resync failed')
 
     def __onWindowStatus(self, uniqueID, newStatus):
-        # a WG Flash window opened from the room (invites, configure) went away: panel back
+        # a WG Flash window opened from the room (invites, configure) went away: panel back.
+        # WG fires the last status of a closing window while the window is still listed, so
+        # check now and once more in the next frame, when WG has removed it
+        if self._passive is None:
+            return
+        self._checkPassive()
+        BigWorld.callback(0.0, self._checkPassive)
+
+    def _checkPassive(self):
+        # passive ends when every window that came up after the click is gone again; windows
+        # that were open before (or close meanwhile) don't count (0.8.16: counting them left
+        # the room hidden after invites until minimize + reopen)
         passive = self._passive
-        if passive is None:
+        if passive is None or self._finalized:
             return
         try:
-            count = _wgWindowCount(self._ownWindowID())
+            alive = _wgWindowIDs(self._ownWindowID())
         except Exception:
-            _logger.exception('counting windows failed')
+            _logger.exception('listing windows failed')
             return
-        if count > passive['baseline']:
-            passive['seen'] = True
-        elif passive['seen'] and count <= passive['baseline']:
-            self._passive = None
-            self._push(force=True)
+        passive['new'] |= alive - passive['before']
+        if passive['new'] and not passive['new'] & alive:
+            self._endPassive('WG window closed')
+
+    def _endPassive(self, reason):
+        if self._passive is None:
+            return
+        self._passive = None
+        _logger.info('passive off: %s', reason)
+        self._push(force=True)
 
     def _ownWindowID(self):
         window = self.getParentWindow()
@@ -2248,24 +2264,33 @@ class EzRoomView(ViewImpl):
 
     def _whileWgWindow(self, opener):
         # WG's Flash windows (invites, configure) open on the same layer as the room: the panel is
-        # hidden while one is up and comes back when it closes (window status events, no polling)
+        # hidden while one is up and comes back when it closes (window status events, plus a
+        # check every second as a safety net in case an event never comes)
         try:
-            baseline = _wgWindowCount(self._ownWindowID())
+            before = _wgWindowIDs(self._ownWindowID())
         except Exception:
-            _logger.exception('counting windows failed')
+            _logger.exception('listing windows failed')
             opener()
             return
-        self._passive = {'baseline': baseline, 'seen': False}
+        passive = self._passive = {'before': before, 'new': set()}
+        _logger.info('passive on: %s', getattr(opener, '__name__', 'WG window'))
         self._push(force=True)
         opener()
 
         def timeout():
             # the window never showed up (e.g. WG refused it): panel back
-            if self._passive is not None and not self._passive['seen'] and not self._finalized:
-                self._passive = None
-                self._push(force=True)
+            if self._passive is passive and not passive['new'] and not self._finalized:
+                self._endPassive('no WG window came up')
+
+        def tick():
+            if self._passive is not passive or self._finalized:
+                return
+            self._checkPassive()
+            if self._passive is passive:
+                BigWorld.callback(1.0, tick)
 
         BigWorld.callback(3.0, timeout)
+        BigWorld.callback(1.0, tick)
 
     # WG's own Flash tooltips (BackportTooltipWindow), used for the direction graphic
     def _showWgTip(self, kind, index):
@@ -2292,9 +2317,14 @@ class EzRoomView(ViewImpl):
 _WATCH_LAYERS = (WindowLayer.WINDOW, WindowLayer.TOP_WINDOW)
 
 
-def _wgWindowCount(ignoreID):
+_GONE = (WindowStatus.DESTROYING, WindowStatus.DESTROYED)
+
+
+def _wgWindowIDs(ignoreID):
+    # IDs of the open WG windows on the room's layers; closing ones are already left out
     gui = dependency.instance(IGuiLoader)
-    return len(gui.windowsManager.findWindows(lambda w: w.layer in _WATCH_LAYERS and w.uniqueID != ignoreID))
+    return set(w.uniqueID for w in gui.windowsManager.findWindows(
+        lambda w: w.layer in _WATCH_LAYERS and w.uniqueID != ignoreID and w.windowStatus not in _GONE))
 
 
 class EzRoomWindow(WindowImpl):
