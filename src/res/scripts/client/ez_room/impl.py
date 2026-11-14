@@ -27,7 +27,7 @@ from helpers.i18n import makeString
 from adisp import adisp_process
 from skeletons.gui.impl import IGuiLoader
 
-__version__ = '0.8.16'
+__version__ = '0.8.17'
 _logger = logging.getLogger('EZ_ROOM')
 _logger.setLevel(logging.INFO)
 _LAYOUT_PATH = ('ez_room', 'views', 'EzRoomView')
@@ -313,7 +313,8 @@ def _divisionTip():
 # {"progress_stage": <current stage>} to the WGCG gateway. The client's own gateway accessor
 # (IWebController.getWebRequester().data_source, used for wgsh_event_unfreeze_vehicle) carries the
 # host and the session cookie, so the room uses it the same way. Texts are WG's web locale.
-_AUTO_READY_WINDOW = 30.0  # s after coming back from the battle
+_AUTO_READY_WINDOW = 30.0  # s after coming back from the battle (without notification windows)
+_AUTO_READY_GRACE = 2.0    # s with no notification window before the auto ready
 
 _RESET_TEXTS = {
     'de': {
@@ -1801,6 +1802,33 @@ class EzRoomView(ViewImpl):
             now = time.time()
             if entity.getFlags().isInArena() or entity.getPlayerInfo().isInArena():
                 return
+            # a WG notification window (elite level reward, awards, ...) or a dialog is up: wait
+            # until it is closed, else the player goes into the battle with it open (0.8.17).
+            # The 30 s only count from the moment no such window is open any more
+            blocker = _blockingWindow(self._ownWindowID())
+            if blocker is not None:
+                if pending.get('blocker') != blocker:
+                    pending['blocker'] = blocker
+                    _logger.info('auto ready: waiting, window open: %s', blocker)
+                pending['since'] = None
+                pending['clear'] = None
+                return
+            if pending.get('blocker'):
+                pending['blocker'] = None
+                _logger.info('auto ready: window closed')
+            if pending.get('clear') is None:
+                pending['clear'] = now
+            if now - pending['clear'] < _AUTO_READY_GRACE:
+                # WG opens the next queued notification a moment after the last one closed
+                if not pending.get('graceCb'):
+                    pending['graceCb'] = True
+
+                    def again():
+                        pending['graceCb'] = False
+                        self._autoReady()
+
+                    BigWorld.callback(_AUTO_READY_GRACE, again)
+                return
             if pending['since'] is None:
                 pending['since'] = now
             if now - pending['since'] > _AUTO_READY_WINDOW:
@@ -2326,6 +2354,24 @@ def _windowStatus(window):
         return window.windowStatus
     except AttributeError:
         return WindowStatus.UNDEFINED
+
+
+def _blockingWindow(ignoreID):
+    # name of an open WG notification window (LobbyNotificationWindow: elite level reward,
+    # awards, ...) or modal dialog, None if there is none; auto ready waits for it
+    from gui.impl.pub.lobby_window import LobbyNotificationWindow
+    gui = dependency.instance(IGuiLoader)
+
+    def blocks(w):
+        if w.uniqueID == ignoreID or _windowStatus(w) not in (WindowStatus.LOADING, WindowStatus.LOADED):
+            return False
+        try:
+            return isinstance(w, LobbyNotificationWindow) or w.isModal()
+        except Exception:
+            return False
+
+    windows = gui.windowsManager.findWindows(blocks)
+    return type(windows[0]).__name__ if windows else None
 
 
 def _wgWindowIDs(ignoreID):
