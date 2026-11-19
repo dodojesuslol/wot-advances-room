@@ -282,7 +282,42 @@ def _openTestRoom():
         _logger.exception('opening the test room failed')
 
 
+def _sameVehicleClick(orig):
+    # carousel click (new garage / old Flash carousel): WG ignores a click on the tank that is
+    # already selected (CurrentVehicle._selectVehicle returns early, no onChanged), so the room
+    # gets it from here: same invID before and after the click = click on the selected tank
+    def hooked(self, *args, **kwargs):
+        before = 0
+        try:
+            from CurrentVehicle import g_currentVehicle
+            before = g_currentVehicle.invID
+        except Exception:
+            _logger.exception('carousel click: current vehicle failed')
+        result = orig(self, *args, **kwargs)
+        try:
+            from CurrentVehicle import g_currentVehicle
+            if before and g_currentVehicle.invID == before:
+                _impl().onSameVehicleClick(_state)
+        except Exception:
+            _logger.exception('carousel click hook failed')
+        return result
+    return hooked
+
+
+def _hookVehicleClicks():
+    # set once at load: the garage binds its click handler when it is built (after this)
+    for modName, clsName, attr in (
+            ('gui.impl.lobby.hangar.presenters.vehicle_inventory_presenter', 'VehicleInventoryPresenter', '_VehicleInventoryPresenter__onSelectVehicle'),
+            ('gui.Scaleform.daapi.view.common.vehicle_carousel.carousel_environment', 'CarouselEnvironment', 'selectVehicle')):
+        try:
+            cls = getattr(__import__(modName, fromlist=[clsName]), clsName)
+            setattr(cls, attr, _sameVehicleClick(getattr(cls, attr)))
+        except Exception:
+            _logger.exception('carousel click hook %s failed', clsName)
+
+
 def _install():
+    _hookVehicleClicks()
     EventDispatcher.showStrongholdsWindow = _showStrongholdsWindow
     from gui.Scaleform.daapi.view.lobby.fortifications.stronghold_battle_room_window import StrongholdBattleRoomWindow
     StrongholdBattleRoomWindow._dispose = _onWgWindowDispose(StrongholdBattleRoomWindow._dispose)

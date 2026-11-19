@@ -880,6 +880,9 @@ class EzRoomView(ViewImpl):
         self._gridMap = 0
         self._speakEvents = {}    # dbID -> bool from g_messengerEvents.voip.onPlayerSpeaking
         self._carouselCD = 0      # carousel tank last seen (carousel -> slot)
+        self._inSlot = False      # own slot state at the last build (slot join -> carousel tank)
+        self._needBuild = False   # a pending flush rebuilds the room data (False: only re-push)
+        self._rawOpen = False     # dev: raw data view open in the UI (raw data only sent then)
         self._highlight = []      # slots a dragged volunteer may go to (WG's getAvailableSlots)
         self._reserveSlot = -1    # reserve slot whose list is open
         self._parts = {}          # room data rebuilt on unit / stronghold events
@@ -898,6 +901,8 @@ class EzRoomView(ViewImpl):
         self._waitingShown = None
         self._dirty = False
         self._lastKey = None
+        # dev: lag measuring (room data builds and pushes to the web UI), logged when the room closes
+        self._perf = {'builds': 0, 'ms': 0.0, 'max': 0.0, 'pushes': 0, 'bytes': 0, 'since': time.time(), 'steps': {}}
         self._uiReady = False
         self._minimizing = False
         self._closing = False     # closed on purpose (ours or WG's signals), not by the game
@@ -1053,6 +1058,7 @@ class EzRoomView(ViewImpl):
 
     def _finalize(self):
         self._finalized = True
+        self._logPerf()
         self._hideWgTip()
         try:
             if self._listener is not None:
@@ -1245,30 +1251,59 @@ class EzRoomView(ViewImpl):
         except Exception:
             _logger.exception('carousel to slot failed')
 
-    def _carouselToSlot(self):
+    def onSameVehicleClick(self):
+        # loader hook: the carousel tank that is already selected was clicked again (WG ignores
+        # that click, no onChanged): into the slot like a new pick (user 0.8.18)
+        self._carouselToSlot(force=True, why='same tank clicked')
+
+    def _checkSlotJoin(self):
+        # own extension (user 0.8.18): a tank picked while still a candidate was ignored (not in a
+        # slot yet), so when the player gets into a slot (or the room opens with them in one) and
+        # their slot is still empty, the carousel tank goes in with the same rules as a pick
+        entity = roomEntity()
+        inSlot = entity is not None and entity.getPlayerInfo().isInSlot
+        joined = inSlot and not self._inSlot
+        self._inSlot = inSlot
+        if joined and not self._selectedVehicles(entity):
+            self._carouselToSlot(force=True, why='slot join')
+
+    def _carouselToSlot(self, force=False, why='carousel'):
         # own extension (WG has no carousel -> slot link): a tank picked in the hangar carousel is
         # set into the own slot. onChanged also fires on repairs/crew/ammo, so only a real change of
-        # the carousel tank counts; the server's confirmation re-selects the same tank (no loop).
+        # the carousel tank counts (force: a real click on the same tank); the server's
+        # confirmation re-selects the same tank (no loop: it is the own slot tank then).
         from CurrentVehicle import g_currentVehicle
         cd = g_currentVehicle.item.intCD if g_currentVehicle.isPresent() else 0
-        if cd == self._carouselCD:
+        if cd == self._carouselCD and not force:
             return
         self._carouselCD = cd
         entity = roomEntity()
         if not cd or entity is None:
             return
+
+        def skip(reason):
+            # dev: why a pick was left alone (the player sees nothing, the log says why)
+            if DEV:
+                _logger.info('carousel skip: %s, %s (%s)', cd, reason, why)
+
         pInfo = entity.getPlayerInfo()
-        if not pInfo.isInSlot or pInfo.isReady or not entity.getPermissions().canSetVehicle():
-            return
+        if not pInfo.isInSlot:
+            return skip('not in a slot')
+        if pInfo.isReady:
+            return skip('ready')
+        if not entity.getPermissions().canSetVehicle():
+            return skip('no permission (room frozen?)')
         if cd in self._selectedVehicles(entity):
-            return
+            return skip('already in the own slot')
         if g_currentVehicle.item.level not in entity.getRosterSettings().getLevelsRange():
-            return
+            return skip('level %s not in %s' % (g_currentVehicle.item.level, entity.getRosterSettings().getLevelsRange()))
         unit = pInfo.unit
-        # roster check of WG's vehicle list (PlayerUnitInfo.getVehiclesToSlot): slot vehicle filters
-        if unit is not None and not unit.getRoster().checkVehicle(cd, pInfo.slotIdx)[0]:
-            return
-        _logger.info('carousel -> slot: %s', cd)
+        # roster check of WG's vehicle list (PlayerUnitInfo.getVehiclesToSlot): slot vehicle filters.
+        # Not for the commander: WG never builds that list for him (canAssignToSlot is False for the
+        # commander), and checkVehicle(cd, 0) refuses every tank there (user 0.8.18)
+        if unit is not None and not pInfo.isCommander() and not unit.getRoster().checkVehicle(cd, pInfo.slotIdx)[0]:
+            return skip('slot %s filter' % pInfo.slotIdx)
+        _logger.info('carousel -> slot: %s (%s)', cd, why)
         self._selectVehicle(cd)
 
     def __onUserChange(self, *args):
@@ -1285,7 +1320,7 @@ class EzRoomView(ViewImpl):
     def __onPlayerSpeaking(self, accountDBID, isSpeak):
         # same live event WG's voice chat manager forwards to Flash (as_onPlayerSpeakS)
         self._speakEvents[accountDBID] = bool(isSpeak)
-        self.mark()
+        self.mark(full=False)
 
     def __onVehicleSelected(self, event):
         # BaseRallyRoomView.__onVehicleSelectHandler -> _selectVehicles
@@ -1548,7 +1583,7 @@ class EzRoomView(ViewImpl):
         except Exception:
             _logger.exception('chat history failed')
         self._chatSeeding = False
-        self.mark()
+        self.mark(full=False)
 
     def onChatLine(self, text):
         if not self._chatSeeding:
@@ -1558,7 +1593,7 @@ class EzRoomView(ViewImpl):
         self._chatLines.append(text)
         if len(self._chatLines) > _CHAT_LINES:
             del self._chatLines[:-_CHAT_LINES]
-        self.mark()
+        self.mark(full=False)
 
     def onChatCommand(self, command):
         # MinimapGrid.addCommand: commander marking (unit chat ATTENTIONTOCELL)
@@ -1581,8 +1616,12 @@ class EzRoomView(ViewImpl):
 
     # building the data -----------------------------------------------------------------------
 
-    def mark(self):
-        # many callbacks arrive in a burst: rebuild once on the next tick
+    def mark(self, full=True):
+        # many callbacks arrive in a burst: rebuild once on the next tick. full=False: only data
+        # _pack reads itself changed (chat lines, voice chat speaking), the room VOs stay (WG's
+        # slots cost ~15 ms, an inventory scan per free slot), only a new push
+        if full:
+            self._needBuild = True
         if self._dirty or self._finalized:
             return
         self._dirty = True
@@ -1590,29 +1629,80 @@ class EzRoomView(ViewImpl):
 
     def _flush(self):
         self._dirty = False
+        if not self._finalized and not self._needBuild:
+            start = time.time()
+            self._lightPush = True
+            try:
+                self._push()
+            finally:
+                self._lightPush = False
+            if DEV:
+                self._perf['light'] = self._perf.get('light', 0) + 1
+                self._perf['lightMs'] = self._perf.get('lightMs', 0.0) + (time.time() - start) * 1000.0
+            return
+        self._needBuild = False
         if not self._finalized:
+            start = time.time()
             self._build()
+            try:
+                self._checkSlotJoin()
+            except Exception:
+                _logger.exception('slot join check failed')
+            if DEV:
+                ms = (time.time() - start) * 1000.0
+                perf = self._perf
+                perf['builds'] += 1
+                perf['ms'] += ms
+                perf['max'] = max(perf['max'], ms)
+                if ms >= 20.0:
+                    _logger.info('perf: slow room data build %.0f ms', ms)
+
+    def _logPerf(self):
+        perf = self._perf
+        if not DEV or not perf['builds']:
+            return
+        secs = max(1.0, time.time() - perf['since'])
+        _logger.info('perf: %d builds in %.0f s (%.1f/s), avg %.1f ms, max %.0f ms; %d pushes to the UI, avg %d bytes',
+                     perf['builds'], secs, perf['builds'] / secs, perf['ms'] / perf['builds'], perf['max'],
+                     perf['pushes'], perf['bytes'] / max(1, perf['pushes']))
+        # average ms per build for each step, slowest first ('push:' = steps inside _push)
+        steps = sorted(perf['steps'].items(), key=lambda kv: -kv[1])
+        rest = (perf['ms'] - sum(total for name, total in steps)) / perf['builds']
+        _logger.info('perf: per build: %s, rest %.1f ms', ', '.join('%s %.1f ms' % (name, total / perf['builds']) for name, total in steps), rest)
+        if perf.get('light'):
+            _logger.info('perf: push only (chat / voice) %d x, avg %.1f ms', perf['light'], perf['lightMs'] / perf['light'])
+        if perf.get('snapshots'):
+            _logger.info('perf: dev snapshot %d x, avg %.1f ms', perf['snapshots'], perf['snapshotMs'] / perf['snapshots'])
+
+    def _perfAdd(self, name, start):
+        # dev: adds the ms since start to one step of the lag measuring
+        if getattr(self, '_lightPush', False):
+            return  # push only (no build): not part of the per-build steps
+        steps = self._perf['steps']
+        steps[name] = steps.get(name, 0.0) + (time.time() - start) * 1000.0
 
     def _build(self):
         entity = roomEntity()
         if entity is None:
             return
-        from gui.Scaleform.daapi.view.lobby.fortifications.vo_converters import makeStrongholdsSlotsVOs, makeSortieVO
+        from gui.Scaleform.daapi.view.lobby.fortifications.vo_converters import makeStrongholdsSlotsVOs
         from gui.Scaleform.daapi.view.lobby.rally import vo_converters
         p = dict(self._parts)
 
         def part(name, fn):
+            start = time.time()
             try:
                 p[name] = fn()
             except Exception:
                 _logger.exception('room data %s failed', name)
+            if DEV:
+                self._perfAdd(name, start)
 
         valid = entity.isStrongholdSettingsValid()
         header = entity.getStrongholdSettings().getHeader() if valid else None
         maxPlayers = header.getMaxPlayersCount() if header is not None else vo_converters.MAX_PLAYER_COUNT_ALL
         perms = entity.getPermissions()
-        part('rally', lambda: makeSortieVO(entity, perms.canChangeUnitState(), unitMgrID=entity.getID(),
-                                           canInvite=perms.canSendInvite(), maxPlayerCount=maxPlayers))
+        part('rally', lambda: self._rallyInfo(entity, perms))
         if valid:
             part('slots', lambda: list(makeStrongholdsSlotsVOs(entity, entity.getID(), maxPlayerCount=maxPlayers)[1]))
             part('tableHeader', lambda: self._tableHeader(entity, maxPlayers, header.getMaxLegionariesCount()))
@@ -1642,6 +1732,16 @@ class EzRoomView(ViewImpl):
         self._waitingShown = not valid
         self._parts = p
         self._push()
+
+    @staticmethod
+    def _rallyInfo(entity, perms):
+        # the fields of WG's makeSortieVO the UI uses, without it: makeSortieVO builds all slots a
+        # second time (makeStrongholdsSlotsVOs, an inventory scan per free slot), ~20 ms per build
+        canInvite = perms.canSendInvite()
+        flags = entity.getUnitFullData(unitMgrID=entity.getID()).flags
+        freezed = flags.isLocked() or entity.isStrongholdUnitFreezed() or entity.inPlayersMatchingMode()
+        return {'canInvite': canInvite, 'isCommander': perms.canChangeUnitState(),
+                'isFreezed': flags.isLocked(), 'canAssignToSlot': False if freezed else canInvite}
 
     @staticmethod
     def _tableHeader(entity, maxPlayers, maxLegionaries):
@@ -1759,7 +1859,7 @@ class EzRoomView(ViewImpl):
         seconds = max(0, int(round((time.time() - self._searchRef) if search['dir'] > 0 else (self._searchRef - time.time()))))
         return dict(search, seconds=seconds, canCancel=canCancel)
 
-    def _pack(self):
+    def _pack(self, raw=None):
         now = time.time()
         p = self._parts
         slots = p.get('slots') or []
@@ -1822,7 +1922,8 @@ class EzRoomView(ViewImpl):
                 data['reserveOptions'] = _packReserveOptions(entity, self._reserveSlot) if entity is not None else None
             except Exception:
                 _logger.exception('reserve options failed')
-        if DEV:
+        # dev raw data doubles the payload: only while the raw view is open (and in the snapshot)
+        if DEV and (self._rawOpen if raw is None else raw):
             data['raw'] = {'calls': dict(self._parts, header=self._header), 'slotCalls': {}}
         return _clean(data)
 
@@ -1907,17 +2008,37 @@ class EzRoomView(ViewImpl):
         # count in the UI itself; they only count as a change when they jump)
         if self._finalized:
             return
+        start = time.time()
         self._autoReady()
+        if DEV:
+            self._perfAdd('push:autoReady', start)
         try:
+            start = time.time()
             data = self._pack()
+            if DEV:
+                self._perfAdd('push:pack', start)
+            start = time.time()
             keyData = dict(data, timer=bool(data['timer']), timerAge=None, readyCoolDown=None,
                            search=dict(data['search'], seconds=None) if data['search'] else None,
                            grid=dict(data['grid'], points=[(pt['x'], pt['y'], pt['t']) for pt in data['grid']['points']]))
-            key = json.dumps(keyData, sort_keys=True)
+            # compared as values (deep ==), not as sorted JSON: ~4 ms less per push. Safe to keep:
+            # _clean made data a fresh copy, nothing changes it afterwards
+            key = keyData
+            if DEV:
+                self._perfAdd('push:compare', start)
             if key == self._lastKey and not force:
                 return
             self._lastKey = key
-            self.viewModel.setData(json.dumps(data))
+            start = time.time()
+            payload = json.dumps(data)
+            if DEV:
+                self._perfAdd('push:json', start)
+            start = time.time()
+            self.viewModel.setData(payload)
+            if DEV:
+                self._perfAdd('push:setData', start)
+            self._perf['pushes'] += 1
+            self._perf['bytes'] += len(payload)
         except Exception:
             _logger.exception('packing room data failed')
             return
@@ -1930,14 +2051,18 @@ class EzRoomView(ViewImpl):
         self._snapshotPending = False
         if self._finalized:
             return
+        start = time.time()
         try:
             path = os.path.dirname(_SNAPSHOT_FILE)
             if not os.path.isdir(path):
                 os.makedirs(path)
             with open(_SNAPSHOT_FILE, 'wb') as f:
-                f.write(json.dumps(self._pack(), indent=1, sort_keys=True).encode('utf-8'))
+                f.write(json.dumps(self._pack(raw=True), indent=1, sort_keys=True).encode('utf-8'))
         except Exception:
             _logger.exception('writing snapshot failed')
+        ms = (time.time() - start) * 1000.0
+        self._perf['snapshots'] = self._perf.get('snapshots', 0) + 1
+        self._perf['snapshotMs'] = self._perf.get('snapshotMs', 0.0) + ms
 
     # battle timer (StrongholdEvent.STRONGHOLD_ON_TIMER, once per second) ---------------------
 
@@ -2061,6 +2186,9 @@ class EzRoomView(ViewImpl):
             self._push(force=True)
         elif action == 'log':
             _logger.info('ui: %s', args.get('msg'))
+        elif action == 'rawView':
+            self._rawOpen = bool(args.get('open'))
+            self._push(force=True)
         elif action == 'minimize':
             self.minimize()
         elif action == 'close':
@@ -2584,6 +2712,16 @@ def onServiceMessage(state, message):
         window.content.mark()
 
 
+def onSameVehicleClick(state):
+    # loader hook: click on the carousel tank that is already selected, to the open room (real
+    # or test room); without an open room nothing happens
+    for key in ('window', 'testWindow'):
+        window = state.get(key)
+        view = window.content if window is not None else None
+        if view is not None and hasattr(view, 'onSameVehicleClick'):
+            view.onSameVehicleClick()
+
+
 def closeRoom(state):
     window = state.get('window')
     state['window'] = None
@@ -2652,6 +2790,10 @@ def _testExample():
 
 class EzTestRoomView(EzRoomView):
 
+    def _checkSlotJoin(self):
+        # test room: no real slot, never send a vehicle request
+        pass
+
     def _onLoading(self, *args, **kwargs):
         ViewImpl._onLoading(self, *args, **kwargs)
         self.viewModel.setDev(_devUI())
@@ -2703,13 +2845,16 @@ class EzTestRoomView(EzRoomView):
         except Exception:
             _logger.exception('test room: carousel subscription failed')
 
+    def onSameVehicleClick(self):
+        self._testCarouselChanged(sameClick=True)
+
     def _testCarouselChanged(self, *args, **kwargs):
         # carousel -> slot like EzRoomView._carouselToSlot, but only local (no server request)
         try:
             from CurrentVehicle import g_currentVehicle
             item = g_currentVehicle.item if g_currentVehicle.isPresent() else None
             cd = item.intCD if item is not None else 0
-            if cd == self._carouselCD or self._finalized:
+            if (cd == self._carouselCD and not kwargs.get('sameClick')) or self._finalized:
                 return
             self._carouselCD = cd
             data = self._test
@@ -2741,7 +2886,7 @@ class EzTestRoomView(EzRoomView):
                                     label=_u(label) if not label.startswith('#') else (u'Nicht bereit' if ready else u'Bereit!'),
                                     toolTipData=u'')
 
-    def _pack(self):
+    def _pack(self, raw=None):
         settings = loadSettings()
         data = dict(self._test)
         data.update({
@@ -2796,7 +2941,7 @@ class EzTestRoomView(EzRoomView):
         self._snapshotPending = False  # the test room never overwrites the real room's snapshot
 
     def _action(self, action, args):
-        if action in ('uiReady', 'log', 'autoReady', 'savePos', 'moveTo', 'sort', 'copyLink', 'wgTipHide'):
+        if action in ('uiReady', 'log', 'rawView', 'autoReady', 'savePos', 'moveTo', 'sort', 'copyLink', 'wgTipHide'):
             return super(EzTestRoomView, self)._action(action, args)
         if action in ('minimize', 'close', 'back', 'wgRoom'):
             self.close()
@@ -2844,6 +2989,7 @@ class EzTestRoomView(EzRoomView):
 
     def _finalize(self):
         self._finalized = True
+        self._logPerf()
         self._hideWgTip()
         if self._state.get('testWindow') is not None and self._state['testWindow'].content in (None, self):
             self._state['testWindow'] = None

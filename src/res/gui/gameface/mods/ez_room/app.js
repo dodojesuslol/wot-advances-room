@@ -1260,6 +1260,8 @@ document.addEventListener("mouseup", (e) => {
 // missing there); they use viewEnv.setInputArea(x, y, w, h) like WG's StyleBuyingPanel
 // (x = pxToRem(px) * getScale()).
 let inputAreaKey = "";
+let inputAreaRetry = 0;
+let inputAreaWaitLogged = false;
 function updateInputArea() {
     if (!fullMode()) return;
     const panel = document.getElementById("panel");
@@ -1284,6 +1286,23 @@ function updateInputArea() {
         }
         const key = [x, y, w, h].map(Math.round).join(",");
         if (key === inputAreaKey) return;
+        // first open after game start: the view has no size yet, the engine turns the area into
+        // negative paddings and rejects it (whole screen stays ours, garage dead). Retry next frame
+        // and only remember an area the view can hold
+        const c = viewEnv.getClientSizePx();
+        if (!c || c.width < 1 || c.height < 1 || x + w > c.width + 1 || y + h > c.height + 1) {
+            inputAreaKey = "";
+            if (!inputAreaWaitLogged) {
+                inputAreaWaitLogged = true;
+                send({ action: "log", msg: "inputArea: view not ready (" + (c ? c.width + "x" + c.height : "none") + "), waiting for " + key });
+            }
+            if (!inputAreaRetry)
+                inputAreaRetry = requestAnimationFrame(() => {
+                    inputAreaRetry = 0;
+                    updateInputArea();
+                });
+            return;
+        }
         inputAreaKey = key;
         viewEnv.setInputArea(x, y, w, h);
     } catch (e) {
@@ -1649,6 +1668,8 @@ document.addEventListener("click", (e) => {
         render();
     } else if (act === "raw") {
         ui.raw = !ui.raw;
+        // dev: Python only sends the raw data while this view is open
+        send({ action: "rawView", open: ui.raw });
         render();
     } else if (act === "takeSlot") send({ action: "takeSlot", slot: slot });
     else if (act === "leaveSlot") send({ action: "leaveSlot", dbID: id });
@@ -1903,6 +1924,20 @@ let lastKey = "";
 let sortLoaded = false;
 
 let lastData = null;
+
+// dev: paths of the single values that changed (e.g. slots.3.player.isReady), at most 8
+const DIFF_MAX = 8;
+function diffPaths(a, b, path, out) {
+    if (out.length >= DIFF_MAX || a === b) return;
+    if (a && b && typeof a === "object" && typeof b === "object") {
+        const keys = {};
+        Object.keys(a).concat(Object.keys(b)).forEach((k) => (keys[k] = true));
+        Object.keys(keys).forEach((k) => diffPaths(a[k], b[k], path + "." + k, out));
+        return;
+    }
+    if (JSON.stringify(a) !== JSON.stringify(b)) out.push(`${path}=${JSON.stringify(b)}`.slice(0, 80));
+}
+
 function changeKey(d) {
     const grid = d.grid ? Object.assign({}, d.grid, { points: (d.grid.points || []).map((p) => [p.x, p.y]) }) : null;
     // timer and search time count here; dev raw data only counts while the raw view is open
@@ -1928,10 +1963,13 @@ function readModel() {
             return;
         }
         // dev: which parts of the room data made it render again (finding needless re-renders)
+        let devChanged = null;
+        const devPaths = [];
         if (next.dev && lastData) {
-            const changed = Object.keys(next).filter((k) => k !== "timer" && k !== "timerAge" && k !== "raw" && JSON.stringify(next[k]) !== JSON.stringify(lastData[k]));
-            send({ action: "log", msg: "render: " + changed.join(",") });
+            devChanged = Object.keys(next).filter((k) => k !== "timer" && k !== "timerAge" && k !== "raw" && JSON.stringify(next[k]) !== JSON.stringify(lastData[k]));
+            devChanged.forEach((k) => diffPaths(lastData[k], next[k], k, devPaths));
         }
+        const prevData = lastData;
         lastData = next;
         lastKey = key;
         if (!sortLoaded) {
@@ -1942,7 +1980,16 @@ function readModel() {
             if (savedCand && savedCand.key && savedCand.dir) ui.candSort = { key: savedCand.key, dir: sortDir(savedCand.key) };
         }
         if (ui.selCand && (!(data.candidates || []).some((c) => c.dbID === ui.selCand) || slotOf(ui.selCand) !== -1)) ui.selCand = 0;
+        const t0 = Date.now();
         render();
+        const t1 = Date.now();
+        if (devChanged && prevData) {
+            // dev lag measuring: build = render() itself, frame = until Gameface drew the next frame (layout)
+            requestAnimationFrame(() => {
+                const paths = devPaths.length ? " | " + devPaths.join(" ") : "";
+                send({ action: "log", msg: `render: ${devChanged.join(",")} | ${t1 - t0} ms build, ${Date.now() - t1} ms frame${paths}` });
+            });
+        }
     } catch (e) {
         console.error("ez_room: bad model data", e);
         send({ action: "log", msg: "bad model data: " + e });
