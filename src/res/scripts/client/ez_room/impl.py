@@ -2696,6 +2696,38 @@ class EzTestRoomView(EzRoomView):
         data['rally'] = dict(data.get('rally') or {}, isCommander=False)
         self._test = data
         self._setReady(bool(player.get('readyState')) or slots[idx].get('playerStatus') == _STATUS_READY)
+        try:
+            from CurrentVehicle import g_currentVehicle
+            self._carouselCD = g_currentVehicle.item.intCD if g_currentVehicle.isPresent() else 0
+            g_currentVehicle.onChanged += self._testCarouselChanged
+        except Exception:
+            _logger.exception('test room: carousel subscription failed')
+
+    def _testCarouselChanged(self, *args, **kwargs):
+        # carousel -> slot like EzRoomView._carouselToSlot, but only local (no server request)
+        try:
+            from CurrentVehicle import g_currentVehicle
+            item = g_currentVehicle.item if g_currentVehicle.isPresent() else None
+            cd = item.intCD if item is not None else 0
+            if cd == self._carouselCD or self._finalized:
+                return
+            self._carouselCD = cd
+            data = self._test
+            if not cd or data['me'].get('isReady'):
+                return
+            slot = data['slots'][data['me']['slotIdx']]
+            if (slot.get('selectedVehicle') or {}).get('intCD') == cd:
+                return
+            levels = data.get('levelsRange') or (data.get('room') or {}).get('levelsRange')
+            if levels and item.level not in levels:
+                _logger.info('test room: carousel %s ignored (level %s, room %s)', cd, item.level, levels)
+                return
+            from gui.Scaleform.daapi.view.lobby.rally import vo_converters
+            slot['selectedVehicle'] = vo_converters.makeVehicleVO(item, levels or None)
+            _logger.info('test room: carousel -> slot: %s', cd)
+            self._push()
+        except Exception:
+            _logger.exception('test room: carousel to slot failed')
 
     def _setReady(self, ready):
         data = self._test
@@ -2816,6 +2848,11 @@ class EzTestRoomView(EzRoomView):
         if self._state.get('testWindow') is not None and self._state['testWindow'].content in (None, self):
             self._state['testWindow'] = None
         self._state['testAutoReady'] = None
+        try:
+            from CurrentVehicle import g_currentVehicle
+            g_currentVehicle.onChanged -= self._testCarouselChanged
+        except Exception:
+            _logger.exception('test room: carousel unsubscription failed')
         _logger.info('test room closed')
         ViewImpl._finalize(self)
 
