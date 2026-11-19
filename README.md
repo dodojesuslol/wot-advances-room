@@ -37,6 +37,7 @@ folder into the WoT folder (raw data view, F5 reload of the UI from `mods\config
   slot, drag = that slot, drag a member back out
 - Header: WG's direction graphic (also while the unit is in battle) with WG's own tooltips,
   timer with alert colour, reserves, division info tooltip, back link
+- Pick a tank in the garage carousel = it goes into your slot (not while Ready; a tank the room does not allow is ignored)
 - Ready button with WG's cooldown after a click
 - Map: square minimap with grid, bases of the current battle (WG's markers), commander markings
   for everyone (WG's MinimapGrid), dice for a random map; skirmishes have no map (more room for
@@ -55,7 +56,7 @@ folder into the WoT folder (raw data view, F5 reload of the UI from `mods\config
 
 ## Development
 
-- Build: `python3 build.py` -> `dist/EZ_ROOM_<ver>.wotmod` (needs `python2.7` for the .pyc files)
+- Build: `python3 build.py` -> `dist/EZ_ROOM_<ver>.wotmod` (needs `python2.7` for the .pyc files); `--dev` -> `dist/dev/` with the dev-only test room files
 - Dev mode: `<game>/mods/configs/ez_room/dev.json` = `{"src": "X:/path/to/wot-advances-room/src"}`;
   impl.py / app.js / style.css are reloaded on every open, F5 in the room reopens it, and the
   last room state is written to `mods/configs/ez_room/last_room.json`.
