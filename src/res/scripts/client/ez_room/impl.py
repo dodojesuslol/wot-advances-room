@@ -27,7 +27,7 @@ from helpers.i18n import makeString
 from adisp import adisp_process
 from skeletons.gui.impl import IGuiLoader
 
-__version__ = '0.8.17'
+__version__ = '0.8.18'
 _logger = logging.getLogger('EZ_ROOM')
 _logger.setLevel(logging.INFO)
 _LAYOUT_PATH = ('ez_room', 'views', 'EzRoomView')
@@ -879,6 +879,7 @@ class EzRoomView(ViewImpl):
         self._grid = []           # commander markings: {'x', 'y', 'time'} in WG's 207 px grid
         self._gridMap = 0
         self._speakEvents = {}    # dbID -> bool from g_messengerEvents.voip.onPlayerSpeaking
+        self._carouselCD = 0      # carousel tank last seen (carousel -> slot)
         self._highlight = []      # slots a dragged volunteer may go to (WG's getAvailableSlots)
         self._reserveSlot = -1    # reserve slot whose list is open
         self._parts = {}          # room data rebuilt on unit / stronghold events
@@ -980,6 +981,12 @@ class EzRoomView(ViewImpl):
         entity.forceTimerEvent()
         self._postMinimiseFilterUpdate(entity)
         self._validateNationGroup(entity)
+        try:
+            from CurrentVehicle import g_currentVehicle
+            # carousel tank at opening = baseline, only later picks go into the slot
+            self._carouselCD = g_currentVehicle.item.intCD if g_currentVehicle.isPresent() else 0
+        except Exception:
+            self._carouselCD = 0
         pInfo = entity.getPlayerInfo()
         if pInfo.isInSlot and not pInfo.isReady:
             entity.resetPlayerReadiness()
@@ -1027,7 +1034,7 @@ class EzRoomView(ViewImpl):
         itemsCache = dependency.instance(IItemsCache)
         settingsCore = dependency.instance(ISettingsCore)
         wm = dependency.instance(IGuiLoader).windowsManager
-        for owner, attr, handler in ((g_currentVehicle, 'onChanged', self.__onAnyChange),
+        for owner, attr, handler in ((g_currentVehicle, 'onChanged', self.__onCurrentVehicleChanged),
                                      (itemsCache, 'onSyncCompleted', self.__onCacheResync),
                                      (users, 'onUsersListReceived', self.__onAnyChange),
                                      (users, 'onUserActionReceived', self.__onUserChange),
@@ -1230,6 +1237,39 @@ class EzRoomView(ViewImpl):
 
     def __onAnyChange(self, *args, **kwargs):
         self.mark()
+
+    def __onCurrentVehicleChanged(self, *args, **kwargs):
+        self.mark()
+        try:
+            self._carouselToSlot()
+        except Exception:
+            _logger.exception('carousel to slot failed')
+
+    def _carouselToSlot(self):
+        # own extension (WG has no carousel -> slot link): a tank picked in the hangar carousel is
+        # set into the own slot. onChanged also fires on repairs/crew/ammo, so only a real change of
+        # the carousel tank counts; the server's confirmation re-selects the same tank (no loop).
+        from CurrentVehicle import g_currentVehicle
+        cd = g_currentVehicle.item.intCD if g_currentVehicle.isPresent() else 0
+        if cd == self._carouselCD:
+            return
+        self._carouselCD = cd
+        entity = roomEntity()
+        if not cd or entity is None:
+            return
+        pInfo = entity.getPlayerInfo()
+        if not pInfo.isInSlot or pInfo.isReady or not entity.getPermissions().canSetVehicle():
+            return
+        if cd in self._selectedVehicles(entity):
+            return
+        if g_currentVehicle.item.level not in entity.getRosterSettings().getLevelsRange():
+            return
+        unit = pInfo.unit
+        # roster check of WG's vehicle list (PlayerUnitInfo.getVehiclesToSlot): slot vehicle filters
+        if unit is not None and not unit.getRoster().checkVehicle(cd, pInfo.slotIdx)[0]:
+            return
+        _logger.info('carousel -> slot: %s', cd)
+        self._selectVehicle(cd)
 
     def __onUserChange(self, *args):
         self.mark()
