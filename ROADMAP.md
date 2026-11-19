@@ -130,6 +130,8 @@ Legende: ✅ vorhanden · 🟡 teilweise · ❌ fehlt · 🚫 bewusst weggelasse
 | G5 | Dev-Modus vor Release aus (`mods/configs/ez_room/dev.json` löschen) | ❌ |
 | G6 | Zurück zu EZ ROOM ohne Mods-Liste | 🚫 | v0.8.0: kleiner „EZ ROOM“-Knopf über WGs Fenster entfällt (brauchte Abfrage der Fensterposition); zurück über die Mods-Liste |
 | G7 | Fortschritt des Manövers zurücksetzen (Clan → Manöver, unten rechts) | ✅ | v0.8.9 (im Spiel bestätigt 2026-11-12), v0.8.11 eigener Kasten „MANÖVER“ + Abschnitt + „Zurücksetzen“ (bestätigt): Knopf unter „Konfigurieren“ nur für `reset_progress_roles` (commander, executive_officer, personnel_officer, combat_officer); WGs Rückfrage-Texte aus dem Web-Cache; `PATCH /wgshevents/clan/reset_progress {"progress_stage": n}` über `IWebController.getWebRequester().data_source._request_data` |
+| G9 | Panzer im Garagen-Karussell wählen = in den eigenen Slot (eigene Erweiterung, WG hat das nicht) | ✅ | v0.8.18 bestätigt: nur wenn nicht bereit, falsche Stufe / Slot-Filter still ignoriert, auch im Testraum (lokal) |
+| G10 | Testraum: „WG-Raum“ = Nachbau von WGs Flash-Raum zum Vergleichen (nur Ansicht) | ✅ | v0.8.18 bestätigt: Positionen aus dem SWF-Layout, WG-Hintergrund |
 | G8 | Klickfläche auf `viewEnv.setHitAreaPaddingsRem(top, right, bottom, left, 15)` umstellen (`setInputArea` meldet im Spiel DEPRECATED) | ❌ | mit der nächsten hochgeladenen Version (Nutzer, 2026-11-12); danach Garage/Raum/Ziehen testen |
 
 ## Empfohlene Reihenfolge
