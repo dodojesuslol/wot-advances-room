@@ -1306,7 +1306,7 @@ function renderTitlebar() {
             <div class="ttext">${esc(data.title || "EZ ROOM")}</div>
             ${renderSession()}
             <div class="tbrand">EZ ROOM</div>
-            <div class="tbtn" data-act="wgRoom" data-tip="${esc(L("{HEADER}WG-Raum{/HEADER}{BODY}WGs eigenen Raum öffnen. WGs Raum minimieren und unten in der Chat-Leiste wieder anklicken = EZ ROOM (oder Mods-Liste).{/BODY}", "{HEADER}WG room{/HEADER}{BODY}Open WG's own room. Minimize it and click it in the chat bar again = EZ ROOM (or the mods list).{/BODY}"))}">${L("WG-Raum", "WG room")}</div>
+            ${data.testRoom ? `<div class="tbtn" data-act="wgFake" data-tip="${esc(L("{HEADER}WG-Original (Nachbau){/HEADER}{BODY}Testraum: dieselben Daten im Layout von WGs Flash-Raum, nur zum Ansehen.{/BODY}", "{HEADER}WG original (replica){/HEADER}{BODY}Test room: the same data in the layout of WG's Flash room, view only.{/BODY}"))}">${L("WG-Raum", "WG room")}</div>` : `<div class="tbtn" data-act="wgRoom" data-tip="${esc(L("{HEADER}WG-Raum{/HEADER}{BODY}WGs eigenen Raum öffnen. WGs Raum minimieren und unten in der Chat-Leiste wieder anklicken = EZ ROOM (oder Mods-Liste).{/BODY}", "{HEADER}WG room{/HEADER}{BODY}Open WG's own room. Minimize it and click it in the chat bar again = EZ ROOM (or the mods list).{/BODY}"))}">${L("WG-Raum", "WG room")}</div>`}
             <div class="wbtn wmin" data-act="minimize" data-tip="${esc(L("Minimieren", "Minimize"))}"></div>
             ${data.search ? "" : `<div class="wbtn wclose" data-act="close" data-tip="${esc(L("Schließen", "Close"))}"></div>`}
         </div>`;
@@ -1333,6 +1333,128 @@ function renderSession() {
         </div>`;
 }
 
+// --- dev test room: replica of WG's Flash room (fortClanBattleRoom.swf) -------------------
+// View only, same data as the room. Positions in px from the SWF layout (FortClanBattleRoomUI,
+// content 1013x653 at +12/+35 in WG's window), background = bitmap 146 + WG's shapes from the SWF.
+const WGF_SLOT_Y = 175; // slot0 y, then every 26 px (ClanBattleSortieSlotUI)
+
+function wgfLabel(html) {
+    // WG's table header labels carry Flash <img> tags (legionnaire icon)
+    return String(html || "")
+        .split(/(<img[^>]*>)/i)
+        .map((part) => {
+            const m = /<img[^>]*src=['"]([^'"]+)['"]/i.exec(part);
+            return m ? `<div class="wgf-ico" style="background-image:url(${esc(m[1])})"></div>` : esc(txt(part));
+        })
+        .join("");
+}
+
+function wgfSlot(slot, idx) {
+    if (!slot || typeof slot !== "object") return "";
+    const y = WGF_SLOT_Y + 26 * idx - 175;
+    const p = slot.player;
+    const v = slot.selectedVehicle;
+    const own = !!(p && p.dbID === (data.me || {}).dbID);
+    // locked slots (beyond the division size): WG's lockBackground over the row, nothing else
+    if (slot.isLocked) return `<div class="wgf-slot locked" style="top:${y}rem"><div class="wgf-lock"></div></div>`;
+    let name;
+    if (p) {
+        const c = own ? "#ffc864" : color((p.colors || [])[0]);
+        name = `<div class="wgf-sname" ${c ? `style="color:${c}"` : ""}>${esc(p.userName || p.fullName)}${p.clanAbbrev ? ` [${esc(p.clanAbbrev)}]` : ""}</div>`;
+    } else {
+        name = `<div class="wgf-sname free">${esc(txt(slot.slotLabel) || (slot.isClosed ? L("Gesperrt", "Closed") : ""))}</div>`;
+    }
+    const veh = v
+        ? `<div class="wgf-veh" cohinline="true">
+               <div class="wgf-vicon" style="background-image:url(${esc(img(v.smallIconPath))})"></div>
+               <div class="wgf-vlvl">${ROMAN[v.level] || ""}</div>
+               <div class="wgf-vname">${esc(v.shortUserName || v.userName)}</div>
+           </div>`
+        : p ? `<div class="wgf-veh none">${L("Kein Panzer", "No vehicle")}</div>` : "";
+    return `
+        <div class="wgf-slot ${own ? "own" : ""}" style="top:${y}rem">
+            ${own ? `<div class="wgf-self"></div>` : ""}
+            <div class="wgf-status">${slotStatus(slot)}</div>
+            ${p && p.isCommander ? `<div class="wgf-crown"></div>` : ""}
+            <div class="wgf-no">${idx + 1}</div>
+            ${name}
+            <div class="wgf-rating">${p ? esc(slot.rating || "") : ""}</div>
+            ${veh}
+        </div>`;
+}
+
+function renderWgFake() {
+    const room = data.room || {};
+    const ready = data.readyStatus || [];
+    const mine = txt(room.mineClanName);
+    const enemy = txt(room.enemyClanName);
+    const slots = data.slots || [];
+    const heads = data.tableHeader || [];
+    const ab = data.actionButton || {};
+    const cands = (data.candidates || []).filter((p) => p.headerText || p.dbID);
+    const opened = data.opened || [];
+    const chatLines = ((data.chat || {}).lines || []).map((l) => `<div class="wgf-cline">${chatHtml(l)}</div>`).join("");
+    let hx = 257;
+    const headBar = heads
+        .map((h) => {
+            const w = h.buttonWidth || 100;
+            const out = `<div class="wgf-th ${h.textAlign === "left" ? "left" : ""}" style="left:${hx - 257}rem;width:${w}rem" cohinline="true">${wgfLabel(h.label)}</div>`;
+            hx += w;
+            return out;
+        })
+        .join("");
+    const lamp = (on) => `<div class="sicon" style="background-image:url(img://gui/maps/icons/ez_room/status/${on ? "ready" : "normal"}.png)"></div>`;
+    const showVs = !!(mine || enemy);
+    return `
+        <div class="wgf-titlebar" data-drag="1">
+            <div class="wgf-ttext">${esc(data.title || "")}</div>
+            <div class="wgf-fake">${L("NACHBAU · nur Ansicht", "REPLICA · view only")}</div>
+            <div class="tbtn" data-act="wgFake">EZ ROOM</div>
+            <div class="wbtn wmin" data-act="minimize"></div>
+            <div class="wbtn wclose" data-act="close"></div>
+        </div>
+        <div class="wgf-c">
+            <div class="wgf-bg"></div>
+            <div class="wgf-back" data-tip="${esc((data.back || {}).tip || "")}">${esc((data.back || {}).label || "")}</div>
+            <div class="wgf-title">${esc(data.title || "")}</div>
+            <div class="wgf-descr">${esc(txt(data.comment || ""))}</div>
+            ${isCommander() ? `<div class="wgf-cfg"></div>` : ""}
+            <div class="wgf-hdescr">${esc(txt(room.headerDescr))}</div>
+            ${data.divisionTip ? `<div class="wgf-dinfo" data-tip="${esc(data.divisionTip)}"></div>` : ""}
+            ${data.direction && data.direction[0] ? `<div class="wgf-dir" style="background-image:url(img://gui/maps/icons/ez_room/direction/${esc(data.direction[0])}.png)"></div>` : ""}
+            ${showVs
+                ? `<div class="wgf-mine">${esc(mine)}</div><div class="wgf-lamp" style="left:443rem">${lamp(ready[0])}</div>
+                   <div class="wgf-timer">${esc(timerText())}</div>
+                   <div class="wgf-lamp" style="left:536rem">${lamp(ready[1])}</div><div class="wgf-enemy">${esc(enemy)}</div>`
+                : `<div class="wgf-wait">${esc(txt(room.waitForBattleDescr))}</div>`}
+            ${(data.reserves || [])
+                .map((r, i) => `<div class="wgf-res" style="left:${942 - 60 * i}rem"><div class="ricon" style="background-image:url(img://gui/maps/icons/reserveTypes/${esc(r.slotType)}.png)"></div></div>`)
+                .join("")}
+
+            <div class="wgf-h18" style="left:16rem;top:114rem">${esc(L("Freiwillige", "Volunteers"))}</div>
+            ${rally().canInvite ? `<div class="wgf-btn" style="left:15rem;top:147rem;width:230rem">${L("Einladen", "Invite")}</div>` : ""}
+            <div class="wgf-ch" style="left:15rem;top:180rem"><span>${L("Spieler", "Player")}</span><span>${L("Wertung", "Rating")}</span></div>
+            <div class="wgf-cands">${cands
+                .map((p) => (p.headerText ? `<div class="wgf-cgroup">${esc(txt(p.headerText))}</div>` : `<div class="wgf-cand"><div class="wgf-cname" ${color((p.colors || [])[0]) ? `style="color:${color((p.colors || [])[0])}"` : ""}>${esc(p.userName || p.fullName)}</div><div class="wgf-crating">${esc(p.rating || "")}</div></div>`))
+                .join("")}</div>
+            <div class="wgf-small" style="left:15rem;top:589rem;width:230rem">${esc(txt(opened[1]))}</div>
+            ${isCommander() && opened[0] ? `<div class="wgf-btn" style="left:15rem;top:611rem;width:230rem">${esc(txt(opened[0]))}</div>` : ""}
+
+            <div class="wgf-h18" style="left:272rem;top:114rem">${esc(txt(room.teamHeader))}</div>
+            <div class="wgf-thead">${headBar}</div>
+            <div class="wgf-slots">${slots.map((sl, i) => wgfSlot(sl, i)).join("")}</div>
+            <div class="wgf-status-l" cohinline="true">${txt(ab.stateString) ? esc(txt(ab.stateString)) : ""}</div>
+            <div class="wgf-btn ${ab.isReady ? "" : "red"} ${ab.isEnabled === false ? "off" : ""}" style="left:445rem;top:611rem;width:120rem">${esc(txt(ab.label))}</div>
+
+            <div class="wgf-h18" style="left:769rem;top:114rem">${esc(txt(room.mapName) || L("Karte", "Map"))}</div>
+            <div class="wgf-map">${data.mapIcon ? `<div class="wgf-mapimg" style="background-image:url(${esc(data.mapIcon)})"></div>` : ""}</div>
+            <div class="wgf-h18" style="left:769rem;top:401rem">${L("Chat-Kanal", "Chat channel")}</div>
+            <div class="wgf-chat">${chatLines}</div>
+            <div class="wgf-input"></div>
+            <div class="wgf-send"></div>
+        </div>`;
+}
+
 let readySent = false;
 
 function render() {
@@ -1356,6 +1478,11 @@ function render() {
     if (keepLog) keepLog.parentNode.removeChild(keepLog);
     chatLinesShown = chatLinesNext;
     document.body.className = fullMode() ? "full" : "panelmode";
+    if (ui.wgFake && data.testRoom) {
+        root.innerHTML = `<div id="panel" class="win wgf ${data.passive ? "passive" : ""}">${renderWgFake()}</div><div id="tip" class="tip"></div>`;
+        placePanel();
+        return;
+    }
     root.innerHTML = `
         <div id="panel" class="win ${data.passive ? "passive" : ""}">
             <div class="frame"></div>
@@ -1516,7 +1643,11 @@ document.addEventListener("click", (e) => {
     const slot = Number(el.getAttribute("data-slot"));
     if (act === "minimize" || act === "close" || act === "wgRoom" || act === "searchCancel" || act === "maintenanceRefresh") send({ action: act });
     else if (act === "unfreeze") send({ action: "unfreeze", slot: slot });
-    else if (act === "raw") {
+    else if (act === "wgFake") {
+        ui.wgFake = !ui.wgFake;
+        tipRaw = "";
+        render();
+    } else if (act === "raw") {
         ui.raw = !ui.raw;
         render();
     } else if (act === "takeSlot") send({ action: "takeSlot", slot: slot });
